@@ -1,0 +1,65 @@
+/* About page only -- reuses theme.css's design tokens (--green,
+   --panel, --text, etc.) and existing components (.value-grid,
+   .section-label, .site-header). This file only adds what those
+   don't already cover: page prose and the honesty callout. */
+
+.about-main {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.about-block {
+  margin-bottom: 3rem;
+}
+
+.about-block p {
+  line-height: 1.7;
+  color: var(--text);
+  margin: 0 0 1rem;
+}
+
+.about-block p strong {
+  color: var(--green);
+}
+
+.about-intro {
+  margin-bottom: 1.5rem !important;
+}
+
+.about-outro {
+  margin-top: 1.5rem !important;
+  color: var(--text-dim) !important;
+  font-style: italic;
+}
+
+.honesty-block {
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 1.75rem 2rem;
+  margin-bottom: 3rem;
+}
+
+.honesty-tag {
+  font-family: 'Chakra Petch', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.honesty-block p {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.closing-line {
+  text-align: center;
+  color: var(--green);
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  margin: 3rem 0;
+}

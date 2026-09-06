@@ -1,0 +1,918 @@
+/* Shared design system for the Matrix-themed pages (index.html,
+   home.html, signup.html). Look-and-feel prototype -- see each page's
+   own JS for what's real vs. placeholder data. */
+
+:root {
+  --bg: #030603;
+  --panel: rgba(4, 20, 8, 0.72);
+  --panel-solid: #061a0c;
+  --panel-border: rgba(0, 255, 65, 0.28);
+  --green: #00ff41;
+  --green-dim: #0d7a2e;
+  --green-faint: rgba(0, 255, 65, 0.12);
+  --text: #c8ffd4;
+  --text-dim: #6fae83;
+  --red: #ff3b3b;
+  --gold: #e8c547;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+}
+
+#rain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.5;
+}
+
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.25) 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+.page {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem 4rem;
+}
+
+/* ---------------------------------------------------------------
+   Nav bar (home.html, signup.html)
+   --------------------------------------------------------------- */
+
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--panel-border);
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.navbar .brand {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  color: var(--green);
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+.navbar .brand span {
+  color: var(--text);
+  text-shadow: none;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.navbar-links a {
+  text-decoration: none;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  transition: color 0.15s;
+}
+
+.navbar-links a:hover {
+  color: var(--green);
+}
+
+.member-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 255, 65, 0.4);
+  background: var(--green-faint);
+  color: var(--green);
+}
+
+/* ---------------------------------------------------------------
+   Buttons
+   --------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+  padding: 0.85rem 1.6rem;
+  border-radius: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--green);
+  color: #04140a;
+  box-shadow: 0 0 18px rgba(0, 255, 65, 0.35);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 28px rgba(0, 255, 65, 0.55);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--panel-border);
+}
+
+.btn-ghost:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------
+   Header glow (home.html)
+   --------------------------------------------------------------- */
+
+.site-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+h1.glow {
+  font-family: 'Chakra Petch', 'Share Tech Mono', monospace;
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  letter-spacing: 0.08em;
+  margin: 0.5rem 0 0.25rem;
+  color: var(--green);
+  text-shadow:
+    0 0 4px rgba(0, 255, 65, 0.8),
+    0 0 18px rgba(0, 255, 65, 0.45),
+    0 0 40px rgba(0, 255, 65, 0.25);
+}
+
+h1.glow span {
+  color: var(--text);
+  text-shadow: 0 0 10px rgba(200, 255, 212, 0.4);
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  font-size: 0.95rem;
+}
+
+.demo-flag {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  border: 1px solid rgba(232, 197, 71, 0.5);
+  color: var(--gold);
+  background: rgba(232, 197, 71, 0.08);
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------------------
+   Splash / landing hero (index.html)
+   --------------------------------------------------------------- */
+
+.hero {
+  text-align: center;
+  padding: 4.5rem 0 3rem;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  color: var(--gold);
+  border: 1px solid rgba(232, 197, 71, 0.4);
+  background: rgba(232, 197, 71, 0.08);
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  margin-bottom: 1.5rem;
+}
+
+.hero-eyebrow .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 6px var(--gold);
+}
+
+.hero-title {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  line-height: 1.1;
+  margin: 0 0 1rem;
+  color: var(--green);
+  text-shadow:
+    0 0 4px rgba(0, 255, 65, 0.8),
+    0 0 20px rgba(0, 255, 65, 0.4),
+    0 0 48px rgba(0, 255, 65, 0.2);
+}
+
+.hero-title span {
+  color: var(--text);
+  text-shadow: 0 0 10px rgba(200, 255, 212, 0.4);
+}
+
+.hero-sub {
+  max-width: 640px;
+  margin: 0 auto 2.25rem;
+  color: var(--text-dim);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.hero-note {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+}
+
+.value-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+  margin: 3rem 0;
+}
+
+.value-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1.75rem 1.5rem;
+  backdrop-filter: blur(6px);
+}
+
+.value-card .icon {
+  font-size: 1.6rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.value-card h3 {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--green);
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.03em;
+}
+
+.value-card p {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.pricing-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid rgba(232, 197, 71, 0.35);
+  border-radius: 10px;
+  padding: 1.5rem 2rem;
+  margin: 3rem 0;
+  text-align: center;
+}
+
+.pricing-strip strong {
+  color: var(--gold);
+}
+
+/* ---------------------------------------------------------------
+   Section label + week rail (home.html)
+   --------------------------------------------------------------- */
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-dim);
+  letter-spacing: 0.15em;
+  font-size: 0.8rem;
+  margin-bottom: 1.25rem;
+}
+
+.section-label .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.week-rail {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.25rem 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.week-pill {
+  flex-shrink: 0;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+
+.week-pill:hover {
+  border-color: var(--green);
+  color: var(--text);
+}
+
+.week-pill.active {
+  background: var(--green-faint);
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.25);
+}
+
+/* ---------------------------------------------------------------
+   Matchup cards
+   --------------------------------------------------------------- */
+
+.matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.5rem;
+}
+
+.matchup-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.matchup-card:hover {
+  border-color: rgba(0, 255, 65, 0.55);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 255, 65, 0.08);
+}
+
+.matchup-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+  color: var(--text-dim);
+}
+
+.matchup-status .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.tag.preview {
+  color: #7fd1ff;
+  border: 1px solid rgba(127, 209, 255, 0.4);
+}
+
+.tag.live {
+  color: var(--red);
+  border: 1px solid rgba(255, 59, 59, 0.5);
+  background: rgba(255, 59, 59, 0.08);
+}
+
+.tag.live .blip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.tag.final {
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+}
+
+.team-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.7rem 0.5rem;
+  border-radius: 8px;
+  position: relative;
+}
+
+.team-row + .team-row {
+  margin-top: 0.35rem;
+}
+
+.team-row.winner {
+  background: var(--green-faint);
+}
+
+.team-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a1a0e;
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+}
+
+.team-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.team-badge.fallback {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #04140a;
+  background: linear-gradient(145deg, var(--green), #0a5a20);
+}
+
+.team-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.team-name {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-row.winner .team-name {
+  color: var(--green);
+}
+
+.team-record {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 0.1rem;
+}
+
+.team-metric {
+  text-align: right;
+  min-width: 92px;
+}
+
+.team-score {
+  font-family: 'Chakra Petch', monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.team-prob {
+  font-family: 'Chakra Petch', monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.team-row.winner .team-prob {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+}
+
+.prob-bar {
+  width: 92px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 255, 65, 0.12);
+  margin-top: 0.35rem;
+  overflow: hidden;
+}
+
+.prob-bar-fill {
+  height: 100%;
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(0, 255, 65, 0.6);
+}
+
+.vs-divider {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  letter-spacing: 0.2em;
+  margin: 0.15rem 0;
+}
+
+.game-meta {
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* ---------------------------------------------------------------
+   Premier "Game of the Week" hero card
+   --------------------------------------------------------------- */
+
+.premier-wrap {
+  margin-bottom: 3rem;
+}
+
+.premier-ribbon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  color: var(--gold);
+  border: 1px solid rgba(232, 197, 71, 0.5);
+  background: rgba(232, 197, 71, 0.1);
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  margin-bottom: 1rem;
+}
+
+.premier-card {
+  border-color: rgba(232, 197, 71, 0.45);
+  box-shadow: 0 0 40px rgba(232, 197, 71, 0.08);
+  padding: 1.75rem;
+}
+
+.premier-card:hover {
+  border-color: rgba(232, 197, 71, 0.75);
+}
+
+.premier-card .team-badge {
+  width: 60px;
+  height: 60px;
+}
+
+.premier-card .team-name {
+  font-size: 1.25rem;
+}
+
+.premier-card .team-prob {
+  font-size: 1.4rem;
+}
+
+/* ---------------------------------------------------------------
+   Locked section / paywall overlay
+   --------------------------------------------------------------- */
+
+.locked-section {
+  position: relative;
+}
+
+.locked-section.is-locked .matchup-grid {
+  filter: blur(5px) brightness(0.6) saturate(0.6);
+  pointer-events: none;
+  user-select: none;
+}
+
+.unlock-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.unlock-card {
+  background: var(--panel-solid);
+  border: 1px solid rgba(0, 255, 65, 0.45);
+  border-radius: 12px;
+  padding: 2.25rem 2.5rem;
+  text-align: center;
+  max-width: 420px;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 255, 65, 0.12);
+}
+
+.unlock-card .lock-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.unlock-card h3 {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--text);
+  font-size: 1.3rem;
+  margin: 0 0 0.6rem;
+}
+
+.unlock-card p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin: 0 0 1.5rem;
+}
+
+/* ---------------------------------------------------------------
+   Forms (signup.html)
+   --------------------------------------------------------------- */
+
+.form-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding-top: 1rem;
+}
+
+.form-panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 2rem;
+  backdrop-filter: blur(6px);
+}
+
+.form-panel h2 {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--green);
+  font-size: 1.4rem;
+  margin: 0 0 0.4rem;
+  text-shadow: 0 0 12px rgba(0, 255, 65, 0.35);
+}
+
+.form-panel .form-intro {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  margin: 0 0 1.75rem;
+  line-height: 1.5;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field.full {
+  grid-column: 1 / -1;
+}
+
+.field label {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.field .optional-tag {
+  color: rgba(111, 174, 131, 0.7);
+  font-size: 0.7rem;
+}
+
+.field input,
+.field select {
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  padding: 0.7rem 0.8rem;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+}
+
+.field input.invalid {
+  border-color: var(--red);
+}
+
+.field .error-msg {
+  color: var(--red);
+  font-size: 0.72rem;
+  min-height: 1em;
+}
+
+.field select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--green) 50%),
+                     linear-gradient(135deg, var(--green) 50%, transparent 50%);
+  background-position: calc(100% - 18px) center, calc(100% - 13px) center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  grid-column: 1 / -1;
+  padding: 0.4rem 0;
+}
+
+.checkbox-row input[type="checkbox"] {
+  margin-top: 0.2rem;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--green);
+}
+
+.checkbox-row label {
+  font-size: 0.85rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.checkbox-row .sub {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.form-footer-note {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  margin-top: 0.25rem;
+}
+
+.form-success {
+  display: none;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.form-success.show {
+  display: block;
+}
+
+.form-success .check {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.form-success h3 {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--green);
+  margin: 0 0 0.5rem;
+}
+
+.form-success p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 560px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .field.full {
+    grid-column: auto;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Dev toggle (testing aid -- remove once real auth exists)
+   --------------------------------------------------------------- */
+
+.dev-toggle {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.dev-toggle button {
+  font-family: inherit;
+  background: transparent;
+  border: 1px dashed rgba(232, 197, 71, 0.4);
+  color: var(--gold);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dev-toggle button:hover {
+  border-color: var(--gold);
+  background: rgba(232, 197, 71, 0.08);
+}
+
+/* ---------------------------------------------------------------
+   Footer
+   --------------------------------------------------------------- */
+
+.site-footer {
+  margin-top: 3rem;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 480px) {
+  .navbar {
+    justify-content: center;
+    text-align: center;
+  }
+}

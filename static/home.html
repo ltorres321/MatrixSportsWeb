@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Sports Analytics — Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+  <canvas id="rain"></canvas>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <div class="page">
+
+    <nav class="navbar">
+      <a class="brand" href="index.html">MATRIX<span>SPORTS</span></a>
+      <div class="navbar-links">
+        <a href="about.html">About</a>
+        <span id="member-pill-slot"></span>
+        <a href="signup.html" id="nav-signup-link">Sign Up Free</a>
+      </div>
+    </nav>
+
+    <header class="site-header">
+      <h1 class="glow">WEEK 2 PREDICTIONS</h1>
+      <p class="subtitle">// AI-simulated win probabilities for every NFL matchup</p>
+      <div class="demo-flag">DEMO DATA — NOT CONNECTED TO THE MODEL</div>
+    </header>
+
+    <nav class="week-rail" id="week-rail" aria-label="Week selector"></nav>
+
+    <main>
+
+      <div class="premier-wrap">
+        <div class="premier-ribbon">★ GAME OF THE WEEK — FREE PREVIEW</div>
+        <div id="premier-slot"></div>
+      </div>
+
+      <div class="section-label">
+        <span class="dot"></span> FULL WEEK 2 SLATE
+      </div>
+
+      <div class="locked-section" id="locked-section">
+        <div class="matchup-grid" id="matchup-grid"></div>
+        <div class="unlock-panel" id="unlock-panel">
+          <div class="unlock-card">
+            <span class="lock-icon">🔒</span>
+            <h3>Unlock the Full Slate</h3>
+            <p>
+              Create a free account to see win probabilities for every game,
+              every week — no credit card required.
+            </p>
+            <a class="btn btn-primary btn-block" href="signup.html">Sign Up Free</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="dev-toggle">
+        <button id="dev-toggle-btn" type="button">testing: toggle member view</button>
+      </div>
+
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Layout &amp; look-and-feel prototype only. Probabilities shown are
+        placeholder values for design purposes and are not produced by the
+        prediction model. No picks, entries, or accounts required to view —
+        this page's own gating is a client-side demo, not real
+        authentication.
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="rain.js"></script>
+  <script src="teams.js"></script>
+  <script src="home.js"></script>
+</body>
+</html>

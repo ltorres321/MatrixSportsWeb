@@ -1,0 +1,122 @@
+/* Deliberately minimal -- this page exists to prove the pipeline
+   works end-to-end, not to be a polished product. See Stage 5 of the
+   production plan for what's explicitly out of scope here. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f5f6f8;
+  color: #1a1a2e;
+  margin: 0;
+  padding: 0 1rem 3rem;
+}
+
+header {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 0 1rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.subtitle {
+  color: #666;
+  margin: 0.25rem 0 0;
+}
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+#status {
+  color: #666;
+  margin-bottom: 1rem;
+}
+
+#status.error {
+  color: #b3261e;
+}
+
+.game-card {
+  background: #fff;
+  border: 1px solid #e0e0e6;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.game-card .matchup {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.game-card .matchup h2 {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.game-card .kickoff {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.win-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.win-bar {
+  flex: 1;
+  height: 20px;
+  border-radius: 10px;
+  background: #e74c3c;
+  overflow: hidden;
+}
+
+.win-bar-fill {
+  height: 100%;
+  background: #2e7d32;
+}
+
+.win-bar-label {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  min-width: 12rem;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem 1.5rem;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.details-grid dt {
+  color: #666;
+}
+
+.details-grid dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+footer {
+  max-width: 900px;
+  margin: 2rem auto 0;
+  color: #888;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}

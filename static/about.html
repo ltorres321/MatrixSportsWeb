@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Sports Analytics — About</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="about.css">
+</head>
+<body>
+
+  <canvas id="rain"></canvas>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <div class="page">
+
+    <nav class="navbar">
+      <a class="brand" href="index.html">MATRIX<span>SPORTS</span></a>
+      <div class="navbar-links">
+        <a href="home.html">Predictions</a>
+        <a href="about.html">About</a>
+        <a href="signup.html">Sign Up Free</a>
+      </div>
+    </nav>
+
+    <header class="site-header">
+      <h1 class="glow">WHAT'S ACTUALLY UNDER THE HOOD</h1>
+      <p class="subtitle">// every number on this site is something we can explain</p>
+    </header>
+
+    <main class="about-main">
+
+      <section class="about-block">
+        <div class="section-label"><span class="dot"></span> HOW A PREDICTION GETS MADE</div>
+        <p>
+          We don't start by guessing. Before we simulate a single game, we start
+          from the actual point spread and point total that real sportsbooks
+          publish before kickoff. That number already reflects an enormous
+          amount of information — team news, injuries, public opinion, expert
+          analysis, all of it, priced in by people risking real money to get it
+          right.
+        </p>
+        <p>
+          From there, we look at decades of real NFL games to measure exactly
+          how far final scores have historically landed from that opening
+          number. Sometimes the favorite covers easily. Sometimes the underdog
+          keeps it close. Sometimes the total blows right past expectations.
+          That spread of outcomes is measured history, not a guess.
+        </p>
+        <p>
+          Then, instead of handing you one single prediction, we play the game
+          out <strong>100,000</strong> different ways — each time nudging the
+          score up or down using that same real-world variability — and count
+          what actually happens across all of them. A team winning 68% of the
+          time isn't a vibe. It's a tally.
+        </p>
+      </section>
+
+      <section class="about-block">
+        <div class="section-label"><span class="dot"></span> WHY START FROM THE BETTING LINE AT ALL?</div>
+        <p>
+          Some sites act like the betting line doesn't exist, as if a purely
+          "independent" prediction is somehow more impressive. We think that's
+          backwards. The market line already contains more real-time,
+          real-money-tested information than almost anything else available
+          before a game. Ignoring it on purpose would make our numbers worse,
+          not better. Our job isn't to replace that number — it's to test
+          whether we can responsibly build on top of it.
+        </p>
+      </section>
+
+      <section class="about-block">
+        <div class="section-label"><span class="dot"></span> WHAT WE TESTED — AND CUT</div>
+        <p class="about-intro">
+          Not every idea that sounds smart actually helps. Here's what we
+          tested against real outcomes, and were honest about, when it didn't
+          move the needle:
+        </p>
+        <div class="value-grid">
+          <div class="value-card">
+            <span class="icon">🌦️</span>
+            <h3>Game-Day Weather</h3>
+            <p>Wind, temperature, precipitation — tested directly against real
+               results. Once the betting line was already accounted for,
+               weather added nothing measurable. Left out.</p>
+          </div>
+          <div class="value-card">
+            <span class="icon">🏟️</span>
+            <h3>Indoors vs. Outdoors</h3>
+            <p>Whether a game was played in a dome made no reliable difference
+               either. A real, testable idea — it just didn't hold up. Left
+               out.</p>
+          </div>
+          <div class="value-card">
+            <span class="icon">✈️</span>
+            <h3>Rest Days &amp; Travel</h3>
+            <p>Extra rest, cross-country travel, short weeks — a genuine
+               hypothesis. It didn't add anything beyond what the betting line
+               already captures. Left out.</p>
+          </div>
+        </div>
+        <p class="about-outro">
+          None of these were dead ends — they're proof the process works. A
+          model that never says "no" to itself isn't rigorous. It's just
+          decorated.
+        </p>
+      </section>
+
+      <section class="about-block">
+        <div class="section-label"><span class="dot"></span> WHY 100,000 GAMES, NOT ONE GUESS</div>
+        <p>
+          Think about flipping a coin. Flip it 10 times and you might get 7
+          heads — that doesn't mean the coin is unfair, it just means small
+          samples wobble. Flip it 100,000 times and the result settles in
+          close to the true odds. We do the same thing with every matchup:
+          instead of one guess dressed up as a percentage, we run the game
+          forward 100,000 times and report exactly how often each outcome
+          actually happened.
+        </p>
+      </section>
+
+      <section class="honesty-block">
+        <div class="honesty-tag">OUR HONESTY COMMITMENT</div>
+        <p>
+          We will never round a number up to make it sound better. If the
+          honest math says 54%, we show 54% — not a confident-sounding 65%.
+          Sports has real randomness in it that no model erases, and we'd
+          rather earn your trust with a number you can rely on than sell you
+          one that just sounds good.
+        </p>
+      </section>
+
+      <p class="closing-line">
+        Most sites just hand you a percentage and ask you to trust it.<br>
+        We named this site Matrix because we'd rather show you what's
+        underneath.
+      </p>
+
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Have a question about how a specific number was produced? Every
+        prediction we publish is kept permanently, so we can always show our
+        work.
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="rain.js"></script>
+</body>
+</html>

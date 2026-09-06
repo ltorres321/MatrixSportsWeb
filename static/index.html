@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Sports Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+  <canvas id="rain"></canvas>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <div class="page">
+
+    <nav class="navbar">
+      <a class="brand" href="index.html">MATRIX<span>SPORTS</span></a>
+      <div class="navbar-links">
+        <a href="home.html">Predictions</a>
+        <a href="about.html">About</a>
+        <a href="signup.html">Sign Up Free</a>
+      </div>
+    </nav>
+
+    <main>
+      <section class="hero">
+        <div class="hero-eyebrow"><span class="dot"></span> FREE DURING BETA</div>
+        <h1 class="hero-title">SEE THE GAME<br><span>BEFORE IT'S PLAYED</span></h1>
+        <p class="hero-sub">
+          Matrix Sports Analytics simulates every NFL matchup 100,000 times,
+          grounded in the real betting line — not a boosted number. Free
+          model picks for early users, every week.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="home.html">View This Week's Free Pick</a>
+          <a class="btn btn-ghost" href="signup.html">Get Early Access — Free</a>
+        </div>
+        <p class="hero-note">No credit card required. Cancel anytime — it's free.</p>
+      </section>
+
+      <div class="value-grid">
+        <div class="value-card">
+          <span class="icon">🎯</span>
+          <h3>Model-Driven Probabilities</h3>
+          <p>Every matchup gets a simulated win probability, refreshed as the market line moves.</p>
+        </div>
+        <div class="value-card">
+          <span class="icon">🔓</span>
+          <h3>One Free Game a Week</h3>
+          <p>Anyone can view our marquee Game of the Week. Sign up free to see the full slate.</p>
+        </div>
+        <div class="value-card">
+          <span class="icon">🏷️</span>
+          <h3>Early Subscriber Pricing</h3>
+          <p>Free accounts created now lock in preferential pricing when paid tiers launch later.</p>
+        </div>
+      </div>
+
+      <div class="pricing-strip">
+        <span>🔒 Early subscribers get <strong>preferential pricing</strong> — signup is free, forever, for those who join during beta.</span>
+        <a class="btn btn-primary" href="signup.html">Claim Your Spot</a>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Landing page prototype — probabilities referenced above describe
+        the product direction and are not live figures. See
+        <a href="home.html">the predictions page</a> for the current
+        design of the game-viewing experience.
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="rain.js"></script>
+</body>
+</html>
