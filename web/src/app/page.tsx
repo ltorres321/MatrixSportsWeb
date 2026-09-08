@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSeasons, getCurrentSeasonYear, CURRENT_WEEK } from "@/lib/matchups";
 import { teamLogoPath, TEAMS } from "@/lib/teams";
 import MatchupCard from "@/components/MatchupCard";
+import { getEspnNflNews, type NewsItem } from "@/lib/espnNews";
 
 // Signed-out visitors get the marketing pitch below. Signed-in users
 // get a real dashboard instead -- see SignedInDashboard.
@@ -12,7 +13,8 @@ export default async function HomePage() {
 
   if (data.user) {
     const firstName = (data.user.user_metadata?.first_name as string | undefined) ?? undefined;
-    return <SignedInDashboard firstName={firstName} />;
+    const news = await getEspnNflNews(6);
+    return <SignedInDashboard firstName={firstName} news={news} />;
   }
 
   return (
@@ -84,7 +86,7 @@ export default async function HomePage() {
   );
 }
 
-function SignedInDashboard({ firstName }: { firstName?: string }) {
+function SignedInDashboard({ firstName, news }: { firstName?: string; news: NewsItem[] }) {
   const seasons = getSeasons();
   const year = getCurrentSeasonYear();
   const premier = seasons[year].matchups.find((m) => m.premier);
@@ -113,6 +115,32 @@ function SignedInDashboard({ firstName }: { firstName?: string }) {
               <Link className="btn btn-ghost" href="/home">
                 View Full Week {CURRENT_WEEK} Slate →
               </Link>
+            </div>
+          </div>
+        )}
+
+        {news.length > 0 && (
+          <div className="news-section">
+            <div className="section-label">
+              <span className="dot" /> LATEST NFL NEWS
+              <span className="news-credit">via ESPN</span>
+            </div>
+            <div className="news-grid">
+              {news.map((item) => (
+                <a key={item.link} className="news-card" href={item.link} target="_blank" rel="noopener noreferrer">
+                  {item.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="news-card-image" src={item.image} alt="" />
+                  ) : (
+                    <div className="news-card-image news-card-image-fallback">🏈</div>
+                  )}
+                  <div className="news-card-body">
+                    <h3>{item.title}</h3>
+                    <p>{item.snippet}</p>
+                    <span className="read-more">Read on ESPN →</span>
+                  </div>
+                </a>
+              ))}
             </div>
           </div>
         )}
