@@ -81,6 +81,34 @@
   color: #ffffff;
 }
 
+/* Same haze problem as text-shadow, just via box-shadow instead --
+   a blur glow that "pops" on black just looks hazy on white. Killed
+   outright on anything where it's purely decorative (buttons, active
+   chips/pills, badge rings, progress fills, the percentile marker).
+   Card-hover elevation and the paywall panel's shadow are left alone
+   -- those are dominated by ordinary (non-glow) shadow, not blur, so
+   they already read fine on a light background. */
+:root[data-theme="light"] .btn-primary,
+:root[data-theme="light"] .btn-primary:hover,
+:root[data-theme="light"] .league-chip.active,
+:root[data-theme="light"] .week-pill.active,
+:root[data-theme="light"] .team-badge,
+:root[data-theme="light"] .prob-bar-fill,
+:root[data-theme="light"] .game-hero-team img,
+:root[data-theme="light"] .bucket-fill,
+:root[data-theme="light"] .percentile-marker {
+  box-shadow: none;
+}
+
+/* Focus rings are functionally important (accessibility), so this one
+   gets a crisp solid-edge ring instead of just deleting it -- zero
+   blur radius, a few px of spread, reads as a clean outline on white
+   instead of a hazy glow. */
+:root[data-theme="light"] .field input:focus,
+:root[data-theme="light"] .field select:focus {
+  box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.25);
+}
+
 :root[data-theme="light"] .team-badge.fallback {
   background: linear-gradient(145deg, var(--green), var(--green-dim));
 }
