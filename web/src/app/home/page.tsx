@@ -114,10 +114,10 @@ export default function PredictionsPage() {
 
       <footer className="site-footer">
         <p>
-          Layout &amp; look-and-feel prototype only. Probabilities shown are
-          placeholder values for design purposes and are not produced by the
-          prediction model. The free/locked gating above is real — based on
-          whether you&apos;re signed in — but the underlying numbers are not.
+          Probabilities shown are placeholder values for design purposes and
+          are not produced by the prediction model. The free/locked gating
+          above is real — based on whether you&apos;re signed in — but the
+          underlying numbers are not.
         </p>
       </footer>
     </>

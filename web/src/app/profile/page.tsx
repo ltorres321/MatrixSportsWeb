@@ -11,6 +11,7 @@ interface ProfileRow {
   first_name: string;
   last_name: string;
   email: string | null;
+  notification_email: string | null;
   cell: string | null;
   address: string | null;
   city: string | null;
@@ -18,6 +19,7 @@ interface ProfileRow {
   zip: string | null;
   favorite_team: string | null;
   notify_win_prob: boolean;
+  notify_teams: string[];
   theme: "dark" | "light";
   matrix_rain_enabled: boolean;
 }
@@ -28,7 +30,6 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [saveNote, setSaveNote] = useState("");
-  const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -89,19 +90,25 @@ export default function ProfilePage() {
     router.refresh();
   }
 
+  async function handleUpdateNotificationEmail(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!user) return;
+    const formData = new FormData(e.currentTarget);
+    const notification_email = String(formData.get("notificationEmail") ?? "").trim() || null;
+
+    const supabase = createClient();
+    const { error } = await supabase.from("profiles").update({ notification_email }).eq("id", user.id);
+    setSaveNote(error ? error.message : "Notification email updated.");
+    if (!error) {
+      setProfile((prev) => (prev ? { ...prev, notification_email } : prev));
+    }
+  }
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
-  }
-
-  async function handleUpdateEmail(e: FormEvent) {
-    e.preventDefault();
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ email: newEmail });
-    setSaveNote(error ? error.message : "Check your new email address for a confirmation link.");
-    if (!error) setNewEmail("");
   }
 
   async function handleUpdateProfile(e: FormEvent<HTMLFormElement>) {
@@ -116,6 +123,7 @@ export default function ProfilePage() {
       zip: (String(formData.get("zip") ?? "").trim() || null) as string | null,
       favorite_team: (String(formData.get("favoriteTeam") ?? "").trim() || null) as string | null,
       notify_win_prob: formData.get("notify") === "on",
+      notify_teams: formData.getAll("notifyTeams").map(String),
     };
 
     const supabase = createClient();
@@ -132,7 +140,7 @@ export default function ProfilePage() {
 
   if (!isRealMember) {
     return (
-      <main>
+      <main className="profile-zoom">
         <div className="form-shell">
           <div className="unlock-card" style={{ maxWidth: "none" }}>
             <span className="lock-icon">🔒</span>
@@ -152,7 +160,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <main>
+    <main className="profile-zoom">
       <header className="site-header">
         <h1 className="glow">YOUR PROFILE</h1>
         <p className="subtitle">
@@ -276,25 +284,27 @@ export default function ProfilePage() {
         </div>
 
         <div className="form-panel" style={{ marginBottom: "1.5rem" }}>
-          <h2>Email</h2>
+          <h2>Notification Email</h2>
           <p className="form-intro">
-            Currently <strong style={{ color: "var(--green)" }}>{profile?.email ?? user?.email}</strong>. Changing it
-            sends a confirmation link to the new address before it takes effect.
+            <strong>
+              Your sign-in email is {profile?.email ?? user?.email} and can&apos;t be changed on this page.
+            </strong>{" "}
+            The address below is only where we send notifications and account updates — change it any time
+            without affecting how you sign in. It starts out the same as your sign-in email.
           </p>
-          <form className="form-grid" onSubmit={handleUpdateEmail}>
+          <form className="form-grid" onSubmit={handleUpdateNotificationEmail}>
             <div className="field full">
-              <label htmlFor="profile-email">New Email</label>
+              <label htmlFor="notification-email">Notification Email</label>
               <input
                 type="email"
-                id="profile-email"
-                autoComplete="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
+                id="notification-email"
+                name="notificationEmail"
+                defaultValue={profile?.notification_email ?? profile?.email ?? user?.email ?? ""}
               />
             </div>
             <div className="field full">
               <button type="submit" className="btn btn-primary btn-block">
-                Update Email
+                Save Notification Email
               </button>
             </div>
           </form>
@@ -339,9 +349,27 @@ export default function ProfilePage() {
               <div className="checkbox-row">
                 <input type="checkbox" id="notify" name="notify" defaultChecked={profile?.notify_win_prob ?? false} />
                 <label htmlFor="notify">
-                  Notify me when my favorite team&apos;s win probability changes
+                  Notify me when a selected team&apos;s win probability changes
                   <span className="sub">Requires the cell number above.</span>
                 </label>
+              </div>
+              <div className="field full">
+                <label>
+                  Teams to Notify Me About <span className="optional-tag">(select any number)</span>
+                </label>
+                <div className="team-checklist">
+                  {TEAMS.map((t) => (
+                    <label key={t.alias} className="team-checklist-item">
+                      <input
+                        type="checkbox"
+                        name="notifyTeams"
+                        value={t.alias}
+                        defaultChecked={profile?.notify_teams?.includes(t.alias) ?? false}
+                      />
+                      {t.market} {t.name}
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="field full">
                 <button type="submit" className="btn btn-primary btn-block">

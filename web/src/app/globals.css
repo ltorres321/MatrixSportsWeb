@@ -109,6 +109,16 @@
   box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.25);
 }
 
+/* Same story again: a translucent-black input fill reads as a subtle
+   darkening against the dark theme, but on white it's just a flat,
+   low-contrast gray box. Trying a pale warm yellow instead of plain
+   white so filled-in fields stay visually distinct from the page. */
+:root[data-theme="light"] .field input,
+:root[data-theme="light"] .field select {
+  background: #fefce8;
+  border-color: rgba(180, 150, 20, 0.35);
+}
+
 :root[data-theme="light"] .team-badge.fallback {
   background: linear-gradient(145deg, var(--green), var(--green-dim));
 }
@@ -1471,6 +1481,34 @@ h1.glow span {
   margin-top: 0.15rem;
 }
 
+.team-checklist {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.5rem 1rem;
+  background: var(--panel);
+}
+
+.team-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.team-checklist-item input[type="checkbox"] {
+  accent-color: var(--green);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
 .form-footer-note {
   grid-column: 1 / -1;
   text-align: center;
@@ -1540,6 +1578,20 @@ h1.glow span {
 .dev-toggle button:hover {
   border-color: var(--gold);
   background: rgba(232, 197, 71, 0.08);
+}
+
+/* ---------------------------------------------------------------
+   Profile page -- scoped font bump (Profile only, not site-wide)
+   --------------------------------------------------------------- */
+
+.profile-zoom {
+  /* +2px equivalent, Profile page only. A wrapper's font-size alone
+     wouldn't do this -- nearly everything here is sized in rem, which
+     is always relative to the root <html> element regardless of
+     nesting, so a local font-size bump would have zero effect on it.
+     zoom scales the whole rendered subtree (rem-sized descendants
+     included), which a plain font-size change can't. */
+  zoom: 112.5%;
 }
 
 /* ---------------------------------------------------------------

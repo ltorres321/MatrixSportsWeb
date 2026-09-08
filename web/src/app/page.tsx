@@ -107,7 +107,7 @@ function SignedInDashboard({ firstName }: { firstName?: string }) {
       <main>
         {premier && (
           <div className="premier-wrap">
-            <div className="premier-ribbon">★ THIS WEEK&apos;S FREE PICK</div>
+            <div className="premier-ribbon">★ LOCK OF THE WEEK</div>
             <MatchupCard matchup={premier} premier />
             <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
               <Link className="btn btn-ghost" href="/home">
