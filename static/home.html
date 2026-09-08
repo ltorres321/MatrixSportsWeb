@@ -19,29 +19,38 @@
     <nav class="navbar">
       <a class="brand" href="index.html">MATRIX<span>SPORTS</span></a>
       <div class="navbar-links">
+        <a href="index.html">Home</a>
         <a href="about.html">About</a>
+        <a href="profile.html" id="nav-profile-link" style="display:none;">Profile</a>
         <span id="member-pill-slot"></span>
         <a href="signup.html" id="nav-signup-link">Sign Up Free</a>
       </div>
     </nav>
 
     <header class="site-header">
-      <h1 class="glow">WEEK 2 PREDICTIONS</h1>
+      <h1 class="glow" id="page-title">WEEK 2 PREDICTIONS</h1>
       <p class="subtitle">// AI-simulated win probabilities for every NFL matchup</p>
       <div class="demo-flag">DEMO DATA — NOT CONNECTED TO THE MODEL</div>
     </header>
 
+    <div class="league-chips" aria-label="Sport selector">
+      <button class="league-chip active" type="button">NFL</button>
+      <button class="league-chip" type="button" disabled>NBA<span class="soon-tag">COMING SOON</span></button>
+      <button class="league-chip" type="button" disabled>MLB<span class="soon-tag">COMING SOON</span></button>
+    </div>
+
+    <nav class="season-rail" id="season-rail" aria-label="Season selector"></nav>
     <nav class="week-rail" id="week-rail" aria-label="Week selector"></nav>
 
     <main>
 
       <div class="premier-wrap">
-        <div class="premier-ribbon">★ GAME OF THE WEEK — FREE PREVIEW</div>
+        <div class="premier-ribbon" id="premier-ribbon-text">★ GAME OF THE WEEK — FREE PREVIEW</div>
         <div id="premier-slot"></div>
       </div>
 
       <div class="section-label">
-        <span class="dot"></span> FULL WEEK 2 SLATE
+        <span class="dot"></span> <span id="slate-label">FULL WEEK 2 SLATE</span>
       </div>
 
       <div class="locked-section" id="locked-section">
@@ -78,6 +87,7 @@
   </div>
 
   <script src="rain.js"></script>
+  <script src="auth-nav.js"></script>
   <script src="teams.js"></script>
   <script src="home.js"></script>
 </body>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Sports Analytics — Profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+  <canvas id="rain"></canvas>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <div class="page">
+
+    <nav class="navbar">
+      <a class="brand" href="index.html">MATRIX<span>SPORTS</span></a>
+      <div class="navbar-links">
+        <a href="index.html">Home</a>
+        <a href="home.html">Predictions</a>
+        <a href="about.html">About</a>
+        <a href="profile.html" id="nav-profile-link" style="display:none;">Profile</a>
+        <span id="member-pill-slot"></span>
+        <a href="signup.html" id="nav-signup-link">Sign Up Free</a>
+      </div>
+    </nav>
+
+    <div id="signed-out-gate" style="display:none;">
+      <div class="form-shell">
+        <div class="unlock-card" style="max-width:none;">
+          <span class="lock-icon">🔒</span>
+          <h3>Sign In to Manage Your Profile</h3>
+          <p>Password, email, phone number, and notification preferences
+             live on your free account. Create one to get started.</p>
+          <a class="btn btn-primary btn-block" href="signup.html">Sign Up Free</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="profile-content" style="display:none;">
+
+      <header class="site-header">
+        <h1 class="glow">YOUR PROFILE</h1>
+        <p class="subtitle" id="profile-subtitle">// account settings</p>
+        <div class="demo-flag">DESIGN PREVIEW — NOT WIRED TO A REAL ACCOUNT YET</div>
+      </header>
+
+      <div class="form-shell">
+
+        <div class="form-panel" style="margin-bottom:1.5rem;">
+          <h2>Password</h2>
+          <p class="form-intro">Change the password used to sign in.</p>
+          <form class="form-grid" data-profile-form>
+            <div class="field full">
+              <label for="current-password">Current Password</label>
+              <input type="password" id="current-password" autocomplete="current-password">
+            </div>
+            <div class="field">
+              <label for="new-password">New Password</label>
+              <input type="password" id="new-password" autocomplete="new-password">
+            </div>
+            <div class="field">
+              <label for="confirm-password">Confirm New Password</label>
+              <input type="password" id="confirm-password" autocomplete="new-password">
+            </div>
+            <div class="field full">
+              <button type="submit" class="btn btn-primary btn-block">Update Password</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="form-panel" style="margin-bottom:1.5rem;">
+          <h2>Email</h2>
+          <p class="form-intro">Where we send account and prediction-alert email.</p>
+          <form class="form-grid" data-profile-form>
+            <div class="field full">
+              <label for="profile-email">Email</label>
+              <input type="email" id="profile-email" autocomplete="email">
+            </div>
+            <div class="field full">
+              <button type="submit" class="btn btn-primary btn-block">Update Email</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="form-panel" style="margin-bottom:1.5rem;">
+          <h2>Phone Number</h2>
+          <p class="form-intro">Used only for the text alert below, if enabled.</p>
+          <form class="form-grid" data-profile-form>
+            <div class="field full">
+              <label for="profile-cell">Cell Number</label>
+              <input type="tel" id="profile-cell" autocomplete="tel" placeholder="(555) 555-5555">
+            </div>
+            <div class="field full">
+              <button type="submit" class="btn btn-primary btn-block">Update Phone Number</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="form-panel">
+          <h2>Team &amp; Notifications</h2>
+          <p class="form-intro">Which team you follow, and whether we text you about it.</p>
+          <form class="form-grid" data-profile-form>
+            <div class="field full">
+              <label for="profile-team">Favorite Team</label>
+              <select id="profile-team">
+                <option value="">No preference</option>
+              </select>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="profile-notify">
+              <label for="profile-notify">
+                Notify me when my favorite team's win probability changes
+                <span class="sub">Requires the cell number above.</span>
+              </label>
+            </div>
+            <div class="field full">
+              <button type="submit" class="btn btn-primary btn-block">Save Preferences</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="form-footer-note" id="profile-save-note" style="margin-top:1.5rem;"></p>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script src="rain.js"></script>
+  <script src="auth-nav.js"></script>
+  <script src="teams.js"></script>
+  <script src="profile.js"></script>
+</body>
+</html>

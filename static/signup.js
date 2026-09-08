@@ -1,9 +1,9 @@
-// Free account signup form. IMPORTANT: this is UI-only right now --
-// there is no backend endpoint yet, so nothing here is persisted
-// server-side. Submitting just sets a local "sw_member" flag (read by
-// home.js) so the free/locked gating on home.html can be previewed,
-// and stashes the first name for a personalized nav greeting. Real
-// signups need a POST endpoint + storage before this goes live.
+// Free account signup form. Submits to POST /subscribe (main.py),
+// which persists into the subscribers table -- see
+// sql/001_subscribers_schema.sql. The "sw_member" localStorage flag
+// set on success is a separate, client-side-only thing: it's what the
+// free/locked gating on home.html checks, since there's still no real
+// login/session system yet. That's the next piece after this.
 
 function populateFavoriteTeams() {
   const select = document.getElementById("favorite-team");
@@ -81,7 +81,13 @@ function validateForm(data) {
   return valid;
 }
 
-function handleSubmit(e) {
+function setSubmitting(isSubmitting) {
+  const btn = document.querySelector("#signup-form button[type=submit]");
+  btn.disabled = isSubmitting;
+  btn.textContent = isSubmitting ? "Creating Account..." : "Create Free Account";
+}
+
+async function handleSubmit(e) {
   e.preventDefault();
   const form = e.target;
   const data = {
@@ -90,6 +96,7 @@ function handleSubmit(e) {
     lastName: form.lastName.value,
     email: form.email.value,
     cell: form.cell.value,
+    address: form.address.value,
     city: form.city.value,
     state: form.state.value,
     zip: form.zip.value,
@@ -99,16 +106,56 @@ function handleSubmit(e) {
 
   if (!validateForm(data)) return;
 
-  // Demo-only "account creation" -- see file header.
-  localStorage.setItem("sw_member", "true");
-  localStorage.setItem("sw_first_name", data.firstName.trim());
+  setSubmitting(true);
+  setError("email", "");
 
-  form.style.display = "none";
-  document.getElementById("form-success").classList.add("show");
+  try {
+    const response = await fetch("/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        first_name: data.firstName,
+        middle_name: data.middleName || null,
+        last_name: data.lastName,
+        email: data.email,
+        cell: data.cell || null,
+        address: data.address || null,
+        city: data.city || null,
+        state: data.state || null,
+        zip: data.zip || null,
+        favorite_team: data.favoriteTeam || null,
+        notify_win_prob: data.notify,
+      }),
+    });
 
-  setTimeout(() => {
-    window.location.href = "home.html";
-  }, 1600);
+    if (response.status === 409) {
+      setError("email", "An account with that email already exists.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      setError("email", body.detail || "Something went wrong -- please try again.");
+      setSubmitting(false);
+      return;
+    }
+
+    // Client-side-only "logged in" flag for the home.html demo gating
+    // -- see file header. The actual signup is already saved server-side.
+    localStorage.setItem("sw_member", "true");
+    localStorage.setItem("sw_first_name", data.firstName.trim());
+
+    form.style.display = "none";
+    document.getElementById("form-success").classList.add("show");
+
+    setTimeout(() => {
+      window.location.href = "home.html";
+    }, 1600);
+  } catch (err) {
+    setError("email", "Couldn't reach the server -- please try again.");
+    setSubmitting(false);
+  }
 }
 
 populateFavoriteTeams();

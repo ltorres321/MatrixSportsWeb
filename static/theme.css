@@ -374,6 +374,56 @@ h1.glow span {
   50% { opacity: 0.3; }
 }
 
+.league-chips {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.league-chip {
+  position: relative;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.league-chip.active {
+  background: var(--green-faint);
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.25);
+}
+
+.league-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.league-chip .soon-tag {
+  display: block;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  margin-top: 0.15rem;
+}
+
+.season-rail {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
 .week-rail {
   display: flex;
   gap: 0.5rem;
@@ -417,6 +467,12 @@ h1.glow span {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 1.5rem;
+}
+
+.matchup-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
 }
 
 .matchup-card {
@@ -696,6 +752,312 @@ h1.glow span {
   font-size: 0.9rem;
   line-height: 1.55;
   margin: 0 0 1.5rem;
+}
+
+/* ---------------------------------------------------------------
+   Game detail / "sticky stats" page (game.html)
+   --------------------------------------------------------------- */
+
+.game-sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  background: rgba(3, 8, 4, 0.88);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--panel-border);
+  padding: 0.7rem 1rem;
+  margin: 0 -1.5rem 2rem;
+}
+
+.game-sticky-bar .side {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+}
+
+.game-sticky-bar .side img {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
+.game-sticky-bar .side .prob {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.game-sticky-bar .vs {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+}
+
+.game-hero {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2.5rem;
+}
+
+.game-hero-teams {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.game-hero-team {
+  flex: 1;
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.game-hero-team img {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 255, 65, 0.35);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+}
+
+.game-hero-team .name {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin: 0.75rem 0 0.15rem;
+}
+
+.game-hero-team .record {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-bottom: 0.75rem;
+}
+
+.game-hero-team .big-prob {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 2rem;
+  color: var(--green);
+  text-shadow: 0 0 14px rgba(0, 255, 65, 0.4);
+}
+
+.game-hero-team .big-prob .unit {
+  font-size: 1rem;
+  color: var(--text-dim);
+}
+
+.game-hero-vs {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  letter-spacing: 0.15em;
+}
+
+.game-hero-meta {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.stat-section {
+  margin-bottom: 2.5rem;
+}
+
+.stat-section h2 {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--text);
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.35rem;
+}
+
+.stat-section .stat-sub {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  margin: 0 0 1.25rem;
+}
+
+.bucket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.bucket-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 56px;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.bucket-row .bucket-label {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.bucket-track {
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(0, 255, 65, 0.1);
+  overflow: hidden;
+}
+
+.bucket-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green-dim), var(--green));
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+.bucket-row .bucket-pct {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.totals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.totals-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.totals-card .line {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  margin-bottom: 0.6rem;
+}
+
+.totals-card .split {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.6rem;
+}
+
+.totals-card .split .over {
+  background: var(--green);
+}
+
+.totals-card .split .under {
+  background: rgba(255, 59, 59, 0.6);
+}
+
+.totals-card .readout {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.totals-card .readout .over-pct {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.totals-card .readout .under-pct {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.percentile-block {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1.75rem 1.5rem 1.25rem;
+}
+
+.percentile-track {
+  position: relative;
+  height: 6px;
+  background: rgba(0, 255, 65, 0.12);
+  border-radius: 3px;
+  margin: 2.2rem 0.5rem 0.5rem;
+}
+
+.percentile-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 255, 65, 0.4);
+  border-radius: 3px;
+}
+
+.percentile-marker {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.7);
+  transform: translate(-50%, -50%);
+}
+
+.percentile-tick {
+  position: absolute;
+  top: -1.7rem;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.percentile-zero-line {
+  position: absolute;
+  top: -0.6rem;
+  bottom: -0.6rem;
+  width: 1px;
+  background: rgba(200, 255, 212, 0.25);
+}
+
+.result-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.result-compare .compare-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 1.1rem;
+  text-align: center;
+}
+
+.result-compare .compare-card .label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.result-compare .compare-card .value {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+
+.result-compare .compare-card.hit .value {
+  color: var(--green);
 }
 
 /* ---------------------------------------------------------------

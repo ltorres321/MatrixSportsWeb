@@ -19,8 +19,12 @@
     <nav class="navbar">
       <a class="brand" href="index.html">MATRIX<span>SPORTS</span></a>
       <div class="navbar-links">
+        <a href="index.html">Home</a>
         <a href="home.html">Predictions</a>
         <a href="about.html">About</a>
+        <a href="profile.html" id="nav-profile-link" style="display:none;">Profile</a>
+        <span id="member-pill-slot"></span>
+        <a href="signup.html" id="nav-signup-link">Sign Up Free</a>
       </div>
     </nav>
 
@@ -63,6 +67,11 @@
               <label for="cell">Cell Number <span class="optional-tag" id="cell-optional-tag">(optional)</span></label>
               <input type="tel" id="cell" name="cell" autocomplete="tel" placeholder="(555) 555-5555">
               <div class="error-msg" data-error-for="cell"></div>
+            </div>
+
+            <div class="field full">
+              <label for="address">Address <span class="optional-tag">(optional)</span></label>
+              <input type="text" id="address" name="address" autocomplete="street-address" placeholder="123 Main St">
             </div>
 
             <div class="field">
@@ -122,6 +131,7 @@
   </div>
 
   <script src="rain.js"></script>
+  <script src="auth-nav.js"></script>
   <script src="teams.js"></script>
   <script src="signup.js"></script>
 </body>

@@ -10,7 +10,24 @@
 const CURRENT_WEEK = 2;
 const WEEKS = Array.from({ length: 18 }, (_, i) => i + 1);
 
-const MATCHUPS = [
+// NFL seasons span two calendar years (kicks off in Sept, ends the
+// following Feb) -- so "the current season" is this year until
+// ~March, then last year until the new season kicks off. Computing it
+// instead of hardcoding a year is what broke last time (this file
+// said "2025" while it was actually 2026).
+function getCurrentSeasonYear() {
+  const now = new Date();
+  return now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear();
+}
+
+const CURRENT_SEASON_YEAR = getCurrentSeasonYear();
+
+// Three seasons on purpose -- current season live, plus the last two
+// completed seasons visible for transparency. See feedback memory on
+// this project for why. Ids are relative (py1/py2 = "prior year 1/2")
+// rather than baking in a literal year, so this doesn't go stale
+// again next season.
+const CURRENT_SEASON_MATCHUPS = [
   {
     id: "kc-buf",
     premier: true,
@@ -56,9 +73,111 @@ const MATCHUPS = [
   },
 ];
 
-function isMember() {
-  return localStorage.getItem("sw_member") === "true";
-}
+// Completed season, one year back -- every game is final. Not linked
+// to game.html since the per-game stats page doesn't have historical
+// data to show for these ids.
+const PRIOR_SEASON_1_MATCHUPS = [
+  {
+    id: "py1-kc-buf",
+    premier: true,
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "BUF", record: "11-6", score: 24 },
+    teamB: { alias: "KC", record: "14-3", score: 27, winner: true },
+  },
+  {
+    id: "py1-sf-dal",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "DAL", record: "7-10", score: 20 },
+    teamB: { alias: "SF", record: "12-5", score: 30, winner: true },
+  },
+  {
+    id: "py1-phi-bal",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "BAL", record: "12-5", score: 27, winner: true },
+    teamB: { alias: "PHI", record: "11-6", score: 21 },
+  },
+  {
+    id: "py1-det-gb",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "GB", record: "11-6", score: 27, winner: true },
+    teamB: { alias: "DET", record: "12-5", score: 24 },
+  },
+  {
+    id: "py1-mia-nyj",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "NYJ", record: "5-12", score: 17 },
+    teamB: { alias: "MIA", record: "8-9", score: 20, winner: true },
+  },
+  {
+    id: "py1-cin-pit",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "PIT", record: "10-7", score: 20 },
+    teamB: { alias: "CIN", record: "9-8", score: 23, winner: true },
+  },
+];
+
+// Completed season, two years back -- same idea, different outcomes.
+const PRIOR_SEASON_2_MATCHUPS = [
+  {
+    id: "py2-kc-buf",
+    premier: true,
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "BUF", record: "10-7", score: 17 },
+    teamB: { alias: "KC", record: "15-2", score: 31, winner: true },
+  },
+  {
+    id: "py2-sf-dal",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "DAL", record: "9-8", score: 27, winner: true },
+    teamB: { alias: "SF", record: "10-7", score: 20 },
+  },
+  {
+    id: "py2-phi-bal",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "BAL", record: "10-7", score: 21 },
+    teamB: { alias: "PHI", record: "11-6", score: 24, winner: true },
+  },
+  {
+    id: "py2-det-gb",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "GB", record: "9-8", score: 20 },
+    teamB: { alias: "DET", record: "13-4", score: 23, winner: true },
+  },
+  {
+    id: "py2-mia-nyj",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "NYJ", record: "6-11", score: 24, winner: true },
+    teamB: { alias: "MIA", record: "9-8", score: 23 },
+  },
+  {
+    id: "py2-cin-pit",
+    status: "final",
+    kickoff: "Final",
+    teamA: { alias: "PIT", record: "11-6", score: 27, winner: true },
+    teamB: { alias: "CIN", record: "8-9", score: 24 },
+  },
+];
+
+const SEASONS = {
+  [CURRENT_SEASON_YEAR]: { current: true, matchups: CURRENT_SEASON_MATCHUPS },
+  [CURRENT_SEASON_YEAR - 1]: { current: false, matchups: PRIOR_SEASON_1_MATCHUPS },
+  [CURRENT_SEASON_YEAR - 2]: { current: false, matchups: PRIOR_SEASON_2_MATCHUPS },
+};
+
+let activeSeason = CURRENT_SEASON_YEAR;
+
+// isMember() comes from auth-nav.js, loaded before this file.
 
 function statusTag(status) {
   if (status === "live") {
@@ -98,7 +217,7 @@ function teamRow(side, status) {
 }
 
 function matchupCard(m, extraClass) {
-  return `
+  const card = `
     <div class="matchup-card ${extraClass || ""}">
       <div class="matchup-status">
         ${statusTag(m.status)}
@@ -109,6 +228,39 @@ function matchupCard(m, extraClass) {
       ${teamRow(m.teamB, m.status)}
     </div>
   `;
+
+  // Only the current season links into the per-game stats page --
+  // game.js doesn't have historical data for past-season ids yet.
+  if (!SEASONS[activeSeason].current) return card;
+
+  return `<a class="matchup-card-link" href="game.html?id=${m.id}">${card}</a>`;
+}
+
+function renderSeasonRail() {
+  const rail = document.getElementById("season-rail");
+  const years = Object.keys(SEASONS).sort((a, b) => b - a);
+  rail.innerHTML = years.map(
+    (y) => `<button class="week-pill ${Number(y) === activeSeason ? "active" : ""}" data-season="${y}">${y}</button>`
+  ).join("");
+
+  rail.addEventListener("click", (e) => {
+    const btn = e.target.closest(".week-pill");
+    if (!btn) return;
+    activeSeason = Number(btn.dataset.season);
+    rail.querySelectorAll(".week-pill").forEach((el) => el.classList.remove("active"));
+    btn.classList.add("active");
+    renderHeader();
+    renderPremier();
+    renderGrid();
+  });
+}
+
+function renderHeader() {
+  document.getElementById("page-title").textContent = `${activeSeason} SEASON — WEEK ${CURRENT_WEEK} PREDICTIONS`;
+  document.getElementById("slate-label").textContent = `FULL WEEK ${CURRENT_WEEK} SLATE`;
+  document.getElementById("premier-ribbon-text").textContent = SEASONS[activeSeason].current
+    ? "★ GAME OF THE WEEK — FREE PREVIEW"
+    : "★ FEATURED GAME — FREE PREVIEW";
 }
 
 function renderWeekRail() {
@@ -127,12 +279,12 @@ function renderWeekRail() {
 }
 
 function renderPremier() {
-  const premier = MATCHUPS.find((m) => m.premier);
+  const premier = SEASONS[activeSeason].matchups.find((m) => m.premier);
   document.getElementById("premier-slot").innerHTML = matchupCard(premier, "premier-card");
 }
 
 function renderGrid() {
-  const rest = MATCHUPS.filter((m) => !m.premier);
+  const rest = SEASONS[activeSeason].matchups.filter((m) => !m.premier);
   document.getElementById("matchup-grid").innerHTML = rest.map((m) => matchupCard(m)).join("");
 
   const section = document.getElementById("locked-section");
@@ -143,28 +295,6 @@ function renderGrid() {
   } else {
     section.classList.add("is-locked");
     panel.style.display = "flex";
-  }
-}
-
-function renderNav() {
-  const pillSlot = document.getElementById("member-pill-slot");
-  const signupLink = document.getElementById("nav-signup-link");
-
-  if (isMember()) {
-    const firstName = localStorage.getItem("sw_first_name");
-    pillSlot.innerHTML = `<span class="member-pill">✓ Free Member${firstName ? " — " + firstName : ""}</span>`;
-    signupLink.textContent = "Reset Demo";
-    signupLink.href = "#";
-    signupLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      localStorage.removeItem("sw_member");
-      localStorage.removeItem("sw_first_name");
-      location.reload();
-    });
-  } else {
-    pillSlot.innerHTML = "";
-    signupLink.textContent = "Sign Up Free";
-    signupLink.href = "signup.html";
   }
 }
 
@@ -180,8 +310,9 @@ function renderDevToggle() {
   });
 }
 
+renderSeasonRail();
+renderHeader();
 renderWeekRail();
 renderPremier();
 renderGrid();
-renderNav();
 renderDevToggle();
