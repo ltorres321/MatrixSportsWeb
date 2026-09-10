@@ -22,4 +22,9 @@ export interface Matchup {
   // game the model hasn't run on yet (nothing to grade in any of
   // those cases).
   predictionCorrect?: boolean;
+  // True only for the single highest-confidence game of the week AND
+  // only when that confidence is >= LOCK_OF_WEEK_THRESHOLD -- see
+  // predictions.ts. Implies `premier`, but `premier` doesn't imply
+  // this: the free-preview game is always picked, gold styling isn't.
+  lockOfWeek?: boolean;
 }

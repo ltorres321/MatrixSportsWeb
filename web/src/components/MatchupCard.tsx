@@ -75,8 +75,9 @@ function TeamRow({
 }
 
 export default function MatchupCard({ matchup, premier }: { matchup: Matchup; premier?: boolean }) {
+  const premierClass = premier ? `premier-card ${matchup.lockOfWeek ? "gold" : ""}` : "";
   const card = (
-    <div className={`matchup-card ${premier ? "premier-card" : ""}`}>
+    <div className={`matchup-card ${premierClass}`}>
       <div className="matchup-status">
         <StatusTag status={matchup.status} />
         <span className="game-meta">{matchup.kickoff}</span>

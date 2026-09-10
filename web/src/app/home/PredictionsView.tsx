@@ -96,7 +96,9 @@ export default function PredictionsView({
           <>
             {premier && (
               <div className="premier-wrap">
-                <div className="premier-ribbon">★ GAME OF THE WEEK — FREE PREVIEW</div>
+                <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
+                  {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : "★ GAME OF THE WEEK — FREE PREVIEW"}
+                </div>
                 <MatchupCard matchup={premier} premier />
               </div>
             )}

@@ -27,6 +27,8 @@ export interface GameStat {
   finalResult?: { winnerAlias: string; margin: number; totalScore: number };
   // Same meaning as Matchup.predictionCorrect -- see there.
   predictionCorrect?: boolean;
+  // Same meaning as Matchup.lockOfWeek -- see there.
+  lockOfWeek?: boolean;
 }
 
 export const PERCENTILE_MIN = -30;

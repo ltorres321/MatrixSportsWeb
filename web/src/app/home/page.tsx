@@ -2,7 +2,7 @@ import {
   getAvailableSeasons,
   getWeeksForSeason,
   getDefaultWeek,
-  getPremierGameId,
+  getPremierGame,
   getMatchupsForSeasonWeek,
   getCurrentSeasonYear,
 } from "@/lib/predictions";
@@ -39,10 +39,8 @@ export default async function HomePage({
     ? requestedWeek
     : defaultWeek ?? weeks[weeks.length - 1] ?? null;
 
-  const premierGameId = activeWeek ? await getPremierGameId(activeSeason, activeWeek) : null;
-  const matchups = activeWeek
-    ? await getMatchupsForSeasonWeek(activeSeason, activeWeek, premierGameId ?? undefined)
-    : [];
+  const premier = activeWeek ? await getPremierGame(activeSeason, activeWeek) : null;
+  const matchups = activeWeek ? await getMatchupsForSeasonWeek(activeSeason, activeWeek, premier) : [];
 
   return (
     <PredictionsView

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getAvailableSeasons,
   getDefaultWeek,
-  getPremierGameId,
+  getPremierGame,
   getMatchupsForSeasonWeek,
   getCurrentSeasonYear,
 } from "@/lib/predictions";
@@ -103,8 +103,8 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
   if (season !== undefined) {
     currentWeek = await getDefaultWeek(season);
     if (currentWeek !== null) {
-      const premierGameId = await getPremierGameId(season, currentWeek);
-      const matchups = await getMatchupsForSeasonWeek(season, currentWeek, premierGameId ?? undefined);
+      const premierGame = await getPremierGame(season, currentWeek);
+      const matchups = await getMatchupsForSeasonWeek(season, currentWeek, premierGame);
       premier = matchups.find((m) => m.premier);
     }
   }
@@ -128,7 +128,9 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
       <main>
         {premier && (
           <div className="premier-wrap">
-            <div className="premier-ribbon">★ LOCK OF THE WEEK</div>
+            <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
+              {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : "★ GAME OF THE WEEK — FREE PREVIEW"}
+            </div>
             <MatchupCard matchup={premier} premier />
             <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
               <Link className="btn btn-ghost" href="/home">

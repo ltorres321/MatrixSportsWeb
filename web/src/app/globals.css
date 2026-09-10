@@ -35,6 +35,7 @@
      fixed green in both themes on purpose. */
   --correct-rgb: 34, 197, 94;
   --wrong-rgb: 255, 59, 59;
+  --gold-rgb: 232, 197, 71;
 }
 
 /* Light theme -- an account preference set on the Profile page
@@ -64,6 +65,7 @@
   --red: #c92a2a;
   --wrong-rgb: 201, 42, 42;
   --gold: #8a6208;
+  --gold-rgb: 138, 98, 8;
 }
 
 /* A blur glow on fine text reads as glare/haze on a light background
@@ -1088,28 +1090,42 @@ h1.glow span {
   margin-bottom: 3rem;
 }
 
+/* Neutral by default -- every week always has a free-preview game,
+   but the gold "Lock of the Week" treatment below is reserved for
+   when that game's win probability actually clears
+   LOCK_OF_WEEK_THRESHOLD (see predictions.ts). Below that bar this is
+   just a themed badge, same accent color as everything else. */
 .premier-ribbon {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
   letter-spacing: 0.15em;
-  color: var(--gold);
-  border: 1px solid rgba(232, 197, 71, 0.5);
-  background: rgba(232, 197, 71, 0.1);
+  color: var(--green);
+  border: 1px solid var(--panel-border);
+  background: var(--green-faint);
   padding: 0.3rem 0.8rem;
   border-radius: 999px;
   margin-bottom: 1rem;
 }
 
+.premier-ribbon.gold {
+  color: var(--gold);
+  border: 1px solid rgba(var(--gold-rgb), 0.5);
+  background: rgba(var(--gold-rgb), 0.1);
+}
+
 .premier-card {
-  border-color: rgba(232, 197, 71, 0.45);
-  box-shadow: 0 0 40px rgba(232, 197, 71, 0.08);
   padding: 1.75rem;
 }
 
-.premier-card:hover {
-  border-color: rgba(232, 197, 71, 0.75);
+.premier-card.gold {
+  border-color: rgba(var(--gold-rgb), 0.45);
+  box-shadow: 0 0 40px rgba(var(--gold-rgb), 0.08);
+}
+
+.premier-card.gold:hover {
+  border-color: rgba(var(--gold-rgb), 0.75);
 }
 
 .premier-card .team-badge {

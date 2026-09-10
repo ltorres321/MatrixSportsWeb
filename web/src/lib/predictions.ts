@@ -308,7 +308,7 @@ function scheduleGameToMatchup(game: ScheduleGame, records: Map<string, string>)
 export async function getMatchupsForSeasonWeek(
   season: number,
   week: number,
-  premierGameId?: string
+  premier?: PremierGame | null
 ): Promise<Matchup[]> {
   const rows = await query<PredictionRow>(
     `SELECT ${PREDICTION_COLUMNS} FROM latest_predictions
@@ -345,16 +345,33 @@ export async function getMatchupsForSeasonWeek(
   combined.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   return combined.map(({ matchup }) => {
-    if (premierGameId && matchup.id === premierGameId) matchup.premier = true;
+    if (premier && matchup.id === premier.id) {
+      matchup.premier = true;
+      matchup.lockOfWeek = premier.probability >= LOCK_OF_WEEK_THRESHOLD;
+    }
     return matchup;
   });
 }
 
+// A win probability at or above this (for whichever side is favored)
+// is the "highly accurate" tier -- only the single most confident
+// game of the week can ever earn the gold Lock of the Week treatment,
+// and only when it actually clears this bar.
+export const LOCK_OF_WEEK_THRESHOLD = 0.77;
+
+export interface PremierGame {
+  id: string;
+  probability: number; // the favored side's win probability, 0-1
+}
+
 // Game of the Week: among this week's games, whichever the model is
-// most confident about (win probability furthest from a coin flip).
-// Picking the marquee free game from real model output rather than a
-// hardcoded id.
-export async function getPremierGameId(season: number, week: number): Promise<string | null> {
+// most confident about (win probability furthest from a coin flip) --
+// i.e. whichever side has the single highest win probability this
+// week. Always picked (this is the free-preview game regardless of
+// confidence); getMatchupsForSeasonWeek/getGameDetail separately
+// decide whether its probability clears LOCK_OF_WEEK_THRESHOLD for
+// the gold "Lock of the Week" styling.
+export async function getPremierGame(season: number, week: number): Promise<PremierGame | null> {
   const rows = await query<{ universal_game_id: string; home_win_probability: number }>(
     `SELECT universal_game_id, home_win_probability FROM latest_predictions
      WHERE season = $1 AND week = $2`,
@@ -370,7 +387,8 @@ export async function getPremierGameId(season: number, week: number): Promise<st
       bestConfidence = confidence;
     }
   }
-  return best.universal_game_id;
+  const probability = best.home_win_probability >= 0.5 ? best.home_win_probability : 1 - best.home_win_probability;
+  return { id: best.universal_game_id, probability };
 }
 
 // "-3.5" traditionally sits next to the favored team's name. Our
@@ -463,7 +481,10 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
   const row = rows[0];
   const records = await getTeamRecords(row.season, row.week);
   const game = rowToGameStat(row, records);
-  const premierId = await getPremierGameId(row.season, row.week);
-  if (premierId === row.universal_game_id) game.premier = true;
+  const premier = await getPremierGame(row.season, row.week);
+  if (premier && premier.id === row.universal_game_id) {
+    game.premier = true;
+    game.lockOfWeek = premier.probability >= LOCK_OF_WEEK_THRESHOLD;
+  }
   return game;
 }
