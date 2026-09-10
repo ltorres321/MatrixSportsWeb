@@ -35,13 +35,17 @@ function TeamRow({ side, status }: { side: TeamSide; status: Matchup["status"] }
       <div className="team-metric">
         {isFinal ? (
           <div className="team-score">{side.score}</div>
-        ) : (
+        ) : side.prob !== undefined ? (
           <>
             <div className="team-prob">{side.prob}%</div>
             <div className="prob-bar">
               <div className="prob-bar-fill" style={{ width: `${side.prob}%` }} />
             </div>
           </>
+        ) : (
+          <div className="team-prob" style={{ opacity: 0.5 }}>
+            —
+          </div>
         )}
       </div>
     </div>

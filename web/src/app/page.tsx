@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getSeasons, getCurrentSeasonYear, CURRENT_WEEK } from "@/lib/matchups";
+import {
+  getAvailableSeasons,
+  getDefaultWeek,
+  getPremierGameId,
+  getMatchupsForSeasonWeek,
+  getCurrentSeasonYear,
+} from "@/lib/predictions";
+import type { Matchup } from "@/lib/matchups";
 import { teamLogoPath, TEAMS } from "@/lib/teams";
 import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews, type NewsItem } from "@/lib/espnNews";
@@ -86,10 +93,22 @@ export default async function HomePage() {
   );
 }
 
-function SignedInDashboard({ firstName, news }: { firstName?: string; news: NewsItem[] }) {
-  const seasons = getSeasons();
-  const year = getCurrentSeasonYear();
-  const premier = seasons[year].matchups.find((m) => m.premier);
+async function SignedInDashboard({ firstName, news }: { firstName?: string; news: NewsItem[] }) {
+  const seasons = await getAvailableSeasons();
+  const fallbackSeason = getCurrentSeasonYear();
+  const season = seasons.includes(fallbackSeason) ? fallbackSeason : seasons[0];
+
+  let premier: Matchup | undefined;
+  let currentWeek: number | null = null;
+  if (season !== undefined) {
+    currentWeek = await getDefaultWeek(season);
+    if (currentWeek !== null) {
+      const premierGameId = await getPremierGameId(season, currentWeek);
+      const matchups = await getMatchupsForSeasonWeek(season, currentWeek, premierGameId ?? undefined);
+      premier = matchups.find((m) => m.premier);
+    }
+  }
+
   const logoStrip = TEAMS.slice(0, 12);
 
   return (
@@ -113,7 +132,7 @@ function SignedInDashboard({ firstName, news }: { firstName?: string; news: News
             <MatchupCard matchup={premier} premier />
             <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
               <Link className="btn btn-ghost" href="/home">
-                View Full Week {CURRENT_WEEK} Slate →
+                View Full Week {currentWeek} Slate →
               </Link>
             </div>
           </div>
@@ -168,7 +187,7 @@ function SignedInDashboard({ firstName, news }: { firstName?: string; news: News
             </span>
             <h3>This Week&apos;s Model Insight</h3>
             <p>
-              After Week {CURRENT_WEEK} wraps, this space breaks down what the
+              After Week {currentWeek} wraps, this space breaks down what the
               simulations got right, what surprised us, and how the numbers
               compared to what actually happened on the field.
             </p>

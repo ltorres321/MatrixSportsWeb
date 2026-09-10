@@ -1,125 +1,56 @@
-"use client";
+import {
+  getAvailableSeasons,
+  getWeeksForSeason,
+  getDefaultWeek,
+  getPremierGameId,
+  getMatchupsForSeasonWeek,
+  getCurrentSeasonYear,
+} from "@/lib/predictions";
+import PredictionsView from "./PredictionsView";
 
-import { useState } from "react";
-import Link from "next/link";
-import { useMemberPreview } from "@/lib/useMemberPreview";
-import { getSeasons, getCurrentSeasonYear, WEEKS, CURRENT_WEEK } from "@/lib/matchups";
-import MatchupCard from "@/components/MatchupCard";
+// Server Component: season/week live in the URL (?season=&week=) so
+// each combination is a real server-rendered fetch against
+// latest_predictions, not client state holding a copy of every
+// season's data at once.
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string; week?: string }>;
+}) {
+  const params = await searchParams;
 
-const SEASONS = getSeasons();
-const CURRENT_SEASON_YEAR = getCurrentSeasonYear();
-const SEASON_YEARS = Object.keys(SEASONS).map(Number).sort((a, b) => b - a);
+  const seasons = await getAvailableSeasons();
+  if (seasons.length === 0) {
+    return <PredictionsView seasons={[]} weeks={[]} activeSeason={null} activeWeek={null} matchups={[]} />;
+  }
 
-export default function PredictionsPage() {
-  const { isMember, toggle } = useMemberPreview();
-  const [activeSeason, setActiveSeason] = useState(CURRENT_SEASON_YEAR);
-  const [activeWeek, setActiveWeek] = useState(CURRENT_WEEK);
+  const fallbackSeason = getCurrentSeasonYear();
+  const requestedSeason = params.season ? Number(params.season) : NaN;
+  const activeSeason = seasons.includes(requestedSeason)
+    ? requestedSeason
+    : seasons.includes(fallbackSeason)
+      ? fallbackSeason
+      : seasons[0];
 
-  const season = SEASONS[activeSeason];
-  const premier = season.matchups.find((m) => m.premier);
-  const rest = season.matchups.filter((m) => !m.premier);
-  const locked = !isMember;
+  const weeks = await getWeeksForSeason(activeSeason);
+  const defaultWeek = await getDefaultWeek(activeSeason);
+  const requestedWeek = params.week ? Number(params.week) : NaN;
+  const activeWeek = weeks.includes(requestedWeek)
+    ? requestedWeek
+    : defaultWeek ?? weeks[weeks.length - 1] ?? null;
+
+  const premierGameId = activeWeek ? await getPremierGameId(activeSeason, activeWeek) : null;
+  const matchups = activeWeek
+    ? await getMatchupsForSeasonWeek(activeSeason, activeWeek, premierGameId ?? undefined)
+    : [];
 
   return (
-    <>
-      <header className="site-header">
-        <h1 className="glow">
-          {activeSeason} SEASON — WEEK {activeWeek} PREDICTIONS
-        </h1>
-        <p className="subtitle">{"// AI-simulated win probabilities for every NFL matchup"}</p>
-        <div className="demo-flag">DEMO DATA — NOT CONNECTED TO THE MODEL</div>
-      </header>
-
-      <div className="league-chips" aria-label="Sport selector">
-        <button className="league-chip active" type="button">
-          NFL
-        </button>
-        <button className="league-chip" type="button" disabled>
-          NBA
-          <span className="soon-tag">COMING SOON</span>
-        </button>
-        <button className="league-chip" type="button" disabled>
-          MLB
-          <span className="soon-tag">COMING SOON</span>
-        </button>
-      </div>
-
-      <nav className="season-rail" aria-label="Season selector">
-        {SEASON_YEARS.map((year) => (
-          <button
-            key={year}
-            type="button"
-            className={`week-pill ${year === activeSeason ? "active" : ""}`}
-            onClick={() => setActiveSeason(year)}
-          >
-            {year}
-          </button>
-        ))}
-      </nav>
-
-      <nav className="week-rail" aria-label="Week selector">
-        {WEEKS.map((w) => (
-          <button
-            key={w}
-            type="button"
-            className={`week-pill ${w === activeWeek ? "active" : ""}`}
-            onClick={() => setActiveWeek(w)}
-          >
-            WK {w}
-          </button>
-        ))}
-      </nav>
-
-      <main>
-        <div className="premier-wrap">
-          <div className="premier-ribbon">
-            {season.current ? "★ GAME OF THE WEEK — FREE PREVIEW" : "★ FEATURED GAME — FREE PREVIEW"}
-          </div>
-          {premier && <MatchupCard matchup={premier} premier />}
-        </div>
-
-        <div className="section-label">
-          <span className="dot" /> FULL WEEK {activeWeek} SLATE
-        </div>
-
-        <div className={`locked-section ${locked ? "is-locked" : ""}`}>
-          <div className="matchup-grid">
-            {rest.map((m) => (
-              <MatchupCard key={m.id} matchup={m} />
-            ))}
-          </div>
-          {locked && (
-            <div className="unlock-panel">
-              <div className="unlock-card">
-                <span className="lock-icon">🔒</span>
-                <h3>Unlock the Full Slate</h3>
-                <p>
-                  Create a free account to see win probabilities for every
-                  game, every week — no credit card required.
-                </p>
-                <Link className="btn btn-primary btn-block" href="/signup">
-                  Sign Up Free
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="dev-toggle">
-          <button type="button" onClick={toggle}>
-            testing: toggle member view
-          </button>
-        </div>
-      </main>
-
-      <footer className="site-footer">
-        <p>
-          Probabilities shown are placeholder values for design purposes and
-          are not produced by the prediction model. The free/locked gating
-          above is real — based on whether you&apos;re signed in — but the
-          underlying numbers are not.
-        </p>
-      </footer>
-    </>
+    <PredictionsView
+      seasons={seasons}
+      weeks={weeks}
+      activeSeason={activeSeason}
+      activeWeek={activeWeek}
+      matchups={matchups}
+    />
   );
 }
