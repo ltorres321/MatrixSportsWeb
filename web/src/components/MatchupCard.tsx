@@ -17,13 +17,32 @@ function StatusTag({ status }: { status: Matchup["status"] }) {
   return <span className="tag preview">UPCOMING</span>;
 }
 
-function TeamRow({ side, status }: { side: TeamSide; status: Matchup["status"] }) {
+function TeamRow({
+  side,
+  status,
+  predictionCorrect,
+}: {
+  side: TeamSide;
+  status: Matchup["status"];
+  predictionCorrect?: boolean;
+}) {
   const team = teamByAlias(side.alias);
   const displayName = team ? `${team.market} ${team.name}` : side.alias;
   const isFinal = status === "final";
 
+  // Only the row of the team that actually won gets graded -- green
+  // if that team was also the model's pick, red if it was an upset.
+  // Ungraded (no prediction, or a tie) keeps the old neutral highlight.
+  const winnerClass = !side.winner
+    ? ""
+    : predictionCorrect === true
+      ? "winner pred-correct"
+      : predictionCorrect === false
+        ? "winner pred-wrong"
+        : "winner";
+
   return (
-    <div className={`team-row ${side.winner ? "winner" : ""}`}>
+    <div className={`team-row ${winnerClass}`}>
       <div className="team-badge">
         {/* eslint-disable-next-line @next/next/no-img-element -- fixed small logo set in /public, next/image adds no benefit here */}
         <img src={teamLogoPath(side.alias)} alt={`${displayName} logo`} />
@@ -34,7 +53,10 @@ function TeamRow({ side, status }: { side: TeamSide; status: Matchup["status"] }
       </div>
       <div className="team-metric">
         {isFinal ? (
-          <div className="team-score">{side.score}</div>
+          <>
+            <div className="team-score">{side.score}</div>
+            {side.prob !== undefined && <div className="team-prob-pregame">Predicted {side.prob}%</div>}
+          </>
         ) : side.prob !== undefined ? (
           <>
             <div className="team-prob">{side.prob}%</div>
@@ -59,9 +81,9 @@ export default function MatchupCard({ matchup, premier }: { matchup: Matchup; pr
         <StatusTag status={matchup.status} />
         <span className="game-meta">{matchup.kickoff}</span>
       </div>
-      <TeamRow side={matchup.teamA} status={matchup.status} />
+      <TeamRow side={matchup.teamA} status={matchup.status} predictionCorrect={matchup.predictionCorrect} />
       <div className="vs-divider">VS</div>
-      <TeamRow side={matchup.teamB} status={matchup.status} />
+      <TeamRow side={matchup.teamB} status={matchup.status} predictionCorrect={matchup.predictionCorrect} />
     </div>
   );
 

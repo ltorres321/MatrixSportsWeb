@@ -236,6 +236,17 @@ export function formatKickoff(gameDate: Date): string {
   }).format(gameDate) + " ET";
 }
 
+// Was the model's favorite actually right? undefined when there's no
+// real score yet, or the game tied (rare in the NFL, but not
+// impossible -- a tie isn't a "hit" or a "miss" for either side).
+function computePredictionCorrect(row: PredictionRow): boolean | undefined {
+  if (row.actual_home_score === null || row.actual_away_score === null) return undefined;
+  if (row.actual_home_score === row.actual_away_score) return undefined;
+  const homeFavored = row.home_win_probability >= 0.5;
+  const homeWon = row.actual_home_score > row.actual_away_score;
+  return homeWon === homeFavored;
+}
+
 function rowToMatchup(row: PredictionRow, records: Map<string, string>): Matchup {
   const status = statusFor(row);
   const homeProb = Math.round(row.home_win_probability * 100);
@@ -244,14 +255,16 @@ function rowToMatchup(row: PredictionRow, records: Map<string, string>): Matchup
   const teamA: TeamSide = {
     alias: row.away_team,
     record: records.get(row.away_team) ?? "0-0",
-    prob: status === "final" ? undefined : awayProb,
+    // Shown for final games too, not just upcoming ones -- so a
+    // historical game shows what was predicted next to what happened.
+    prob: awayProb,
     score: status === "final" ? row.actual_away_score ?? undefined : undefined,
     winner: status === "final" && (row.actual_away_score ?? 0) > (row.actual_home_score ?? 0),
   };
   const teamB: TeamSide = {
     alias: row.home_team,
     record: records.get(row.home_team) ?? "0-0",
-    prob: status === "final" ? undefined : homeProb,
+    prob: homeProb,
     score: status === "final" ? row.actual_home_score ?? undefined : undefined,
     winner: status === "final" && (row.actual_home_score ?? 0) > (row.actual_away_score ?? 0),
   };
@@ -262,6 +275,7 @@ function rowToMatchup(row: PredictionRow, records: Map<string, string>): Matchup
     kickoff: status === "final" ? "Final" : formatKickoff(row.game_date),
     teamA,
     teamB,
+    predictionCorrect: status === "final" ? computePredictionCorrect(row) : undefined,
   };
 }
 
@@ -436,6 +450,7 @@ function rowToGameStat(row: PredictionRow, records: Map<string, string>): GameSt
             totalScore: row.actual_home_score + row.actual_away_score,
           }
         : undefined,
+    predictionCorrect: status === "final" ? computePredictionCorrect(row) : undefined,
   };
 }
 

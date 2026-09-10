@@ -25,6 +25,8 @@ export interface GameStat {
   totals: { line: number; over: number; under: number }[];
   liveNote?: string;
   finalResult?: { winnerAlias: string; margin: number; totalScore: number };
+  // Same meaning as Matchup.predictionCorrect -- see there.
+  predictionCorrect?: boolean;
 }
 
 export const PERCENTILE_MIN = -30;

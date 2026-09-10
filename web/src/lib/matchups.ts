@@ -17,4 +17,9 @@ export interface Matchup {
   kickoff: string;
   teamA: TeamSide;
   teamB: TeamSide;
+  // Only set once the game is final AND a model prediction exists for
+  // it -- undefined for an upcoming game, a tie, or a schedule-only
+  // game the model hasn't run on yet (nothing to grade in any of
+  // those cases).
+  predictionCorrect?: boolean;
 }

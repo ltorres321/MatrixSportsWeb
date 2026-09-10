@@ -168,7 +168,11 @@ function ResultCompare({ game }: { game: GameStat }) {
             {teamDisplay(favored.alias).split(" ").pop()} {favored.winProb}%
           </div>
         </div>
-        <div className="compare-card hit">
+        <div
+          className={`compare-card ${
+            game.predictionCorrect === true ? "hit" : game.predictionCorrect === false ? "miss" : ""
+          }`}
+        >
           <div className="label">ACTUAL RESULT</div>
           <div className="value">
             {winnerName} won by {game.finalResult.margin}
