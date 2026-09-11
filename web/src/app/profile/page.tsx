@@ -13,6 +13,7 @@ interface ProfileRow {
   email: string | null;
   notification_email: string | null;
   cell: string | null;
+  cell_verified: boolean;
   address: string | null;
   city: string | null;
   state: string | null;
@@ -32,6 +33,10 @@ export default function ProfilePage() {
   const [saveNote, setSaveNote] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [cellInput, setCellInput] = useState("");
+  const [cellOtpSent, setCellOtpSent] = useState(false);
+  const [cellOtpCode, setCellOtpCode] = useState("");
+  const [cellNote, setCellNote] = useState("");
 
   useEffect(() => {
     if (!isRealMember || !user) return;
@@ -42,10 +47,67 @@ export default function ProfilePage() {
       .eq("id", user.id)
       .single()
       .then(({ data }) => {
-        setProfile(data as ProfileRow | null);
+        const row = data as ProfileRow | null;
+        setProfile(row);
+        setCellInput(row?.cell ?? "");
         setLoadingProfile(false);
       });
   }, [isRealMember, user]);
+
+  // A verified cell is only trustworthy for whatever number Supabase
+  // actually confirmed via OTP -- if the field's since been edited to
+  // something else (not yet sent/verified), that badge has to go away
+  // even though the DB still says cell_verified until the new number
+  // is confirmed.
+  const cellIsVerifiedForCurrentInput =
+    !!profile?.cell_verified && profile?.cell === cellInput && cellInput.trim() !== "";
+
+  async function handleSendCellCode(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = cellInput.trim();
+    if (!trimmed) {
+      setCellNote("Enter a cell number first.");
+      return;
+    }
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({ phone: trimmed });
+    if (error) {
+      setCellNote(error.message);
+      return;
+    }
+    setCellOtpSent(true);
+    setCellNote("Verification code sent by text -- enter it below.");
+  }
+
+  async function handleVerifyCellCode(e: FormEvent) {
+    e.preventDefault();
+    if (!user) return;
+    const trimmed = cellInput.trim();
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      phone: trimmed,
+      token: cellOtpCode.trim(),
+      type: "phone_change",
+    });
+    if (error) {
+      setCellNote(error.message);
+      return;
+    }
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ cell: trimmed, cell_verified: true })
+      .eq("id", user.id);
+
+    setCellOtpSent(false);
+    setCellOtpCode("");
+    if (profileError) {
+      setCellNote(profileError.message);
+      return;
+    }
+    setProfile((prev) => (prev ? { ...prev, cell: trimmed, cell_verified: true } : prev));
+    setCellNote("Cell number verified.");
+  }
 
   async function handleUpdatePassword(e: FormEvent) {
     e.preventDefault();
@@ -116,7 +178,6 @@ export default function ProfilePage() {
     if (!user) return;
     const formData = new FormData(e.currentTarget);
     const updates = {
-      cell: (String(formData.get("cell") ?? "").trim() || null) as string | null,
       address: (String(formData.get("address") ?? "").trim() || null) as string | null,
       city: (String(formData.get("city") ?? "").trim() || null) as string | null,
       state: (String(formData.get("state") ?? "").trim() || null) as string | null,
@@ -310,15 +371,68 @@ export default function ProfilePage() {
           </form>
         </div>
 
+        <div className="form-panel" style={{ marginBottom: "1.5rem" }}>
+          <h2>Cell Number</h2>
+          <p className="form-intro">
+            Verified by text message -- this is what text alerts (below) actually get sent to, not just
+            whatever&apos;s typed in the field.
+          </p>
+
+          {cellIsVerifiedForCurrentInput && (
+            <p className="form-footer-note" style={{ textAlign: "left", color: "var(--green)" }}>
+              ✓ Verified
+            </p>
+          )}
+
+          <form className="form-grid" onSubmit={cellOtpSent ? handleVerifyCellCode : handleSendCellCode}>
+            <div className="field full">
+              <label htmlFor="cell">Cell Number</label>
+              <input
+                type="tel"
+                id="cell"
+                value={cellInput}
+                onChange={(e) => {
+                  setCellInput(e.target.value);
+                  setCellOtpSent(false);
+                  setCellNote("");
+                }}
+                placeholder="(555) 555-5555"
+              />
+            </div>
+
+            {cellOtpSent && (
+              <div className="field full">
+                <label htmlFor="cell-otp">Verification Code</label>
+                <input
+                  type="text"
+                  id="cell-otp"
+                  inputMode="numeric"
+                  value={cellOtpCode}
+                  onChange={(e) => setCellOtpCode(e.target.value)}
+                  placeholder="123456"
+                />
+              </div>
+            )}
+
+            {cellNote && (
+              <p className="form-footer-note" style={{ textAlign: "left" }}>
+                {cellNote}
+              </p>
+            )}
+
+            <div className="field full">
+              <button type="submit" className="btn btn-primary btn-block">
+                {cellOtpSent ? "Verify Code" : cellIsVerifiedForCurrentInput ? "Send New Code" : "Send Verification Code"}
+              </button>
+            </div>
+          </form>
+        </div>
+
         <div className="form-panel">
-          <h2>Contact &amp; Notifications</h2>
-          <p className="form-intro">Phone, address, favorite team, and text alerts.</p>
+          <h2>Address &amp; Team Notifications</h2>
+          <p className="form-intro">Mailing address, favorite team, and text alerts.</p>
           {!loadingProfile && (
             <form className="form-grid" onSubmit={handleUpdateProfile}>
-              <div className="field full">
-                <label htmlFor="cell">Cell Number</label>
-                <input type="tel" id="cell" name="cell" defaultValue={profile?.cell ?? ""} placeholder="(555) 555-5555" />
-              </div>
               <div className="field full">
                 <label htmlFor="address">Address</label>
                 <input type="text" id="address" name="address" defaultValue={profile?.address ?? ""} />
@@ -350,7 +464,7 @@ export default function ProfilePage() {
                 <input type="checkbox" id="notify" name="notify" defaultChecked={profile?.notify_win_prob ?? false} />
                 <label htmlFor="notify">
                   Notify me when a selected team&apos;s win probability changes
-                  <span className="sub">Requires the cell number above.</span>
+                  <span className="sub">Requires a verified cell number (see the Cell Number section above).</span>
                 </label>
               </div>
               <div className="field full">
