@@ -1771,6 +1771,13 @@ h1.glow span {
   margin-right: auto;
 }
 
+/* Scoped to the predictions page's methodology note only -- +2px over
+   .site-footer's 12px base, not a change to the shared footer style
+   every other page's footer text also uses. */
+.footer-note-large {
+  font-size: 0.875rem;
+}
+
 @media (max-width: 480px) {
   .navbar {
     justify-content: center;

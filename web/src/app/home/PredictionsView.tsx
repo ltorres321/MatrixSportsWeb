@@ -140,7 +140,7 @@ export default function PredictionsView({
       </main>
 
       <footer className="site-footer">
-        <p>
+        <p className="footer-note-large">
           Probabilities are produced by 100,000 Monte Carlo simulations per
           matchup, grounded in the market line. The free/locked gating above
           is based on whether you&apos;re signed in.
