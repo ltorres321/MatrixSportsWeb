@@ -414,8 +414,8 @@ export default function ProfilePage() {
           </p>
 
           {cellIsVerifiedForCurrentInput && (
-            <p className="form-footer-note" style={{ textAlign: "left", color: "var(--green)" }}>
-              ✓ Verified
+            <p className="form-footer-note" style={{ textAlign: "left", color: "var(--gold)" }}>
+              ✓ Verified Number
             </p>
           )}
 
@@ -425,6 +425,7 @@ export default function ProfilePage() {
               <input
                 type="tel"
                 id="cell"
+                className={cellIsVerifiedForCurrentInput ? "cell-input-verified" : ""}
                 value={cellInput}
                 onChange={(e) => {
                   setCellInput(e.target.value);

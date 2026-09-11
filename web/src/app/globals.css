@@ -1651,6 +1651,22 @@ h1.glow span {
   box-shadow: 0 0 10px rgba(var(--glow-rgb), 0.2);
 }
 
+/* Cell Number input once it matches a real, OTP-verified number (see
+   profile/page.tsx's cellIsVerifiedForCurrentInput) -- reverts to the
+   plain default styling above automatically the moment the field is
+   edited to something that no longer matches, no extra logic needed
+   for that since the class itself is conditional on the comparison. */
+.field input.cell-input-verified {
+  background: rgba(var(--gold-rgb), 0.12);
+  border-color: rgba(var(--gold-rgb), 0.6);
+  color: var(--gold);
+}
+
+.field input.cell-input-verified:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(var(--gold-rgb), 0.3);
+}
+
 .field input.invalid {
   border-color: var(--red);
 }
