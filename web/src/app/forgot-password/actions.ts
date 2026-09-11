@@ -35,14 +35,23 @@ export async function requestPasswordReset(
   // and exchanges that code on load, so no server-side /auth/callback
   // hop is needed for this flow at all.
   const supabase = await createClient();
-  await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/reset-password`,
   });
   // (page lives at src/app/auth/reset-password/page.tsx -- keep this
   // path in sync with that if it's ever moved)
 
-  // Always report success, whether or not that email is actually
-  // registered -- telling a visitor "no account with that email"
-  // would let anyone probe which addresses have accounts here.
+  // Supabase's resetPasswordForEmail already never reveals whether an
+  // email is registered on its own (that's built into the API, not
+  // something this app has to fake) -- so there's nothing to hide by
+  // blanket-suppressing every error. Surfacing a REAL failure (most
+  // commonly its per-email rate limit, ~60s between requests) is what
+  // actually matters: silently swallowing it just leaves someone
+  // staring at "check your email" for an email that was never sent,
+  // with no way to tell the difference from a slow inbox.
+  if (error) {
+    return { error: error.message };
+  }
+
   return { submitted: true };
 }
