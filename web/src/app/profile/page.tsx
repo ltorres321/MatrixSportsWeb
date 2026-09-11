@@ -331,17 +331,17 @@ export default function ProfilePage() {
             <div className="league-chips" style={{ justifyContent: "flex-start" }}>
               <button
                 type="button"
-                className={`league-chip ${(profile?.theme ?? "dark") === "dark" ? "active" : ""}`}
+                className={`league-chip theme-pill-red ${(profile?.theme ?? "dark") === "dark" ? "active" : ""}`}
                 onClick={() => handleAppearanceChange("theme", "dark")}
               >
-                Dark
+                🔴 Red Pill
               </button>
               <button
                 type="button"
-                className={`league-chip ${profile?.theme === "light" ? "active" : ""}`}
+                className={`league-chip theme-pill-blue ${profile?.theme === "light" ? "active" : ""}`}
                 onClick={() => handleAppearanceChange("theme", "light")}
               >
-                Light
+                🔵 Blue Pill
               </button>
             </div>
           </div>

@@ -633,6 +633,36 @@ h1.glow span {
   opacity: 0.55;
 }
 
+/* Red Pill / Blue Pill theme picker -- colored to match their name
+   even before selection (a light tint), with a stronger version once
+   active. Red reuses --wrong-rgb (already theme-aware); blue is a
+   fixed color in both themes since dark theme has no "blue" of its
+   own to stay consistent with -- this is a literal blue pill, not a
+   themed accent. */
+.theme-pill-red {
+  border-color: rgba(var(--wrong-rgb), 0.4);
+  color: var(--red);
+}
+
+.theme-pill-red.active {
+  background: rgba(var(--wrong-rgb), 0.12);
+  border-color: var(--red);
+  color: var(--red);
+  box-shadow: 0 0 12px rgba(var(--wrong-rgb), 0.3);
+}
+
+.theme-pill-blue {
+  border-color: rgba(59, 158, 255, 0.4);
+  color: #3b9eff;
+}
+
+.theme-pill-blue.active {
+  background: rgba(59, 158, 255, 0.12);
+  border-color: #3b9eff;
+  color: #3b9eff;
+  box-shadow: 0 0 12px rgba(59, 158, 255, 0.3);
+}
+
 .league-chip .soon-tag {
   display: block;
   font-size: 0.6rem;
