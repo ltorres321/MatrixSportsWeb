@@ -18,7 +18,7 @@ export default function PredictionsView({
   activeWeek: number | null;
   matchups: Matchup[];
 }) {
-  const { isMember, toggle } = useMemberPreview();
+  const { isMember, isRealMember, toggle } = useMemberPreview();
 
   if (activeSeason === null) {
     return (
@@ -97,7 +97,11 @@ export default function PredictionsView({
             {premier && (
               <div className="premier-wrap">
                 <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
-                  {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : "★ GAME OF THE WEEK — FREE PREVIEW"}
+                  {premier.lockOfWeek
+                    ? "🔒 LOCK OF THE WEEK"
+                    : isRealMember
+                      ? "★ GAME OF THE WEEK — FREE PREVIEW"
+                      : "★ FREE GAME OF THE WEEK — FREE PREVIEW"}
                 </div>
                 <MatchupCard matchup={premier} premier />
               </div>
