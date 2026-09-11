@@ -199,6 +199,7 @@ a {
    --------------------------------------------------------------- */
 
 .navbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -207,6 +208,45 @@ a {
   margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
+}
+
+/* Hidden on desktop -- see the <=768px block below, which reveals
+   this and turns .navbar-links into its dropdown panel. */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--text);
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+/* Morphs into an X when open. */
+.nav-toggle[aria-expanded="true"] span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-toggle[aria-expanded="true"] span:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-toggle[aria-expanded="true"] span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
 }
 
 .navbar .brand {
@@ -1793,13 +1833,6 @@ h1.glow span {
   font-size: 0.875rem;
 }
 
-@media (max-width: 480px) {
-  .navbar {
-    justify-content: center;
-    text-align: center;
-  }
-}
-
 /* ---------------------------------------------------------------
    About page
    --------------------------------------------------------------- */
@@ -1873,4 +1906,182 @@ h1.glow span {
   font-size: 1.15rem;
   line-height: 1.6;
   margin: 3rem 0;
+}
+
+/* ---------------------------------------------------------------
+   Mobile / responsive pass
+
+   Two breakpoints:
+     768px -- tablet and below: nav collapses to the hamburger menu,
+              grids that used a wide minmax() get a smaller one so
+              they still show 2 columns instead of 1 on a mid-size
+              screen.
+     480px -- phone: everything above still applies, plus tighter
+              page padding and single-column grids where a wide
+              minmax() would otherwise force horizontal overflow
+              (e.g. .matchup-grid's 340px minimum is wider than a
+              phone's content area once page padding is subtracted).
+   --------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+  .nav-toggle {
+    display: flex;
+  }
+
+  /* Becomes a dropdown panel instead of an inline row -- anchored to
+     .navbar via that rule's position: relative. */
+  .navbar-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: var(--panel-solid);
+    border: 1px solid var(--panel-border);
+    border-top: none;
+    padding: 0.5rem 1.5rem 0.75rem;
+    z-index: 30;
+  }
+
+  .navbar-links.open {
+    display: flex;
+  }
+
+  .navbar-links a {
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .navbar-links a:last-child {
+    border-bottom: none;
+  }
+
+  /* 340px's minimum was tuned for desktop multi-column layouts --
+     280px still leaves two columns comfortably on a tablet-width
+     screen instead of dropping to one before it needs to. */
+  .matchup-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .game-hero-teams {
+    gap: 1.25rem;
+  }
+
+  .game-hero-team {
+    min-width: 130px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Keeps the sticky bar's edge-to-edge bleed matching .page's
+     reduced padding above -- see .game-sticky-bar's base rule. */
+  .game-sticky-bar {
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+
+  h1.glow {
+    letter-spacing: 0.04em;
+  }
+
+  .hero-title {
+    letter-spacing: 0;
+  }
+
+  /* A single 340px-minimum column can be wider than the whole
+     content area on a phone -- one column, full width, instead of
+     the grid trying (and failing) to honor that minimum. */
+  .matchup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .value-grid,
+  .article-grid,
+  .news-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-panel {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .honesty-block {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .unlock-card {
+    padding: 1.75rem 1.5rem;
+  }
+
+  .premier-card {
+    padding: 1.25rem;
+  }
+
+  .premier-card .team-badge {
+    width: 48px;
+    height: 48px;
+  }
+
+  .premier-card .team-name {
+    font-size: 1.05rem;
+  }
+
+  .premier-card .team-prob {
+    font-size: 1.2rem;
+  }
+
+  .game-hero {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .game-hero-teams {
+    gap: 0.75rem;
+  }
+
+  .game-hero-team {
+    min-width: 120px;
+  }
+
+  .game-hero-team img {
+    width: 64px;
+    height: 64px;
+  }
+
+  .game-hero-team .big-prob {
+    font-size: 1.5rem;
+  }
+
+  .game-sticky-bar {
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  .game-sticky-bar .side {
+    gap: 0.4rem;
+    font-size: 0.78rem;
+  }
+
+  /* The fixed 140px label column was tuned for desktop -- "Won by
+     15-21" plus a 56px percentage column left very little room for
+     the bar itself on a phone. */
+  .bucket-row {
+    grid-template-columns: 96px 1fr 44px;
+    gap: 0.5rem;
+  }
+
+  .bucket-row .bucket-label {
+    font-size: 0.72rem;
+  }
+
+  .totals-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
 }
