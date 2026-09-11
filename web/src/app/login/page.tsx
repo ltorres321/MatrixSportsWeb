@@ -36,6 +36,12 @@ export default function LoginPage() {
               <div className="field full">
                 <label htmlFor="password">Password</label>
                 <input id="password" name="password" type="password" autoComplete="current-password" required />
+                <Link
+                  href="/forgot-password"
+                  style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginTop: "0.35rem", display: "inline-block" }}
+                >
+                  Forgot password?
+                </Link>
               </div>
 
               <div className="field full">
