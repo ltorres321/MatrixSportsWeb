@@ -14,18 +14,18 @@ export const metadata: Metadata = {
 // the very first HTML sent -- doing this client-side instead would
 // flash the default look before switching, since it'd have to wait
 // for a browser round trip to Supabase first.
-async function getAppearance(): Promise<{ theme: "dark" | "light"; rainEnabled: boolean }> {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
+async function getAppearance(
+  userId: string | undefined
+): Promise<{ theme: "dark" | "light"; rainEnabled: boolean }> {
+  if (!userId) {
     return { theme: "dark", rainEnabled: true };
   }
 
+  const supabase = await createClient();
   const { data: profile } = await supabase
     .from("profiles")
     .select("theme, matrix_rain_enabled")
-    .eq("id", userData.user.id)
+    .eq("id", userId)
     .single();
 
   const theme = profile?.theme === "light" ? "light" : "dark";
@@ -40,14 +40,23 @@ async function getAppearance(): Promise<{ theme: "dark" | "light"; rainEnabled: 
 }
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const { theme, rainEnabled } = await getAppearance();
+  // Read here (server-side, every request) rather than in SiteNav via
+  // a client hook -- SiteNav lives in this persistent layout, which
+  // never remounts on an in-app navigation, so a one-time client-side
+  // getUser() call would keep showing "Sign In / Login" forever after
+  // a Server Action login redirects here, until an actual full page
+  // reload. Resolving it server-side on every request means the nav
+  // is correct the instant the redirect lands, no reload needed.
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const { theme, rainEnabled } = await getAppearance(userData.user?.id);
 
   return (
     <html lang="en" data-theme={theme}>
       <body>
         {rainEnabled && <RainCanvas theme={theme} />}
         <div className="page">
-          <SiteNav />
+          <SiteNav signedIn={!!userData.user} />
           {children}
         </div>
       </body>

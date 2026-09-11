@@ -1,18 +1,15 @@
-"use client";
-
 import Link from "next/link";
-import { useUser } from "@/lib/useUser";
 
-// Real auth now (Supabase), replacing the old static site's
-// localStorage "sw_member" flag. Deliberately uses real auth only
-// (not the dev preview toggle from useMemberPreview) -- the nav must
-// always reflect whether you're actually signed in, never a stale
-// "preview" flag left on from testing a page's locked/unlocked
-// content. Rightmost slot is always exactly one of Profile / Sign In
-// -- never both, never neither. Sign-out lives on the Profile page.
-export default function SiteNav() {
-  const { user } = useUser();
-
+// Real auth now (Supabase). Resolved server-side by the root layout
+// on every request (see layout.tsx) and passed down as a plain prop
+// -- NOT a client-side hook -- because this component lives in the
+// persistent layout shell, which never remounts on an in-app
+// navigation. A client hook here would only ever check auth once per
+// full page load, so it kept showing "Sign In / Login" after signing
+// in until a hard refresh. Rightmost slot is always exactly one of
+// My Profile / Sign In -- never both, never neither. Sign-out lives
+// on the Profile page.
+export default function SiteNav({ signedIn }: { signedIn: boolean }) {
   return (
     <nav className="navbar">
       <Link className="brand" href="/">
@@ -22,8 +19,8 @@ export default function SiteNav() {
         <Link href="/">Home</Link>
         <Link href="/home">Predictions</Link>
         <Link href="/about">About</Link>
-        {user ? (
-          <Link href="/profile">Profile</Link>
+        {signedIn ? (
+          <Link href="/profile">My Profile</Link>
         ) : (
           <Link href="/login">Sign In / Login</Link>
         )}
