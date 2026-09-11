@@ -1,9 +1,17 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
 import type { Matchup } from "@/lib/matchups";
 import MatchupCard from "@/components/MatchupCard";
+
+// How often to re-fetch while at least one game on screen is live --
+// short enough to feel real-time, long enough not to hammer the
+// server (each refresh re-runs the Server Component, which itself
+// only re-hits ESPN at most once per liveScores.ts's own 30s cache).
+const LIVE_REFRESH_MS = 20_000;
 
 export default function PredictionsView({
   seasons,
@@ -19,6 +27,19 @@ export default function PredictionsView({
   matchups: Matchup[];
 }) {
   const { isMember, isRealMember, toggle } = useMemberPreview();
+  const router = useRouter();
+  const hasLiveGame = matchups.some((m) => m.status === "live");
+
+  // Re-runs the Server Component data fetch on an interval so scores
+  // actually move while someone's sitting on the page, not just on a
+  // manual reload -- stops polling automatically the moment nothing
+  // in view is live anymore (a fresh prop from the server re-render
+  // naturally flips hasLiveGame to false once every game's final).
+  useEffect(() => {
+    if (!hasLiveGame) return;
+    const interval = setInterval(() => router.refresh(), LIVE_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [hasLiveGame, router]);
 
   if (activeSeason === null) {
     return (
@@ -47,6 +68,12 @@ export default function PredictionsView({
           {activeSeason} SEASON — WEEK {activeWeek} PREDICTIONS
         </h1>
         <p className="subtitle">{"// AI-simulated win probabilities for every NFL matchup"}</p>
+        {hasLiveGame && (
+          <p className="subtitle" style={{ color: "var(--red)" }}>
+            <span className="live-blip" style={{ display: "inline-block", marginRight: "0.4em" }} />
+            Live scores updating automatically
+          </p>
+        )}
       </header>
 
       <div className="league-chips" aria-label="Sport selector">

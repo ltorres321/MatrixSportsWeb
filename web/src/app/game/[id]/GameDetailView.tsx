@@ -1,9 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import { scalePosition, type GameStat, type GameStatSide } from "@/lib/gameStats";
+
+const LIVE_REFRESH_MS = 20_000;
 
 function teamDisplay(alias: string): string {
   const team = teamByAlias(alias);
@@ -11,6 +15,7 @@ function teamDisplay(alias: string): string {
 }
 
 function StickyBar({ game }: { game: GameStat }) {
+  const showScore = game.status === "final" || game.status === "live";
   const statusWord = game.status === "final" ? "FINAL" : game.kickoff;
   return (
     <div className="game-sticky-bar">
@@ -18,11 +23,11 @@ function StickyBar({ game }: { game: GameStat }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={teamLogoPath(game.teamA.alias)} alt="" />
         <span>{game.teamA.alias}</span>
-        <span className="prob">{game.status === "final" ? game.teamA.score : `${game.teamA.winProb}%`}</span>
+        <span className="prob">{showScore ? game.teamA.score : `${game.teamA.winProb}%`}</span>
       </div>
       <div className="vs">{statusWord}</div>
       <div className="side">
-        <span className="prob">{game.status === "final" ? game.teamB.score : `${game.teamB.winProb}%`}</span>
+        <span className="prob">{showScore ? game.teamB.score : `${game.teamB.winProb}%`}</span>
         <span>{game.teamB.alias}</span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={teamLogoPath(game.teamB.alias)} alt="" />
@@ -32,13 +37,14 @@ function StickyBar({ game }: { game: GameStat }) {
 }
 
 function HeroTeam({ side, status }: { side: GameStatSide; status: GameStat["status"] }) {
+  const showScore = status === "final" || status === "live";
   return (
     <div className="game-hero-team">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={teamLogoPath(side.alias)} alt={`${teamDisplay(side.alias)} logo`} />
       <div className="name">{teamDisplay(side.alias)}</div>
       <div className="record">{side.record}</div>
-      {status === "final" ? (
+      {showScore ? (
         <div className="big-prob">{side.score}</div>
       ) : (
         <div className="big-prob">
@@ -56,6 +62,11 @@ function Hero({ game }: { game: GameStat }) {
       <div className="matchup-status" style={{ justifyContent: "center", marginBottom: "1.5rem" }}>
         {game.status === "final" ? (
           <span className="tag final">FINAL</span>
+        ) : game.status === "live" ? (
+          <span className="tag live">
+            <span className="blip" />
+            LIVE — {game.kickoff}
+          </span>
         ) : (
           <span className="tag preview">{game.kickoff}</span>
         )}
@@ -189,7 +200,14 @@ function ResultCompare({ game }: { game: GameStat }) {
 
 export default function GameDetailView({ game }: { game: GameStat }) {
   const { isMember, toggle } = useMemberPreview();
+  const router = useRouter();
   const locked = !game.premier && !isMember;
+
+  useEffect(() => {
+    if (game.status !== "live") return;
+    const interval = setInterval(() => router.refresh(), LIVE_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [game.status, router]);
 
   return (
     <>

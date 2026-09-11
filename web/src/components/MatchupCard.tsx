@@ -28,7 +28,7 @@ function TeamRow({
 }) {
   const team = teamByAlias(side.alias);
   const displayName = team ? `${team.market} ${team.name}` : side.alias;
-  const isFinal = status === "final";
+  const showScore = status === "final" || status === "live";
 
   // Only the row of the team that actually won gets graded -- green
   // if that team was also the model's pick, red if it was an upset.
@@ -52,10 +52,12 @@ function TeamRow({
         <div className="team-record">{side.record}</div>
       </div>
       <div className="team-metric">
-        {isFinal ? (
+        {showScore ? (
           <>
             <div className="team-score">{side.score}</div>
-            {side.prob !== undefined && <div className="team-prob-pregame">Predicted {side.prob}%</div>}
+            {status === "final" && side.prob !== undefined && (
+              <div className="team-prob-pregame">Predicted {side.prob}%</div>
+            )}
           </>
         ) : side.prob !== undefined ? (
           <>

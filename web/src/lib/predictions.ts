@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import type { Matchup, TeamSide } from "@/lib/matchups";
 import type { GameStat, GameStatSide } from "@/lib/gameStats";
 import { getSeasonSchedule, getScheduleWeek, getScheduleWeeks, type ScheduleGame } from "@/lib/schedule";
+import { getAllLiveScores, getLiveScore, type LiveScore } from "@/lib/liveScores";
 
 // Real data layer over the predictions/latest_predictions table that
 // SportsAnalytics (a separate repo/pipeline) writes into. This file
@@ -221,12 +222,6 @@ async function getTeamRecords(season: number, throughWeek: number): Promise<Map<
   return map;
 }
 
-function statusFor(row: PredictionRow): "preview" | "final" {
-  // No live in-progress score feed exists yet -- every game is either
-  // "not played" or "final," never "live," until that's wired up.
-  return row.actual_home_score !== null ? "final" : "preview";
-}
-
 export function formatKickoff(gameDate: Date): string {
   return new Intl.DateTimeFormat("en-US", {
     weekday: "short",
@@ -237,69 +232,153 @@ export function formatKickoff(gameDate: Date): string {
 }
 
 // Was the model's favorite actually right? undefined when there's no
-// real score yet, or the game tied (rare in the NFL, but not
-// impossible -- a tie isn't a "hit" or a "miss" for either side).
-function computePredictionCorrect(row: PredictionRow): boolean | undefined {
-  if (row.actual_home_score === null || row.actual_away_score === null) return undefined;
-  if (row.actual_home_score === row.actual_away_score) return undefined;
-  const homeFavored = row.home_win_probability >= 0.5;
-  const homeWon = row.actual_home_score > row.actual_away_score;
+// real score yet, homeWinProbability isn't known (a schedule-only
+// game with no prediction), or the game tied (rare in the NFL, but
+// not impossible -- a tie isn't a "hit" or a "miss" for either side).
+function computeCorrect(
+  homeScore: number,
+  awayScore: number,
+  homeWinProbability: number | undefined
+): boolean | undefined {
+  if (homeWinProbability === undefined || homeScore === awayScore) return undefined;
+  const homeFavored = homeWinProbability >= 0.5;
+  const homeWon = homeScore > awayScore;
   return homeWon === homeFavored;
 }
 
-function rowToMatchup(row: PredictionRow, records: Map<string, string>): Matchup {
-  const status = statusFor(row);
+interface ResolvedGameState {
+  status: "preview" | "live" | "final";
+  homeScore: number | undefined;
+  awayScore: number | undefined;
+  kickoffText: string;
+  predictionCorrect: boolean | undefined;
+}
+
+// Single source of truth for "what's actually happening with this
+// game right now," shared by the matchup-list and game-detail
+// builders below -- a DB row that's already been permanently graded
+// (File 60 ran) always wins, since that's the one row with a
+// prediction to compare against that's guaranteed not to change.
+// Absent that, a live ESPN fetch fills in: "in" progress shows the
+// current score under a LIVE tag, and "post" (ESPN says it's over,
+// but our own sync job hasn't run yet) shows the real final score --
+// and grades it against the model's probability immediately, rather
+// than leaving the site showing a stale pregame percentage until the
+// next scheduled sync.
+function resolveGameState(
+  gameDate: Date,
+  dbActualHome: number | null,
+  dbActualAway: number | null,
+  live: LiveScore | undefined,
+  homeWinProbability: number | undefined
+): ResolvedGameState {
+  if (dbActualHome !== null && dbActualAway !== null) {
+    return {
+      status: "final",
+      homeScore: dbActualHome,
+      awayScore: dbActualAway,
+      kickoffText: "Final",
+      predictionCorrect: computeCorrect(dbActualHome, dbActualAway, homeWinProbability),
+    };
+  }
+
+  if (live?.status === "in") {
+    return {
+      status: "live",
+      homeScore: live.home_score,
+      awayScore: live.away_score,
+      kickoffText: live.status_detail,
+      predictionCorrect: undefined,
+    };
+  }
+
+  if (live?.status === "post") {
+    return {
+      status: "final",
+      homeScore: live.home_score,
+      awayScore: live.away_score,
+      kickoffText: "Final",
+      predictionCorrect: computeCorrect(live.home_score, live.away_score, homeWinProbability),
+    };
+  }
+
+  return {
+    status: "preview",
+    homeScore: undefined,
+    awayScore: undefined,
+    kickoffText: formatKickoff(gameDate),
+    predictionCorrect: undefined,
+  };
+}
+
+function rowToMatchup(row: PredictionRow, records: Map<string, string>, live: LiveScore | undefined): Matchup {
+  const state = resolveGameState(
+    row.game_date,
+    row.actual_home_score,
+    row.actual_away_score,
+    live,
+    row.home_win_probability
+  );
   const homeProb = Math.round(row.home_win_probability * 100);
   const awayProb = 100 - homeProb;
+  const showScore = state.status !== "preview";
 
   const teamA: TeamSide = {
     alias: row.away_team,
     record: records.get(row.away_team) ?? "0-0",
-    // Shown for final games too, not just upcoming ones -- so a
+    // Shown for final/live games too, not just upcoming ones -- so a
     // historical game shows what was predicted next to what happened.
     prob: awayProb,
-    score: status === "final" ? row.actual_away_score ?? undefined : undefined,
-    winner: status === "final" && (row.actual_away_score ?? 0) > (row.actual_home_score ?? 0),
+    score: showScore ? state.awayScore : undefined,
+    winner: showScore && (state.awayScore ?? 0) > (state.homeScore ?? 0),
   };
   const teamB: TeamSide = {
     alias: row.home_team,
     record: records.get(row.home_team) ?? "0-0",
     prob: homeProb,
-    score: status === "final" ? row.actual_home_score ?? undefined : undefined,
-    winner: status === "final" && (row.actual_home_score ?? 0) > (row.actual_away_score ?? 0),
+    score: showScore ? state.homeScore : undefined,
+    winner: showScore && (state.homeScore ?? 0) > (state.awayScore ?? 0),
   };
 
   return {
     id: row.universal_game_id,
-    status,
-    kickoff: status === "final" ? "Final" : formatKickoff(row.game_date),
+    status: state.status,
+    kickoff: state.kickoffText,
     teamA,
     teamB,
-    predictionCorrect: status === "final" ? computePredictionCorrect(row) : undefined,
+    predictionCorrect: state.predictionCorrect,
   };
 }
 
 // A game whose kickoff is known (from the schedule) but that the
 // model hasn't predicted yet -- no win probability to show, just who,
-// when, and (once played) what actually happened.
-function scheduleGameToMatchup(game: ScheduleGame, records: Map<string, string>): Matchup {
-  const status = game.final ? "final" : "preview";
+// when, and (once played/live) what's happening.
+function scheduleGameToMatchup(game: ScheduleGame, records: Map<string, string>, live: LiveScore | undefined): Matchup {
+  const state = resolveGameState(
+    game.game_date,
+    game.actual_home_score,
+    game.actual_away_score,
+    live,
+    undefined // no model prediction to grade a schedule-only game against
+  );
+  const showScore = state.status !== "preview";
+
   const teamA: TeamSide = {
     alias: game.away_team,
     record: records.get(game.away_team) ?? "0-0",
-    score: status === "final" ? game.actual_away_score ?? undefined : undefined,
-    winner: status === "final" && (game.actual_away_score ?? 0) > (game.actual_home_score ?? 0),
+    score: showScore ? state.awayScore : undefined,
+    winner: showScore && (state.awayScore ?? 0) > (state.homeScore ?? 0),
   };
   const teamB: TeamSide = {
     alias: game.home_team,
     record: records.get(game.home_team) ?? "0-0",
-    score: status === "final" ? game.actual_home_score ?? undefined : undefined,
-    winner: status === "final" && (game.actual_home_score ?? 0) > (game.actual_away_score ?? 0),
+    score: showScore ? state.homeScore : undefined,
+    winner: showScore && (state.homeScore ?? 0) > (state.awayScore ?? 0),
   };
   return {
     id: game.universal_game_id,
-    status,
-    kickoff: status === "final" ? "Final" : formatKickoff(game.game_date),
+    status: state.status,
+    kickoff: state.kickoffText,
     teamA,
     teamB,
   };
@@ -318,6 +397,13 @@ export async function getMatchupsForSeasonWeek(
   const records = await getTeamRecords(season, week);
   const predicted = new Map(rows.map((row) => [row.universal_game_id, { row, date: row.game_date }]));
 
+  // Only fetches for the current/future season -- live status is
+  // never meaningful for a historical week, and ESPN's scoreboard is
+  // always "the current week" anyway, so a lookup for any other week
+  // just harmlessly finds nothing.
+  const liveScores = isScheduleEnabledSeason(season) ? await getAllLiveScores() : new Map<string, LiveScore>();
+  const liveFor = (away: string, home: string) => liveScores.get(`${away}@${home}`);
+
   // Schedule fills in games the model hasn't gotten to yet (or games
   // the DB doesn't know finished) -- wherever a prediction already
   // exists for the same id, the model's numbers win; the schedule
@@ -329,17 +415,18 @@ export async function getMatchupsForSeasonWeek(
     for (const g of await getScheduleWeek(season, week)) {
       seen.add(g.universal_game_id);
       const predictedEntry = predicted.get(g.universal_game_id);
+      const live = liveFor(g.away_team, g.home_team);
       combined.push(
         predictedEntry
-          ? { date: predictedEntry.date, matchup: rowToMatchup(predictedEntry.row, records) }
-          : { date: g.game_date, matchup: scheduleGameToMatchup(g, records) }
+          ? { date: predictedEntry.date, matchup: rowToMatchup(predictedEntry.row, records, live) }
+          : { date: g.game_date, matchup: scheduleGameToMatchup(g, records, live) }
       );
     }
   }
 
   for (const [id, { row, date }] of predicted) {
     if (seen.has(id)) continue;
-    combined.push({ date, matchup: rowToMatchup(row, records) });
+    combined.push({ date, matchup: rowToMatchup(row, records, liveFor(row.away_team, row.home_team)) });
   }
 
   combined.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -400,25 +487,32 @@ function spreadDisplay(row: PredictionRow): string {
   return `${favoredAlias} -${Math.abs(row.market_spread_line_current).toFixed(1)}`;
 }
 
-function rowToGameStat(row: PredictionRow, records: Map<string, string>): GameStat {
-  const status = statusFor(row);
+function rowToGameStat(row: PredictionRow, records: Map<string, string>, live: LiveScore | undefined): GameStat {
+  const state = resolveGameState(
+    row.game_date,
+    row.actual_home_score,
+    row.actual_away_score,
+    live,
+    row.home_win_probability
+  );
   const homeProb = Math.round(row.home_win_probability * 100);
   const awayProb = 100 - homeProb;
   const homeFavored = row.home_win_probability >= 0.5;
+  const showScore = state.status !== "preview";
 
   const teamA: GameStatSide = {
     alias: row.away_team,
     record: records.get(row.away_team) ?? "0-0",
     winProb: awayProb,
-    score: status === "final" ? row.actual_away_score ?? undefined : undefined,
-    winner: status === "final" && (row.actual_away_score ?? 0) > (row.actual_home_score ?? 0),
+    score: showScore ? state.awayScore : undefined,
+    winner: showScore && (state.awayScore ?? 0) > (state.homeScore ?? 0),
   };
   const teamB: GameStatSide = {
     alias: row.home_team,
     record: records.get(row.home_team) ?? "0-0",
     winProb: homeProb,
-    score: status === "final" ? row.actual_home_score ?? undefined : undefined,
-    winner: status === "final" && (row.actual_home_score ?? 0) > (row.actual_away_score ?? 0),
+    score: showScore ? state.homeScore : undefined,
+    winner: showScore && (state.homeScore ?? 0) > (state.awayScore ?? 0),
   };
 
   const marginBuckets = [
@@ -439,8 +533,8 @@ function rowToGameStat(row: PredictionRow, records: Map<string, string>): GameSt
   ];
 
   return {
-    status,
-    kickoff: status === "final" ? "Final" : formatKickoff(row.game_date),
+    status: state.status,
+    kickoff: state.kickoffText,
     marketLine: { spread: spreadDisplay(row), total: row.market_total_line_current },
     teamA,
     teamB,
@@ -460,15 +554,14 @@ function rowToGameStat(row: PredictionRow, records: Map<string, string>): GameSt
     },
     totals,
     finalResult:
-      status === "final" && row.actual_home_score !== null && row.actual_away_score !== null
+      showScore && state.homeScore !== undefined && state.awayScore !== undefined && state.status === "final"
         ? {
-            winnerAlias:
-              row.actual_home_score > row.actual_away_score ? row.home_team : row.away_team,
-            margin: Math.abs(row.actual_home_score - row.actual_away_score),
-            totalScore: row.actual_home_score + row.actual_away_score,
+            winnerAlias: state.homeScore > state.awayScore ? row.home_team : row.away_team,
+            margin: Math.abs(state.homeScore - state.awayScore),
+            totalScore: state.homeScore + state.awayScore,
           }
         : undefined,
-    predictionCorrect: status === "final" ? computePredictionCorrect(row) : undefined,
+    predictionCorrect: state.predictionCorrect,
   };
 }
 
@@ -480,7 +573,8 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
   if (rows.length === 0) return null;
   const row = rows[0];
   const records = await getTeamRecords(row.season, row.week);
-  const game = rowToGameStat(row, records);
+  const live = isScheduleEnabledSeason(row.season) ? await getLiveScore(row.away_team, row.home_team) : null;
+  const game = rowToGameStat(row, records, live ?? undefined);
   const premier = await getPremierGame(row.season, row.week);
   if (premier && premier.id === row.universal_game_id) {
     game.premier = true;

@@ -774,7 +774,8 @@ h1.glow span {
   background: rgba(255, 59, 59, 0.08);
 }
 
-.tag.live .blip {
+.tag.live .blip,
+.live-blip {
   width: 6px;
   height: 6px;
   border-radius: 50%;
