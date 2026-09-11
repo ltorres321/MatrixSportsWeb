@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemberPreview } from "@/lib/useMemberPreview";
+import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
 import type { Matchup } from "@/lib/matchups";
 import MatchupCard from "@/components/MatchupCard";
 
@@ -132,11 +132,13 @@ export default function PredictionsView({
           </>
         )}
 
-        <div className="dev-toggle">
-          <button type="button" onClick={toggle}>
-            testing: toggle member view
-          </button>
-        </div>
+        {SHOW_MEMBER_PREVIEW_TOGGLE && (
+          <div className="dev-toggle">
+            <button type="button" onClick={toggle}>
+              testing: toggle member view
+            </button>
+          </div>
+        )}
       </main>
 
       <footer className="site-footer">

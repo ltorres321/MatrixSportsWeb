@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemberPreview } from "@/lib/useMemberPreview";
+import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import { scalePosition, type GameStat, type GameStatSide } from "@/lib/gameStats";
 
@@ -232,11 +232,13 @@ export default function GameDetailView({ game }: { game: GameStat }) {
           </>
         )}
 
-        <div className="dev-toggle">
-          <button type="button" onClick={toggle}>
-            testing: toggle member view
-          </button>
-        </div>
+        {SHOW_MEMBER_PREVIEW_TOGGLE && (
+          <div className="dev-toggle">
+            <button type="button" onClick={toggle}>
+              testing: toggle member view
+            </button>
+          </div>
+        )}
       </main>
 
       <footer className="site-footer">

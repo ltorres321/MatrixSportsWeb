@@ -5,13 +5,18 @@ import { useUser } from "@/lib/useUser";
 
 const PREVIEW_KEY = "sw_preview_member";
 
+// Real sign-in/sign-out is confirmed reliable now -- the "testing:
+// toggle member view" button that drives this is hidden site-wide via
+// this flag (see PredictionsView.tsx/GameDetailView.tsx). Left in
+// (not deleted) in case it's needed again; flip to true to bring it
+// back everywhere at once.
+export const SHOW_MEMBER_PREVIEW_TOGGLE = false;
+
 // Testing aid, like the old static site's "toggle member view" button
 // -- but real auth exists now, so this only fakes the *visual* signed-
 // in state (nav pill, unlocked slate). It never creates a real
 // session, so pages that need real data (Profile) should still gate
-// on isRealMember, not isMember, and explain why. Remove this once
-// Google/email sign-in are confirmed reliable and this stops being
-// needed as a workaround.
+// on isRealMember, not isMember, and explain why.
 export function useMemberPreview() {
   const { user, loaded } = useUser();
   // Always starts false so server and first client render match --
