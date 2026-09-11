@@ -26,10 +26,20 @@ export async function requestPasswordReset(
   const headerList = await headers();
   const origin = headerList.get("origin") ?? `https://${headerList.get("host")}`;
 
+  // Points straight at the reset-password page, deliberately with NO
+  // query string of our own -- Supabase appends its own "?code=..."
+  // to this value, and a redirectTo that already has a "?next=..." in
+  // it produces a malformed two-"?" URL once that happens (only the
+  // first "?" is a real query-string start; a second one downstream
+  // is not). The reset-password page's Supabase client auto-detects
+  // and exchanges that code on load, so no server-side /auth/callback
+  // hop is needed for this flow at all.
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/auth/reset-password`,
+    redirectTo: `${origin}/auth/reset-password`,
   });
+  // (page lives at src/app/auth/reset-password/page.tsx -- keep this
+  // path in sync with that if it's ever moved)
 
   // Always report success, whether or not that email is actually
   // registered -- telling a visitor "no account with that email"

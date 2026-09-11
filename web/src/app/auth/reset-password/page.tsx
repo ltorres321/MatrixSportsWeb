@@ -1,18 +1,46 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-// Reached only after /auth/callback has already exchanged the reset
-// link's code for a real (recovery-type) session -- that session is
-// enough on its own to call updateUser, no separate token needed here.
+// Reached straight from the reset-password email link (see
+// forgot-password/actions.ts -- redirectTo points here directly, no
+// /auth/callback hop). The Supabase browser client auto-detects the
+// "code" query param on this page's URL and exchanges it for a real
+// (recovery-type) session on its own; this component just waits for
+// that to finish before letting the form submit.
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // undefined = still checking the link, true = good to go, false = bad/expired link
+  const [ready, setReady] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setReady(true);
+    });
+
+    // Covers the case where detection already finished by the time
+    // this listener attaches -- a real race with the client's own
+    // auto-exchange, not just defensive padding.
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setReady(true);
+    });
+
+    const timeout = setTimeout(() => setReady((r) => r ?? false), 4000);
+
+    return () => {
+      listener.subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,6 +65,23 @@ export default function ResetPasswordPage() {
 
     router.push("/home");
     router.refresh();
+  }
+
+  if (ready === false) {
+    return (
+      <main>
+        <div className="form-shell">
+          <div className="unlock-card" style={{ maxWidth: "none" }}>
+            <span className="lock-icon">⚠️</span>
+            <h3>Reset Link Didn&apos;t Work</h3>
+            <p>That link is invalid or has expired. Request a fresh one below.</p>
+            <Link className="btn btn-primary btn-block" href="/forgot-password">
+              Request a New Link
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -73,8 +118,12 @@ export default function ResetPasswordPage() {
               />
             </div>
             <div className="field full">
-              <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
-                {submitting ? "Saving..." : "Set New Password"}
+              <button
+                type="submit"
+                className="btn btn-primary btn-block"
+                disabled={submitting || ready === undefined}
+              >
+                {ready === undefined ? "Checking link..." : submitting ? "Saving..." : "Set New Password"}
               </button>
             </div>
           </form>
