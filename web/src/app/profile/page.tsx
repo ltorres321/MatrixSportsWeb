@@ -466,7 +466,7 @@ export default function ProfilePage() {
                   inputMode="numeric"
                   value={cellOtpCode}
                   onChange={(e) => setCellOtpCode(e.target.value)}
-                  placeholder="123456"
+                  placeholder="Enter the 6-digit code"
                 />
               </div>
             )}
