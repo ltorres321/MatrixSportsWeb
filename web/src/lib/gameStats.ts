@@ -22,7 +22,7 @@ export interface GameStat {
   expectedScore: { teamA: number; teamB: number };
   marginBuckets: { label: string; pct: number }[];
   marginPercentiles: { p05: number; p25: number; p50: number; p75: number; p95: number };
-  totals: { line: number; over: number; under: number }[];
+  totals: { line: number; over: number; under: number; isMarketLine?: boolean }[];
   liveNote?: string;
   finalResult?: { winnerAlias: string; margin: number; totalScore: number };
   // Same meaning as Matchup.predictionCorrect -- see there.

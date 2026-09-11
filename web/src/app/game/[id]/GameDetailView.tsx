@@ -139,20 +139,25 @@ function MarginSection({ game }: { game: GameStat }) {
 
 function TotalsSection({ game }: { game: GameStat }) {
   const actualTotal = game.finalResult?.totalScore;
+  const hasMarketLine = game.totals.some((t) => t.isMarketLine);
 
   return (
     <div className="stat-section">
       <h2>Total Score — Over / Under</h2>
       <p className="stat-sub">
         Combined final score against five common lines
+        {hasMarketLine ? ", plus this game's actual market line" : ""}
         {actualTotal !== undefined ? ` -- the real combined score was ${actualTotal}.` : "."}
       </p>
       <div className="totals-grid">
         {game.totals.map((t) => {
           const hit = actualTotal === undefined ? null : actualTotal > t.line ? "over" : "under";
           return (
-            <div className={`totals-card ${hit ? "totals-actual" : ""}`} key={t.line}>
-              <div className="line">TOTAL {t.line}</div>
+            <div className={`totals-card ${hit ? "totals-actual" : ""} ${t.isMarketLine ? "totals-market" : ""}`} key={t.line}>
+              <div className="line">
+                TOTAL {t.line}
+                {t.isMarketLine && <span className="market-line-tag"> MARKET LINE</span>}
+              </div>
               <div className="split">
                 <div className="over" style={{ width: `${t.over}%` }} />
                 <div className="under" style={{ width: `${t.under}%` }} />

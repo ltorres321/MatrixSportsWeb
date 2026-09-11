@@ -1506,6 +1506,24 @@ h1.glow span {
   text-shadow: 0 0 6px rgba(255, 214, 10, 0.4);
 }
 
+/* The sixth card, built from this specific game's real market total
+   instead of one of the five fixed reference lines -- a distinct
+   accent border (independent of totals-actual's yellow, which is
+   about the real result, not which line this is) so it reads as
+   "this one's different" at a glance among five otherwise-identical
+   cards. */
+.totals-card.totals-market {
+  border-color: rgba(var(--glow-rgb), 0.5);
+}
+
+.market-line-tag {
+  display: block;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--green);
+  margin-top: 0.15rem;
+}
+
 .percentile-block {
   background: var(--panel);
   border: 1px solid var(--panel-border);

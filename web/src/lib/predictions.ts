@@ -64,6 +64,12 @@ export interface PredictionRow {
   total_under_44: number | null;
   total_under_48: number | null;
   total_under_52: number | null;
+  // Same simulation evaluated at this game's own market_total_line_current
+  // instead of a fixed threshold -- null on any row written before this
+  // column existed (Files 58/59/60 back-fill it going forward, not
+  // retroactively). See gameStats.ts's totals[].isMarketLine.
+  total_over_market: number | null;
+  total_under_market: number | null;
 }
 
 const PREDICTION_COLUMNS = `
@@ -75,7 +81,8 @@ const PREDICTION_COLUMNS = `
   margin_bucket_lost_or_tied, margin_bucket_won_1_3, margin_bucket_won_4_7,
   margin_bucket_won_8_14, margin_bucket_won_15_21, margin_bucket_won_21_plus,
   total_over_30, total_over_40, total_over_44, total_over_48, total_over_52,
-  total_under_30, total_under_40, total_under_44, total_under_48, total_under_52
+  total_under_30, total_under_40, total_under_44, total_under_48, total_under_52,
+  total_over_market, total_under_market
 `;
 
 // NFL seasons span two calendar years -- "the current season" is this
@@ -524,13 +531,28 @@ function rowToGameStat(row: PredictionRow, records: Map<string, string>, live: L
     { label: "Won by 21+", pct: Math.round((row.margin_bucket_won_21_plus ?? 0) * 100) },
   ];
 
-  const totals = [
+  const totals: GameStat["totals"] = [
     { line: 30, over: Math.round((row.total_over_30 ?? 0) * 100), under: Math.round((row.total_under_30 ?? 0) * 100) },
     { line: 40, over: Math.round((row.total_over_40 ?? 0) * 100), under: Math.round((row.total_under_40 ?? 0) * 100) },
     { line: 44, over: Math.round((row.total_over_44 ?? 0) * 100), under: Math.round((row.total_under_44 ?? 0) * 100) },
     { line: 48, over: Math.round((row.total_over_48 ?? 0) * 100), under: Math.round((row.total_under_48 ?? 0) * 100) },
     { line: 52, over: Math.round((row.total_over_52 ?? 0) * 100), under: Math.round((row.total_under_52 ?? 0) * 100) },
   ];
+
+  // A sixth row for the game's ACTUAL market total (e.g. 48.5), not
+  // just its two nearest fixed neighbors above -- null on rows written
+  // before total_over_market/total_under_market existed, in which
+  // case there's nothing real to show and the row is just omitted
+  // rather than faked from an interpolation.
+  if (row.total_over_market !== null && row.total_under_market !== null) {
+    totals.push({
+      line: row.market_total_line_current,
+      over: Math.round(row.total_over_market * 100),
+      under: Math.round(row.total_under_market * 100),
+      isMarketLine: true,
+    });
+    totals.sort((a, b) => a.line - b.line);
+  }
 
   return {
     status: state.status,
