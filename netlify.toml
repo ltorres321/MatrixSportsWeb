@@ -1,0 +1,14 @@
+# Deploys the Next.js app in web/ -- the FastAPI backend (main.py/db.py
+# at the repo root) is NOT part of this deploy; it's a separate
+# process this config doesn't touch.
+[build]
+  base = "web"
+  command = "npm run build"
+  publish = ".next"
+
+# Netlify's official Next.js integration -- handles SSR/RSC/Server
+# Actions via Netlify Functions automatically, no manual adapter
+# config needed for a standard Next.js App Router project like this
+# one.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
