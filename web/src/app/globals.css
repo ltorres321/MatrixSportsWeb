@@ -1655,16 +1655,34 @@ h1.glow span {
    profile/page.tsx's cellIsVerifiedForCurrentInput) -- reverts to the
    plain default styling above automatically the moment the field is
    edited to something that no longer matches, no extra logic needed
-   for that since the class itself is conditional on the comparison. */
+   for that since the class itself is conditional on the comparison.
+   Same #ffd60a "Matrix machine-world" yellow as .week-pill.active,
+   not the softer --gold used for Lock of the Week -- dark theme only,
+   same reasoning as that rule: light theme reverts to the normal
+   accent color below instead. */
 .field input.cell-input-verified {
-  background: rgba(var(--gold-rgb), 0.12);
-  border-color: rgba(var(--gold-rgb), 0.6);
-  color: var(--gold);
+  background: rgba(255, 214, 10, 0.12);
+  border-color: #ffd60a;
+  color: #ffd60a;
 }
 
 .field input.cell-input-verified:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 10px rgba(var(--gold-rgb), 0.3);
+  border-color: #ffd60a;
+  box-shadow: 0 0 10px rgba(255, 214, 10, 0.35);
+}
+
+:root[data-theme="light"] .field input.cell-input-verified {
+  background: var(--green-faint);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.cell-verified-note {
+  color: #ffd60a;
+}
+
+:root[data-theme="light"] .cell-verified-note {
+  color: var(--green);
 }
 
 .field input.invalid {

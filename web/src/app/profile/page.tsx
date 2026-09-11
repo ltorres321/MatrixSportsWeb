@@ -414,7 +414,7 @@ export default function ProfilePage() {
           </p>
 
           {cellIsVerifiedForCurrentInput && (
-            <p className="form-footer-note" style={{ textAlign: "left", color: "var(--gold)" }}>
+            <p className="form-footer-note cell-verified-note" style={{ textAlign: "left" }}>
               ✓ Verified Number
             </p>
           )}
