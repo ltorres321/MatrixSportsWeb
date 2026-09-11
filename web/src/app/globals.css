@@ -68,6 +68,16 @@
   --gold-rgb: 138, 98, 8;
 }
 
+/* .week-pill.active's bright yellow (see that rule) is a dark-theme
+   ("Matrix") callback -- light theme keeps the normal accent color
+   instead, same as every other themed element. */
+:root[data-theme="light"] .week-pill.active {
+  background: var(--green-faint);
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: none;
+}
+
 /* A blur glow on fine text reads as glare/haze on a light background
    regardless of hue (it "pops" on black because the glow is brighter
    than the backdrop; on white it's the opposite, so it just looks
@@ -646,11 +656,16 @@ h1.glow span {
   color: var(--text);
 }
 
+/* Bright amber-yellow -- the source-code/machine-world color from the
+   films, distinct from the green Matrix rain -- marking whichever
+   week is currently selected. Dark (Matrix) theme only; light theme
+   restores the normal accent color below, same reasoning as the rain
+   effect being dark-only. */
 .week-pill.active {
-  background: var(--green-faint);
-  border-color: var(--green);
-  color: var(--green);
-  box-shadow: 0 0 12px rgba(var(--glow-rgb), 0.25);
+  background: rgba(255, 214, 10, 0.14);
+  border-color: #ffd60a;
+  color: #ffd60a;
+  box-shadow: 0 0 12px rgba(255, 214, 10, 0.35);
 }
 
 /* ---------------------------------------------------------------
