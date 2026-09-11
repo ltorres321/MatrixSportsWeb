@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
 import type { Matchup } from "@/lib/matchups";
 import MatchupCard from "@/components/MatchupCard";
+import AdFrame from "@/components/AdFrame";
 
 // How often to re-fetch while at least one game on screen is live --
 // short enough to feel real-time, long enough not to hammer the
@@ -114,63 +115,74 @@ export default function PredictionsView({
         ))}
       </nav>
 
-      <main>
-        {matchups.length === 0 ? (
-          <p style={{ textAlign: "center", color: "var(--text-dim)" }}>
-            No predictions for Week {activeWeek} yet.
-          </p>
-        ) : (
-          <>
-            {premier && (
-              <div className="premier-wrap">
-                <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
-                  {premier.lockOfWeek
-                    ? "🔒 LOCK OF THE WEEK"
-                    : isRealMember
-                      ? "★ GAME OF THE WEEK — FREE PREVIEW"
-                      : "★ FREE GAME OF THE WEEK — FREE PREVIEW"}
-                </div>
-                <MatchupCard matchup={premier} premier />
-              </div>
-            )}
-
-            <div className="section-label">
-              <span className="dot" /> FULL WEEK {activeWeek} SLATE
-            </div>
-
-            <div className={`locked-section ${locked ? "is-locked" : ""}`}>
-              <div className="matchup-grid">
-                {rest.map((m) => (
-                  <MatchupCard key={m.id} matchup={m} />
-                ))}
-              </div>
-              {locked && (
-                <div className="unlock-panel">
-                  <div className="unlock-card">
-                    <span className="lock-icon">🔒</span>
-                    <h3>Unlock the Full Slate</h3>
-                    <p>
-                      Create a free account to see win probabilities for every
-                      game, every week — no credit card required.
-                    </p>
-                    <Link className="btn btn-primary btn-block" href="/signup">
-                      Sign Up Free
-                    </Link>
+      <div className="content-split">
+        <main className="content-main">
+          {matchups.length === 0 ? (
+            <p style={{ textAlign: "center", color: "var(--text-dim)" }}>
+              No predictions for Week {activeWeek} yet.
+            </p>
+          ) : (
+            <>
+              {premier && (
+                <div className="premier-wrap">
+                  <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
+                    {premier.lockOfWeek
+                      ? "🔒 LOCK OF THE WEEK"
+                      : isRealMember
+                        ? "★ GAME OF THE WEEK — FREE PREVIEW"
+                        : "★ FREE GAME OF THE WEEK — FREE PREVIEW"}
                   </div>
+                  <MatchupCard matchup={premier} premier />
                 </div>
               )}
-            </div>
-          </>
-        )}
 
-        {SHOW_MEMBER_PREVIEW_TOGGLE && (
-          <div className="dev-toggle">
-            <button type="button" onClick={toggle}>
-              testing: toggle member view
-            </button>
-          </div>
-        )}
-      </main>
+              <div className="section-label">
+                <span className="dot" /> FULL WEEK {activeWeek} SLATE
+              </div>
+
+              <div className={`locked-section ${locked ? "is-locked" : ""}`}>
+                <div className="matchup-grid">
+                  {rest.map((m) => (
+                    <MatchupCard key={m.id} matchup={m} />
+                  ))}
+                </div>
+                {locked && (
+                  <div className="unlock-panel">
+                    <div className="unlock-card">
+                      <span className="lock-icon">🔒</span>
+                      <h3>Unlock the Full Slate</h3>
+                      <p>
+                        Create a free account to see win probabilities for every
+                        game, every week — no credit card required.
+                      </p>
+                      <Link className="btn btn-primary btn-block" href="/signup">
+                        Sign Up Free
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {SHOW_MEMBER_PREVIEW_TOGGLE && (
+            <div className="dev-toggle">
+              <button type="button" onClick={toggle}>
+                testing: toggle member view
+              </button>
+            </div>
+          )}
+        </main>
+
+        <aside className="promo-column" aria-label="Promotional space">
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+        </aside>
+      </div>
 
       <footer className="site-footer">
         <p className="footer-note-large">

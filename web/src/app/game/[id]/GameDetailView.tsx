@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import { scalePosition, type GameStat, type GameStatSide } from "@/lib/gameStats";
+import AdFrame from "@/components/AdFrame";
 
 const LIVE_REFRESH_MS = 20_000;
 
@@ -269,51 +270,62 @@ export default function GameDetailView({ game }: { game: GameStat }) {
     <>
       <StickyBar game={game} />
 
-      <main>
-        <Link href="/home" style={{ display: "inline-block", marginBottom: "1.5rem", color: "var(--text-dim)" }}>
-          &larr; back to predictions
-        </Link>
+      <div className="content-split">
+        <main className="content-main">
+          <Link href="/home" style={{ display: "inline-block", marginBottom: "1.5rem", color: "var(--text-dim)" }}>
+            &larr; back to predictions
+          </Link>
 
-        <Hero game={game} />
+          <Hero game={game} />
 
-        {locked ? (
-          <div className="locked-section is-locked">
-            <div className="matchup-grid">
-              <MarginSection game={game} />
-              <TotalsSection game={game} />
-            </div>
-            <div className="unlock-panel">
-              <div className="unlock-card">
-                <span className="lock-icon">🔒</span>
-                <h3>Unlock Full Game Stats</h3>
-                <p>
-                  Margin-of-victory breakdowns and total-score probabilities for every game are a free-account
-                  feature. This one&apos;s part of the paid slate — the Game of the Week is always free to view in
-                  full.
-                </p>
-                <Link className="btn btn-primary btn-block" href="/signup">
-                  Sign Up Free
-                </Link>
+          {locked ? (
+            <div className="locked-section is-locked">
+              <div className="matchup-grid">
+                <MarginSection game={game} />
+                <TotalsSection game={game} />
+              </div>
+              <div className="unlock-panel">
+                <div className="unlock-card">
+                  <span className="lock-icon">🔒</span>
+                  <h3>Unlock Full Game Stats</h3>
+                  <p>
+                    Margin-of-victory breakdowns and total-score probabilities for every game are a free-account
+                    feature. This one&apos;s part of the paid slate — the Game of the Week is always free to view in
+                    full.
+                  </p>
+                  <Link className="btn btn-primary btn-block" href="/signup">
+                    Sign Up Free
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <>
-            <ResultCompare game={game} />
-            <MarginSection game={game} />
-            <TotalsSection game={game} />
-            <PercentileSection game={game} />
-          </>
-        )}
+          ) : (
+            <>
+              <ResultCompare game={game} />
+              <MarginSection game={game} />
+              <TotalsSection game={game} />
+              <PercentileSection game={game} />
+            </>
+          )}
 
-        {SHOW_MEMBER_PREVIEW_TOGGLE && (
-          <div className="dev-toggle">
-            <button type="button" onClick={toggle}>
-              testing: toggle member view
-            </button>
-          </div>
-        )}
-      </main>
+          {SHOW_MEMBER_PREVIEW_TOGGLE && (
+            <div className="dev-toggle">
+              <button type="button" onClick={toggle}>
+                testing: toggle member view
+              </button>
+            </div>
+          )}
+        </main>
+
+        <aside className="promo-column" aria-label="Promotional space">
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+        </aside>
+      </div>
 
       <footer className="site-footer">
         <p>
