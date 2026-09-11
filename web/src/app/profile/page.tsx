@@ -25,6 +25,30 @@ interface ProfileRow {
   matrix_rain_enabled: boolean;
 }
 
+// Supabase/Twilio require E.164 (+<country code><number>, digits
+// only, no spaces/punctuation) -- a plain "(555) 555-5555" fails
+// validation outright. Rather than a full country picker (a
+// maintained country list + per-country length rules for an audience
+// that's overwhelmingly US-based right now), this strips whatever
+// punctuation was typed and adds the "+" for the user: assumes US
+// unless "International Number" is checked, in which case the digits
+// are trusted to already start with the right country code. Returns
+// null when the domestic digit count doesn't look like a real US
+// number, so the caller can ask the user to check the box instead of
+// silently sending something wrong.
+function normalizePhoneNumber(raw: string, international: boolean): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return null;
+
+  if (international) {
+    return `+${digits}`;
+  }
+
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return null;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { user, loaded, isRealMember, previewOn } = useMemberPreview();
@@ -34,6 +58,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [cellInput, setCellInput] = useState("");
+  const [cellIsInternational, setCellIsInternational] = useState(false);
   const [cellOtpSent, setCellOtpSent] = useState(false);
   const [cellOtpCode, setCellOtpCode] = useState("");
   const [cellNote, setCellNote] = useState("");
@@ -58,19 +83,25 @@ export default function ProfilePage() {
   // actually confirmed via OTP -- if the field's since been edited to
   // something else (not yet sent/verified), that badge has to go away
   // even though the DB still says cell_verified until the new number
-  // is confirmed.
+  // is confirmed. profile.cell is stored normalized (E.164), so the
+  // comparison has to normalize the current input the same way.
+  const normalizedCellInput = normalizePhoneNumber(cellInput, cellIsInternational);
   const cellIsVerifiedForCurrentInput =
-    !!profile?.cell_verified && profile?.cell === cellInput && cellInput.trim() !== "";
+    !!profile?.cell_verified && !!normalizedCellInput && profile?.cell === normalizedCellInput;
 
   async function handleSendCellCode(e: FormEvent) {
     e.preventDefault();
-    const trimmed = cellInput.trim();
-    if (!trimmed) {
-      setCellNote("Enter a cell number first.");
+    const normalized = normalizePhoneNumber(cellInput, cellIsInternational);
+    if (!normalized) {
+      setCellNote(
+        cellIsInternational
+          ? "Enter the number's digits only, country code first."
+          : "That doesn't look like a valid U.S. number -- check “International Number” below if it's not."
+      );
       return;
     }
     const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ phone: trimmed });
+    const { error } = await supabase.auth.updateUser({ phone: normalized });
     if (error) {
       setCellNote(error.message);
       return;
@@ -82,10 +113,14 @@ export default function ProfilePage() {
   async function handleVerifyCellCode(e: FormEvent) {
     e.preventDefault();
     if (!user) return;
-    const trimmed = cellInput.trim();
+    const normalized = normalizePhoneNumber(cellInput, cellIsInternational);
+    if (!normalized) {
+      setCellNote("Enter a valid number first.");
+      return;
+    }
     const supabase = createClient();
     const { error } = await supabase.auth.verifyOtp({
-      phone: trimmed,
+      phone: normalized,
       token: cellOtpCode.trim(),
       type: "phone_change",
     });
@@ -96,7 +131,7 @@ export default function ProfilePage() {
 
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({ cell: trimmed, cell_verified: true })
+      .update({ cell: normalized, cell_verified: true })
       .eq("id", user.id);
 
     setCellOtpSent(false);
@@ -105,7 +140,7 @@ export default function ProfilePage() {
       setCellNote(profileError.message);
       return;
     }
-    setProfile((prev) => (prev ? { ...prev, cell: trimmed, cell_verified: true } : prev));
+    setProfile((prev) => (prev ? { ...prev, cell: normalized, cell_verified: true } : prev));
     setCellNote("Cell number verified.");
   }
 
@@ -396,8 +431,29 @@ export default function ProfilePage() {
                   setCellOtpSent(false);
                   setCellNote("");
                 }}
-                placeholder="(555) 555-5555"
+                placeholder={cellIsInternational ? "44 7911 123456" : "(555) 555-5555"}
               />
+            </div>
+
+            <div className="checkbox-row">
+              <input
+                type="checkbox"
+                id="cell-international"
+                checked={cellIsInternational}
+                onChange={(e) => {
+                  setCellIsInternational(e.target.checked);
+                  setCellOtpSent(false);
+                  setCellNote("");
+                }}
+              />
+              <label htmlFor="cell-international">
+                International Number
+                <span className="sub">
+                  {cellIsInternational
+                    ? "Enter just the digits, country code first -- we'll add the + for you."
+                    : "Check this if the number above isn't a U.S. number."}
+                </span>
+              </label>
             </div>
 
             {cellOtpSent && (
