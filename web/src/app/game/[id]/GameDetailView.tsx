@@ -14,6 +14,19 @@ function teamDisplay(alias: string): string {
   return team ? `${team.market} ${team.name}` : alias;
 }
 
+// Same thresholds/labels as the model's own margin_buckets() (Files
+// 53/58/59/60) -- given the REAL signed home-team margin (positive =
+// home won by that much, negative = home lost by that much), which of
+// the six pregame buckets did the actual result land in.
+function marginBucketLabel(signedHomeMargin: number): string {
+  if (signedHomeMargin <= 0) return "Lost / Tied";
+  if (signedHomeMargin <= 3) return "Won by 1-3";
+  if (signedHomeMargin <= 7) return "Won by 4-7";
+  if (signedHomeMargin <= 14) return "Won by 8-14";
+  if (signedHomeMargin <= 21) return "Won by 15-21";
+  return "Won by 21+";
+}
+
 function StickyBar({ game }: { game: GameStat }) {
   const showScore = game.status === "final" || game.status === "live";
   const statusWord = game.status === "final" ? "FINAL" : game.kickoff;
@@ -86,17 +99,33 @@ function Hero({ game }: { game: GameStat }) {
 }
 
 function MarginSection({ game }: { game: GameStat }) {
+  // These bars are the PREGAME forecast, frozen at kickoff -- they
+  // never get rewritten after the fact. Once there's a real result,
+  // highlighting which bar it actually landed in is what makes that
+  // clear, rather than leaving a list of "Won by X%" percentages
+  // sitting there with no visible link to what actually happened
+  // (including, often, a bucket that didn't happen at all).
+  const actualLabel = game.finalResult
+    ? marginBucketLabel(
+        game.finalResult.winnerAlias === game.teamB.alias ? game.finalResult.margin : -game.finalResult.margin
+      )
+    : null;
+
   return (
     <div className="stat-section">
       <h2>Margin of Victory — {teamDisplay(game.teamB.alias)} (Home)</h2>
       <p className="stat-sub">
-        How often each outcome happened for {teamDisplay(game.teamB.alias)}, across every simulated version of this
-        game.
+        {actualLabel
+          ? "Pregame odds for every possible outcome, simulated before kickoff -- the highlighted bar is what actually happened."
+          : `How often each outcome happened for ${teamDisplay(game.teamB.alias)}, across every simulated version of this game.`}
       </p>
       <div className="bucket-list">
         {game.marginBuckets.map((b) => (
-          <div className="bucket-row" key={b.label}>
-            <span className="bucket-label">{b.label}</span>
+          <div className={`bucket-row ${b.label === actualLabel ? "bucket-actual" : ""}`} key={b.label}>
+            <span className="bucket-label">
+              {b.label}
+              {b.label === actualLabel && <span className="actual-tag"> ← actual result</span>}
+            </span>
             <div className="bucket-track">
               <div className="bucket-fill" style={{ width: `${b.pct}%` }} />
             </div>
@@ -109,24 +138,32 @@ function MarginSection({ game }: { game: GameStat }) {
 }
 
 function TotalsSection({ game }: { game: GameStat }) {
+  const actualTotal = game.finalResult?.totalScore;
+
   return (
     <div className="stat-section">
       <h2>Total Score — Over / Under</h2>
-      <p className="stat-sub">Combined final score against five common lines.</p>
+      <p className="stat-sub">
+        Combined final score against five common lines
+        {actualTotal !== undefined ? ` -- the real combined score was ${actualTotal}.` : "."}
+      </p>
       <div className="totals-grid">
-        {game.totals.map((t) => (
-          <div className="totals-card" key={t.line}>
-            <div className="line">TOTAL {t.line}</div>
-            <div className="split">
-              <div className="over" style={{ width: `${t.over}%` }} />
-              <div className="under" style={{ width: `${t.under}%` }} />
+        {game.totals.map((t) => {
+          const hit = actualTotal === undefined ? null : actualTotal > t.line ? "over" : "under";
+          return (
+            <div className={`totals-card ${hit ? "totals-actual" : ""}`} key={t.line}>
+              <div className="line">TOTAL {t.line}</div>
+              <div className="split">
+                <div className="over" style={{ width: `${t.over}%` }} />
+                <div className="under" style={{ width: `${t.under}%` }} />
+              </div>
+              <div className="readout">
+                <span className={`over-pct ${hit === "over" ? "actual-hit" : ""}`}>{t.over}% over</span>
+                <span className={`under-pct ${hit === "under" ? "actual-hit" : ""}`}>{t.under}% under</span>
+              </div>
             </div>
-            <div className="readout">
-              <span className="over-pct">{t.over}% over</span>
-              <span className="under-pct">{t.under}% under</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -152,6 +189,10 @@ function PercentileSection({ game }: { game: GameStat }) {
           <div className="percentile-tick" style={{ left: `${scalePosition(p.p05)}%` }}>
             P05: {p.p05 > 0 ? "+" : ""}
             {p.p05}
+          </div>
+          <div className="percentile-tick percentile-tick-median" style={{ left: `${scalePosition(p.p50)}%` }}>
+            Median: {p.p50 > 0 ? "+" : ""}
+            {p.p50}
           </div>
           <div className="percentile-tick" style={{ left: `${scalePosition(p.p95)}%` }}>
             P95: {p.p95 > 0 ? "+" : ""}

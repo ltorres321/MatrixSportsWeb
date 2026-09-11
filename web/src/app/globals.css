@@ -1421,6 +1421,28 @@ h1.glow span {
   text-align: right;
 }
 
+/* Which bucket the real result landed in -- fixed yellow (same as the
+   week-pill/verified-number treatment elsewhere), distinct on purpose
+   from the green/red correctness coloring: a low-probability bucket
+   being what happened isn't "right" or "wrong," just the real
+   outcome, so it shouldn't borrow a color that implies a verdict. */
+.bucket-row.bucket-actual {
+  background: rgba(255, 214, 10, 0.1);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  margin: -0.3rem -0.5rem;
+}
+
+.bucket-row.bucket-actual .bucket-label {
+  color: #ffd60a;
+  font-weight: 700;
+}
+
+.actual-tag {
+  color: #ffd60a;
+  font-weight: 700;
+}
+
 .totals-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -1474,6 +1496,16 @@ h1.glow span {
   font-weight: 700;
 }
 
+.totals-card.totals-actual {
+  border-color: rgba(255, 214, 10, 0.5);
+}
+
+.totals-card .readout .over-pct.actual-hit,
+.totals-card .readout .under-pct.actual-hit {
+  color: #ffd60a;
+  text-shadow: 0 0 6px rgba(255, 214, 10, 0.4);
+}
+
 .percentile-block {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -1515,6 +1547,15 @@ h1.glow span {
   font-size: 0.7rem;
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+/* Below the track instead of above (where P05/P95 sit) -- the median
+   is always between those two, so sharing their row risks the label
+   text colliding with one of them when it sits close to either end. */
+.percentile-tick-median {
+  top: 0.9rem;
+  color: var(--text);
+  font-weight: 700;
 }
 
 .percentile-zero-line {
