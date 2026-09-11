@@ -153,9 +153,9 @@ function TotalsSection({ game }: { game: GameStat }) {
         {game.totals.map((t) => {
           const hit = actualTotal === undefined ? null : actualTotal > t.line ? "over" : "under";
           return (
-            <div className={`totals-card ${hit ? "totals-actual" : ""} ${t.isMarketLine ? "totals-market" : ""}`} key={t.line}>
+            <div className={`totals-card ${t.isMarketLine ? "totals-market" : ""}`} key={t.line}>
               <div className="line">
-                TOTAL {t.line}
+                O/U LINE {t.line}
                 {t.isMarketLine && <span className="market-line-tag"> MARKET LINE</span>}
               </div>
               <div className="split">
@@ -163,8 +163,18 @@ function TotalsSection({ game }: { game: GameStat }) {
                 <div className="under" style={{ width: `${t.under}%` }} />
               </div>
               <div className="readout">
-                <span className={`over-pct ${hit === "over" ? "actual-hit" : ""}`}>{t.over}% over</span>
-                <span className={`under-pct ${hit === "under" ? "actual-hit" : ""}`}>{t.under}% under</span>
+                {/* Over is always green, under is always red -- that
+                    convention never changes. A checkmark next to
+                    whichever one actually happened adds a second,
+                    separate signal instead of recoloring either one,
+                    since a third color there would compete with, not
+                    reinforce, the green/red meaning. */}
+                <span className={`over-pct ${hit === "over" ? "actual-hit" : ""}`}>
+                  {t.over}% over{hit === "over" && " ✓"}
+                </span>
+                <span className={`under-pct ${hit === "under" ? "actual-hit" : ""}`}>
+                  {t.under}% under{hit === "under" && " ✓"}
+                </span>
               </div>
             </div>
           );

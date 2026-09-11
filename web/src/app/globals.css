@@ -1496,22 +1496,23 @@ h1.glow span {
   font-weight: 700;
 }
 
-.totals-card.totals-actual {
-  border-color: rgba(255, 214, 10, 0.5);
+/* The real outcome gets a checkmark (added in the markup) rather than
+   a third color here -- over stays green and under stays red always,
+   with a same-hue glow just making whichever one actually happened
+   stand out a little more, instead of a yellow override that would
+   compete with the green/red meaning instead of reinforcing it. */
+.totals-card .readout .over-pct.actual-hit {
+  text-shadow: 0 0 8px rgba(var(--glow-rgb), 0.6);
 }
 
-.totals-card .readout .over-pct.actual-hit,
 .totals-card .readout .under-pct.actual-hit {
-  color: #ffd60a;
-  text-shadow: 0 0 6px rgba(255, 214, 10, 0.4);
+  text-shadow: 0 0 8px rgba(255, 59, 59, 0.6);
 }
 
 /* The sixth card, built from this specific game's real market total
    instead of one of the five fixed reference lines -- a distinct
-   accent border (independent of totals-actual's yellow, which is
-   about the real result, not which line this is) so it reads as
-   "this one's different" at a glance among five otherwise-identical
-   cards. */
+   accent border so it reads as "this one's different" at a glance
+   among five otherwise-identical cards. */
 .totals-card.totals-market {
   border-color: rgba(var(--glow-rgb), 0.5);
 }
