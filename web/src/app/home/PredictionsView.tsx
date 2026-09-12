@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
@@ -14,6 +14,25 @@ import MobileAdFrame from "@/components/MobileAdFrame";
 // server (each refresh re-runs the Server Component, which itself
 // only re-hits ESPN at most once per liveScores.ts's own 30s cache).
 const LIVE_REFRESH_MS = 20_000;
+
+// This is the page people linger on scanning percentages across a
+// whole slate, so the full-week list gets more ad exposure than a
+// single slot -- split into 4 roughly-even groups (remainder games go
+// to the earlier groups) with an ad between each, rather than one ad
+// per game which would be excessive for a 13-16 game week.
+function splitIntoGroups<T>(items: T[], groups: number): T[][] {
+  if (items.length === 0) return Array.from({ length: groups }, () => []);
+  const base = Math.floor(items.length / groups);
+  const extra = items.length % groups;
+  const result: T[][] = [];
+  let index = 0;
+  for (let i = 0; i < groups; i++) {
+    const size = base + (i < extra ? 1 : 0);
+    result.push(items.slice(index, index + size));
+    index += size;
+  }
+  return result;
+}
 
 export default function PredictionsView({
   seasons,
@@ -62,6 +81,10 @@ export default function PredictionsView({
   const premier = matchups.find((m) => m.premier);
   const rest = matchups.filter((m) => !m.premier);
   const locked = !isMember;
+  // Filtered so a light week (fewer than 4 games) can't produce an
+  // empty trailing group -- without this, the ad-between-groups logic
+  // below could render a dangling ad with nothing after it.
+  const gameGroups = splitIntoGroups(rest, 4).filter((group) => group.length > 0);
 
   return (
     <>
@@ -157,11 +180,22 @@ export default function PredictionsView({
               </div>
 
               <div className={`locked-section ${locked ? "is-locked" : ""}`}>
-                <div className="matchup-grid">
-                  {rest.map((m) => (
-                    <MatchupCard key={m.id} matchup={m} />
-                  ))}
-                </div>
+                {gameGroups.map((group, i) => (
+                  <Fragment key={i}>
+                    <div className="matchup-grid">
+                      {group.map((m) => (
+                        <MatchupCard key={m.id} matchup={m} />
+                      ))}
+                    </div>
+                    {i < gameGroups.length - 1 && (
+                      <div className="mobile-ad-wrap" aria-label="Promotional space">
+                        <MobileAdFrame>
+                          <span className="slot-label">Ad space</span>
+                        </MobileAdFrame>
+                      </div>
+                    )}
+                  </Fragment>
+                ))}
                 {locked && (
                   <div className="unlock-panel">
                     <div className="unlock-card">
