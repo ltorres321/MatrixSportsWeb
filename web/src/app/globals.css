@@ -236,14 +236,21 @@ a {
    Ad rails -- used on the predictions list and game-detail pages, one
    on each side of the main content. Absolutely positioned rather than
    laid out in-flow, so a real 360x720 frame never has to shrink main
-   content to make room; horizontal placement uses vw (not %) so it's
-   measured from the actual viewport center the same way .page's
-   max-width:1200px/margin:auto centering is, keeping a constant 40px
-   gap to .page's edge at any viewport width. top:0 is relative to
-   .content-split itself (position:relative below), which starts
-   right where each page's own header/selector controls end -- so the
-   rails always clear those controls without a hardcoded pixel offset
-   that would only happen to be right on one page's header height.
+   content to make room. top:0 is relative to .content-split itself
+   (position:relative below), which starts right where each page's own
+   header/selector controls end -- so the rails always clear those
+   controls without a hardcoded pixel offset that would only happen to
+   be right on one page's header height.
+   left/right are plain constants (40px gap + 360px rail width = 400),
+   NOT measured from the viewport -- left/right on an absolutely
+   positioned element are always relative to the positioned ancestor's
+   own edge, which here is .content-split, not the true viewport edge.
+   .content-split's own box already sits centered by .page's own
+   max-width:1200px/margin:auto, so a plain negative offset from ITS
+   edges lands the rails just outside .page with no vw math needed --
+   a vw-based formula here double-counts .page's own centering, and
+   the further .content-split sits from the true viewport edge (i.e.
+   the wider the monitor), the further inward the rails would drift.
    Hidden below 2050px rather than shrinking: a real ad unit doesn't
    get to shrink to fit a laptop screen, so it's all-or-nothing,
    wide-desktop-only for now.
@@ -263,11 +270,11 @@ a {
 }
 
 .promo-rail-left {
-  left: calc(50vw - 1000px);
+  left: -400px;
 }
 
 .promo-rail-right {
-  right: calc(50vw - 1000px);
+  right: -400px;
 }
 
 @media (min-width: 2050px) {
