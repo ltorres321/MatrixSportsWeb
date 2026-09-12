@@ -195,33 +195,13 @@ a {
 }
 
 /* ---------------------------------------------------------------
-   Ad rails -- 2 real 300x600 ("Half Page") ad units per side, each
-   wrapped in the angular Matrix-HUD frame (AdFrame.tsx). Absolutely
-   (not fixed-) positioned just outside the 1200px .page column so
-   they scroll with the page like real inventory, 40px gap held
-   constant by keeping both the rail and .page positioned off the
-   viewport center rather than off each other -- see the left/right
-   formulas below. Hidden below 2050px rather than shrinking: a real
-   ad unit doesn't get to shrink to fit a laptop screen, so it's
-   all-or-nothing, wide-desktop-only for now.
+   Ad frame -- a real 300x600 ("Half Page") ad unit wrapped in the
+   angular Matrix-HUD border (AdFrame.tsx). Placed via .content-split/
+   .promo-column below on the pages that use it; there's no sitewide
+   fixed rail anymore -- that and this in-page column used to both
+   render at once on the same page, doubling up on wide screens (4
+   frames on one side instead of 2).
    --------------------------------------------------------------- */
-
-.promo-rail {
-  position: absolute;
-  top: 140px;
-  z-index: 2;
-  display: none;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.promo-rail-left {
-  left: calc(50% - 1000px);
-}
-
-.promo-rail-right {
-  right: calc(50% - 1000px);
-}
 
 .matrix-panel {
   position: relative;
@@ -255,19 +235,11 @@ a {
   text-transform: uppercase;
 }
 
-@media (min-width: 2050px) {
-  .promo-rail {
-    display: flex;
-  }
-}
-
 /* ---------------------------------------------------------------
    In-page ad column -- used on the predictions list and game-detail
-   pages so the ad frames are visible on an ordinary screen, not just
-   the 2050px+ desktops the fixed .promo-rail needs. Main content shrinks
-   to make room (down to a 280px floor) rather than the ad column
-   shrinking a real 360x720 unit; below that floor the column wraps
-   underneath instead of squeezing further.
+   pages. Main content shrinks to make room (down to a 280px floor)
+   rather than the ad column shrinking a real 360x720 unit; below that
+   floor the column wraps underneath instead of squeezing further.
    --------------------------------------------------------------- */
 
 .content-split {

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import RainCanvas from "@/components/RainCanvas";
 import SiteNav from "@/components/SiteNav";
-import AdRail from "@/components/AdRail";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -56,8 +55,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" data-theme={theme}>
       <body>
         {rainEnabled && <RainCanvas theme={theme} />}
-        <AdRail side="left" />
-        <AdRail side="right" />
         <div className="page">
           <SiteNav signedIn={!!userData.user} />
           {children}
