@@ -292,15 +292,18 @@ a {
 
    Went through a few rounds here: a plain clip-path box first (too
    small/stranded on a tablet-width column), a near-square
-   clamp()+aspect-ratio box (too plain/square once it got big enough
-   to matter), then one sized close to the full content width (looked
-   oversized/heavier than the matchup cards it sits among). This
-   version reuses AdFrame's actual SVG geometry rotated into landscape
-   (see that component for the transpose explanation) so it carries
-   the same corner brackets and glow detail as the desktop rail, sized
-   at 75% of the surrounding content width (aspect-ratio 16/9) to sit
-   proportionate to a matchup card rather than matching or exceeding
-   it -- this is specifically the in-content placement; the sidebar
+   clamp()+aspect-ratio box (too plain/square), one close to the full
+   content width (oversized vs. the matchup cards), then a 4/3 ratio
+   that -- because height = width / ratio -- actually made it *taller*
+   than before despite looking like a "smaller" number, ending up
+   bigger overall than the Game of the Week card it needs to sit
+   under. This version reuses AdFrame's actual SVG geometry rotated
+   into landscape (see that component for the transpose explanation),
+   matched to the matchup card's own wide/short shape (aspect-ratio
+   7/2, close to a real card's proportions) and scaled to 85% of the
+   content width -- a true miniature of a card's shape, not an
+   independently-proportioned box that happens to share one width
+   number. This is specifically the in-content placement; the sidebar
    .promo-rail is unrelated and unaffected by this sizing.
    --------------------------------------------------------------- */
 
@@ -320,7 +323,7 @@ a {
   position: relative;
   width: 85%;
   min-width: 240px;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 7 / 2;
   isolation: isolate;
 }
 
