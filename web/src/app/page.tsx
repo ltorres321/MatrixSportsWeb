@@ -11,6 +11,7 @@ import type { Matchup } from "@/lib/matchups";
 import { teamLogoPath, TEAMS } from "@/lib/teams";
 import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews, type NewsItem } from "@/lib/espnNews";
+import AdFrame from "@/components/AdFrame";
 
 // Signed-out visitors get the marketing pitch below. Signed-in users
 // get a real dashboard instead -- see SignedInDashboard.
@@ -125,90 +126,110 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
         ))}
       </div>
 
-      <main>
-        {premier && (
-          <div className="premier-wrap">
-            <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
-              {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : "★ GAME OF THE WEEK — FREE PREVIEW"}
-            </div>
-            <MatchupCard matchup={premier} premier />
-            <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
-              <Link className="btn btn-ghost" href="/home">
-                View Full Week {currentWeek} Slate →
-              </Link>
-            </div>
-          </div>
-        )}
+      <div className="content-split">
+        <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+        </aside>
 
-        {news.length > 0 && (
-          <div className="news-section">
-            <div className="section-label">
-              <span className="dot" /> LATEST NFL NEWS
-              <span className="news-credit">via ESPN</span>
+        <main className="content-main">
+          {premier && (
+            <div className="premier-wrap">
+              <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
+                {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : "★ GAME OF THE WEEK — FREE PREVIEW"}
+              </div>
+              <MatchupCard matchup={premier} premier />
+              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                <Link className="btn btn-ghost" href="/home">
+                  View Full Week {currentWeek} Slate →
+                </Link>
+              </div>
             </div>
-            <div className="news-grid">
-              {news.map((item) => (
-                <a key={item.link} className="news-card" href={item.link} target="_blank" rel="noopener noreferrer">
-                  {item.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className="news-card-image" src={item.image} alt="" />
-                  ) : (
-                    <div className="news-card-image news-card-image-fallback">🏈</div>
-                  )}
-                  <div className="news-card-body">
-                    <h3>{item.title}</h3>
-                    <p>{item.snippet}</p>
-                    <span className="read-more">Read on ESPN →</span>
-                  </div>
-                </a>
-              ))}
+          )}
+
+          {news.length > 0 && (
+            <div className="news-section">
+              <div className="section-label">
+                <span className="dot" /> LATEST NFL NEWS
+                <span className="news-credit">via ESPN</span>
+              </div>
+              <div className="news-grid">
+                {news.map((item) => (
+                  <a key={item.link} className="news-card" href={item.link} target="_blank" rel="noopener noreferrer">
+                    {item.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className="news-card-image" src={item.image} alt="" />
+                    ) : (
+                      <div className="news-card-image news-card-image-fallback">🏈</div>
+                    )}
+                    <div className="news-card-body">
+                      <h3>{item.title}</h3>
+                      <p>{item.snippet}</p>
+                      <span className="read-more">Read on ESPN →</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="section-label">
-          <span className="dot" /> INSIGHTS &amp; ARTICLES
-        </div>
-
-        <div className="article-grid">
-          <Link className="article-card" href="/about">
-            <div className="thumb">🧠</div>
-            <h3>How We Turned a Betting Line Into 100,000 Simulated Games</h3>
-            <p>
-              The full story behind the model: why we start from the market
-              line, what we tested and cut, and why 100,000 runs beats a
-              single guess.
-            </p>
-            <span className="read-more">Read More →</span>
-          </Link>
-
-          <div className="article-card disabled">
-            <div className="thumb">📊</div>
-            <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
-              COMING SOON
-            </span>
-            <h3>This Week&apos;s Model Insight</h3>
-            <p>
-              After Week {currentWeek} wraps, this space breaks down what the
-              simulations got right, what surprised us, and how the numbers
-              compared to what actually happened on the field.
-            </p>
+          <div className="section-label">
+            <span className="dot" /> INSIGHTS &amp; ARTICLES
           </div>
 
-          <div className="article-card disabled">
-            <div className="thumb">🏈</div>
-            <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
-              COMING SOON
-            </span>
-            <h3>Team Deep Dives</h3>
-            <p>
-              Season-long trend pieces on individual teams — how their actual
-              results have tracked against our simulated projections week
-              over week.
-            </p>
+          <div className="article-grid">
+            <Link className="article-card" href="/about">
+              <div className="thumb">🧠</div>
+              <h3>How We Turned a Betting Line Into 100,000 Simulated Games</h3>
+              <p>
+                The full story behind the model: why we start from the market
+                line, what we tested and cut, and why 100,000 runs beats a
+                single guess.
+              </p>
+              <span className="read-more">Read More →</span>
+            </Link>
+
+            <div className="article-card disabled">
+              <div className="thumb">📊</div>
+              <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+                COMING SOON
+              </span>
+              <h3>This Week&apos;s Model Insight</h3>
+              <p>
+                After Week {currentWeek} wraps, this space breaks down what the
+                simulations got right, what surprised us, and how the numbers
+                compared to what actually happened on the field.
+              </p>
+            </div>
+
+            <div className="article-card disabled">
+              <div className="thumb">🏈</div>
+              <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+                COMING SOON
+              </span>
+              <h3>Team Deep Dives</h3>
+              <p>
+                Season-long trend pieces on individual teams — how their actual
+                results have tracked against our simulated projections week
+                over week.
+              </p>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+
+        <aside className="promo-rail promo-rail-right" aria-label="Promotional space">
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+        </aside>
+      </div>
 
       <footer className="site-footer">
         <p>
