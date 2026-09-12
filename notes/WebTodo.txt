@@ -1,0 +1,10 @@
+Setup Email jobs to send out favorites results
+
+Need a feed that pulls in the lines from oddstrader
+
+Need to complete the odds datapull and check for changes in line
+if a line change please run model for onlt games where line was changed only
+
+Ads Setup is not complete yet.
+
+Complete the post to generate traffic

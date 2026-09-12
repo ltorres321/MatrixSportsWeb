@@ -1,0 +1,31 @@
+Let's knock out the Terms of Service page first — quick, and clears the way for the ad-platform signup.
+
+Now link it alongside the Privacy Policy in the site-wide footer:
+
+There's already a `.form-footer-note` right before the submit button — perfect spot to add the standard terms/privacy acknowledgment:
+
+Now build/typecheck and ship:
+
+Clean. Committing and pushing to `ltorres-1`:
+
+`/terms` is live at [ltorres-1--matrixsports.netlify.app/terms](https://ltorres-1--matrixsports.netlify.app/terms). Take a look, and when you're happy, say the word to promote to `main`.
+
+Now, ads and traffic — since you want to move fast with the season already underway:
+
+## Serving ads — pick one and sign up today
+
+Given the urgency, I'd just go with **Ezoic** ([pubdash.ezoic.com/join/accessnow](https://pubdash.ezoic.com/join/accessnow)) — no traffic minimum, it auctions Google plus other buyers automatically, and there's nothing blocking you from applying right now with your GA4 already live. AdSense direct is the alternative, but given the gambling-adjacent content flag I raised earlier, I'd expect a slower/more uncertain review either way — no reason not to apply to both in parallel if you want, actually, since accepting one doesn't block the other.
+
+Once you have an account (either one), tell me and I'll wire the real ad code into the 4 empty boxes — that part's fast on my end, it's the approval wait that takes time, so starting the application today matters more than anything else this week.
+
+## Generating traffic — concrete, not generic
+
+Given the timing (season 2 days in, big slate tomorrow), here's what actually moves the needle for a brand-new sports site, roughly in order of effort-to-payoff:
+
+1. **Reddit — r/sportsbook, r/nfl, r/NFLbetting.** This is the single best-fit audience for what you built. The trap: these communities aggressively remove pure self-promo/link-drops. What works is posting the actual substance — e.g. "Model gave the [Game of the Week] a 76% win probability, here's why" with your reasoning, linking to the site as a secondary reference, not the whole post. Engage in the comments like a person, not a bot.
+2. **X/Twitter — post your "Game of the Week" pick every week, publicly, with your reasoning.** Sports betting Twitter runs on exactly this content type. Reply genuinely to bigger accounts' game threads with your model's number on that specific game — that's how small accounts get seen.
+3. **The forums you already had bookmarked** — Covers.com and OddsShark both have active community/forum sections; same rules as Reddit apply (contribute real analysis, don't just drop links).
+4. **A shareable "pick card" for the Game of the Week** — a clean, single image (final score prediction + win probability + your logo) that's easy to screenshot-and-share from a phone. I could build this as an actual feature (auto-generated per game) if you want something concrete to post rather than a bare link — this tends to perform much better on Reddit/Twitter than a plain URL.
+5. **IndieHackers / "build in public"** — different audience (tech-curious, not bettors), but the "I built a Monte Carlo NFL prediction engine solo" story is a genuinely good one and can bring in early users who stick around and give feedback.
+
+Want me to build that shareable pick-card feature next — that's the one concrete thing I can build right now that directly supports the traffic push, versus the rest being manual outreach on your end?
