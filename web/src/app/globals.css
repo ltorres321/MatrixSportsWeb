@@ -290,16 +290,18 @@ a {
    wide frame doesn't just need repositioning here -- it's wider than
    a typical phone's usable content width and would overflow outright.
 
-   Went through two rounds here: a plain clip-path box first (too
-   small/stranded on a tablet-width column), then a near-square
-   clamp()+aspect-ratio box (technically fluid, but visually too
-   square/plain once it got big enough to matter). This version reuses
-   AdFrame's actual SVG geometry rotated into landscape (see that
-   component for the transpose explanation) so it carries the same
-   corner brackets and glow detail as the desktop rail instead of a
-   generic bordered box, sized wide and short (aspect-ratio 16/9) and
-   extended close to the surrounding content's own width rather than
-   capped at a conservative max.
+   Went through a few rounds here: a plain clip-path box first (too
+   small/stranded on a tablet-width column), a near-square
+   clamp()+aspect-ratio box (too plain/square once it got big enough
+   to matter), then one sized close to the full content width (looked
+   oversized/heavier than the matchup cards it sits among). This
+   version reuses AdFrame's actual SVG geometry rotated into landscape
+   (see that component for the transpose explanation) so it carries
+   the same corner brackets and glow detail as the desktop rail, sized
+   at 75% of the surrounding content width (aspect-ratio 16/9) to sit
+   proportionate to a matchup card rather than matching or exceeding
+   it -- this is specifically the in-content placement; the sidebar
+   .promo-rail is unrelated and unaffected by this sizing.
    --------------------------------------------------------------- */
 
 .mobile-ad-wrap {
@@ -316,7 +318,8 @@ a {
 
 .mobile-ad-frame {
   position: relative;
-  width: clamp(280px, 92%, 960px);
+  width: 75%;
+  min-width: 240px;
   aspect-ratio: 16 / 9;
   isolation: isolate;
 }
