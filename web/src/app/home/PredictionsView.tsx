@@ -7,6 +7,7 @@ import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPre
 import type { Matchup } from "@/lib/matchups";
 import MatchupCard from "@/components/MatchupCard";
 import AdFrame from "@/components/AdFrame";
+import MobileAdFrame from "@/components/MobileAdFrame";
 
 // How often to re-fetch while at least one game on screen is live --
 // short enough to feel real-time, long enough not to hammer the
@@ -144,6 +145,12 @@ export default function PredictionsView({
                   <MatchupCard matchup={premier} premier />
                 </div>
               )}
+
+              <div className="mobile-ad-wrap" aria-label="Promotional space">
+                <MobileAdFrame>
+                  <span className="slot-label">Ad space</span>
+                </MobileAdFrame>
+              </div>
 
               <div className="section-label">
                 <span className="dot" /> FULL WEEK {activeWeek} SLATE

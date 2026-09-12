@@ -12,6 +12,7 @@ import { teamLogoPath, TEAMS } from "@/lib/teams";
 import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews, type NewsItem } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
+import MobileAdFrame from "@/components/MobileAdFrame";
 
 // Signed-out visitors get the marketing pitch below. Signed-in users
 // get a real dashboard instead -- see SignedInDashboard.
@@ -150,6 +151,12 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
               </div>
             </div>
           )}
+
+          <div className="mobile-ad-wrap" aria-label="Promotional space">
+            <MobileAdFrame>
+              <span className="slot-label">Ad space</span>
+            </MobileAdFrame>
+          </div>
 
           {news.length > 0 && (
             <div className="news-section">

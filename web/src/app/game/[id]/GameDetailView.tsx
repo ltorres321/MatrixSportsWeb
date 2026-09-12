@@ -7,6 +7,7 @@ import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPre
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import { scalePosition, type GameStat, type GameStatSide } from "@/lib/gameStats";
 import AdFrame from "@/components/AdFrame";
+import MobileAdFrame from "@/components/MobileAdFrame";
 
 const LIVE_REFRESH_MS = 20_000;
 
@@ -286,6 +287,12 @@ export default function GameDetailView({ game }: { game: GameStat }) {
           </Link>
 
           <Hero game={game} />
+
+          <div className="mobile-ad-wrap" aria-label="Promotional space">
+            <MobileAdFrame>
+              <span className="slot-label">Ad space</span>
+            </MobileAdFrame>
+          </div>
 
           {locked ? (
             <div className="locked-section is-locked">
