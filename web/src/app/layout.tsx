@@ -63,6 +63,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {children}
           <div className="legal-footer">
             <Link href="/privacy">Privacy Policy</Link>
+            <span aria-hidden="true"> · </span>
+            <Link href="/terms">Terms of Service</Link>
           </div>
         </div>
       </body>

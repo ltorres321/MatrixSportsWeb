@@ -153,9 +153,11 @@ export default function SignupPage() {
               </div>
 
               <p className="form-footer-note">
-                By signing up you agree to receive account-related email.
-                Text notifications are opt-in only and sent solely for the
-                alert above.
+                By signing up you agree to receive account-related email and
+                to our <Link href="/terms">Terms of Service</Link> and{" "}
+                <Link href="/privacy">Privacy Policy</Link>. Text
+                notifications are opt-in only and sent solely for the alert
+                above.
               </p>
 
               <div className="field full">
