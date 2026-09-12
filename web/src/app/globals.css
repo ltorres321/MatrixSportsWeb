@@ -290,18 +290,16 @@ a {
    wide frame doesn't just need repositioning here -- it's wider than
    a typical phone's usable content width and would overflow outright.
 
-   Sized with clamp()+aspect-ratio rather than one fixed 300x250 --
-   that size is right for a phone, but on a tablet-width column
-   (e.g. an iPad) a phone-safe box stranded in the middle of a much
-   wider column looks like an afterthought, not a real ad placement.
-   Scaling continuously with the actual container width (not the
-   viewport -- .content-main is narrower than the viewport once .page
-   hits its own max-width) keeps it proportionate at every size in
-   between, capping at 700px so it doesn't get absurdly large just
-   under the 2050px handoff to the sidebar rails. The clip-path corner
-   cut uses percentages instead of a fixed px value for the same
-   reason -- a 14px chamfer that looks right at 300px wide would be
-   an imperceptible nick at 700px.
+   Went through two rounds here: a plain clip-path box first (too
+   small/stranded on a tablet-width column), then a near-square
+   clamp()+aspect-ratio box (technically fluid, but visually too
+   square/plain once it got big enough to matter). This version reuses
+   AdFrame's actual SVG geometry rotated into landscape (see that
+   component for the transpose explanation) so it carries the same
+   corner brackets and glow detail as the desktop rail instead of a
+   generic bordered box, sized wide and short (aspect-ratio 16/9) and
+   extended close to the surrounding content's own width rather than
+   capped at a conservative max.
    --------------------------------------------------------------- */
 
 .mobile-ad-wrap {
@@ -318,18 +316,23 @@ a {
 
 .mobile-ad-frame {
   position: relative;
-  width: clamp(280px, 60%, 700px);
-  aspect-ratio: 6 / 5;
-  clip-path: polygon(6% 0, 94% 0, 100% 6%, 100% 94%, 94% 100%, 6% 100%, 0 94%, 0 6%);
-  background: var(--panel-border);
-  padding: 1px;
+  width: clamp(280px, 92%, 960px);
+  aspect-ratio: 16 / 9;
+  isolation: isolate;
+}
+
+.mobile-ad-frame-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .mobile-ad-panel {
-  width: 100%;
-  height: 100%;
-  clip-path: polygon(6% 0, 94% 0, 100% 6%, 100% 94%, 94% 100%, 6% 100%, 0 94%, 0 6%);
-  background: radial-gradient(ellipse at 50% 35%, rgba(var(--glow-rgb), 0.12), rgba(3, 6, 3, 0.96) 72%);
+  position: absolute;
+  inset: 16% 7%;
   display: flex;
   align-items: center;
   justify-content: center;
