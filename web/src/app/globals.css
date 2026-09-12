@@ -2040,6 +2040,25 @@ h1.glow span {
   margin-right: auto;
 }
 
+/* Sits below every page's own footer/content (rendered in the root
+   layout, not per-page) so a Privacy Policy link exists site-wide
+   without every page needing its own copy of it. */
+.legal-footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--panel-border);
+  text-align: center;
+  font-size: 0.7rem;
+}
+
+.legal-footer a {
+  color: var(--text-dim);
+}
+
+.legal-footer a:hover {
+  color: var(--green);
+}
+
 /* Scoped to the predictions page's methodology note only -- +2px over
    .site-footer's 12px base, not a change to the shared footer style
    every other page's footer text also uses. */

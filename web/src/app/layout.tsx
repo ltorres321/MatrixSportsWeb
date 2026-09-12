@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 import RainCanvas from "@/components/RainCanvas";
 import SiteNav from "@/components/SiteNav";
@@ -58,6 +59,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <div className="page">
           <SiteNav signedIn={!!userData.user} />
           {children}
+          <div className="legal-footer">
+            <Link href="/privacy">Privacy Policy</Link>
+          </div>
         </div>
       </body>
     </html>
