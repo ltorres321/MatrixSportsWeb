@@ -197,10 +197,7 @@ a {
 /* ---------------------------------------------------------------
    Ad frame -- a real 300x600 ("Half Page") ad unit wrapped in the
    angular Matrix-HUD border (AdFrame.tsx). Placed via .content-split/
-   .promo-column below on the pages that use it; there's no sitewide
-   fixed rail anymore -- that and this in-page column used to both
-   render at once on the same page, doubling up on wide screens (4
-   frames on one side instead of 2).
+   .promo-rail below on the pages that use it.
    --------------------------------------------------------------- */
 
 .matrix-panel {
@@ -236,29 +233,47 @@ a {
 }
 
 /* ---------------------------------------------------------------
-   In-page ad column -- used on the predictions list and game-detail
-   pages. Main content shrinks to make room (down to a 280px floor)
-   rather than the ad column shrinking a real 360x720 unit; below that
-   floor the column wraps underneath instead of squeezing further.
+   Ad rails -- used on the predictions list and game-detail pages, one
+   on each side of the main content. Absolutely positioned rather than
+   laid out in-flow, so a real 360x720 frame never has to shrink main
+   content to make room; horizontal placement uses vw (not %) so it's
+   measured from the actual viewport center the same way .page's
+   max-width:1200px/margin:auto centering is, keeping a constant 40px
+   gap to .page's edge at any viewport width. top:0 is relative to
+   .content-split itself (position:relative below), which starts
+   right where each page's own header/selector controls end -- so the
+   rails always clear those controls without a hardcoded pixel offset
+   that would only happen to be right on one page's header height.
+   Hidden below 2050px rather than shrinking: a real ad unit doesn't
+   get to shrink to fit a laptop screen, so it's all-or-nothing,
+   wide-desktop-only for now.
    --------------------------------------------------------------- */
 
 .content-split {
-  display: flex;
-  align-items: flex-start;
-  gap: 2rem;
-  flex-wrap: wrap;
+  position: relative;
 }
 
-.content-main {
-  flex: 1 1 480px;
-  min-width: 280px;
-}
-
-.promo-column {
-  flex: 0 0 360px;
-  display: flex;
+.promo-rail {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  display: none;
   flex-direction: column;
   gap: 2rem;
+}
+
+.promo-rail-left {
+  left: calc(50vw - 1000px);
+}
+
+.promo-rail-right {
+  right: calc(50vw - 1000px);
+}
+
+@media (min-width: 2050px) {
+  .promo-rail {
+    display: flex;
+  }
 }
 
 /* ---------------------------------------------------------------

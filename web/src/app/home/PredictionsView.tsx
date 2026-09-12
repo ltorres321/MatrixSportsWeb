@@ -116,6 +116,15 @@ export default function PredictionsView({
       </nav>
 
       <div className="content-split">
+        <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+        </aside>
+
         <main className="content-main">
           {matchups.length === 0 ? (
             <p style={{ textAlign: "center", color: "var(--text-dim)" }}>
@@ -174,7 +183,7 @@ export default function PredictionsView({
           )}
         </main>
 
-        <aside className="promo-column" aria-label="Promotional space">
+        <aside className="promo-rail promo-rail-right" aria-label="Promotional space">
           <AdFrame>
             <span className="slot-label">Ad space</span>
           </AdFrame>

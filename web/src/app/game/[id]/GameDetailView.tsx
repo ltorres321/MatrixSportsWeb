@@ -271,6 +271,15 @@ export default function GameDetailView({ game }: { game: GameStat }) {
       <StickyBar game={game} />
 
       <div className="content-split">
+        <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+          <AdFrame>
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+        </aside>
+
         <main className="content-main">
           <Link href="/home" style={{ display: "inline-block", marginBottom: "1.5rem", color: "var(--text-dim)" }}>
             &larr; back to predictions
@@ -317,7 +326,7 @@ export default function GameDetailView({ game }: { game: GameStat }) {
           )}
         </main>
 
-        <aside className="promo-column" aria-label="Promotional space">
+        <aside className="promo-rail promo-rail-right" aria-label="Promotional space">
           <AdFrame>
             <span className="slot-label">Ad space</span>
           </AdFrame>
