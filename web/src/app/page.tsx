@@ -184,6 +184,12 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
             </div>
           )}
 
+          <div className="mobile-ad-wrap" aria-label="Promotional space">
+            <MobileAdFrame>
+              <span className="slot-label">Ad space</span>
+            </MobileAdFrame>
+          </div>
+
           <div className="section-label">
             <span className="dot" /> INSIGHTS &amp; ARTICLES
           </div>
@@ -225,6 +231,16 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
                 over week.
               </p>
             </div>
+          </div>
+
+          {/* One ad slot per 3 articles -- currently a single group of
+              3, so this sits right after it; if more articles are
+              added later this is the spot to repeat the pattern
+              every 3rd card rather than add a slot per article. */}
+          <div className="mobile-ad-wrap" aria-label="Promotional space">
+            <MobileAdFrame>
+              <span className="slot-label">Ad space</span>
+            </MobileAdFrame>
           </div>
         </main>
 
