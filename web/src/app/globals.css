@@ -2059,6 +2059,41 @@ h1.glow span {
   color: var(--green);
 }
 
+/* ---------------------------------------------------------------
+   Cookie consent banner (GoogleAnalytics.tsx) -- only rendered while
+   the visitor hasn't chosen yet; analytics_storage defaults to denied
+   until Accept is clicked, so Decline just dismisses it.
+   --------------------------------------------------------------- */
+
+.cookie-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--panel-solid);
+  border-top: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.cookie-banner p {
+  margin: 0;
+  max-width: 640px;
+}
+
+.cookie-banner-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
 /* Scoped to the predictions page's methodology note only -- +2px over
    .site-footer's 12px base, not a change to the shared footer style
    every other page's footer text also uses. */

@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import RainCanvas from "@/components/RainCanvas";
 import SiteNav from "@/components/SiteNav";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -56,6 +57,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" data-theme={theme}>
       <body>
         {rainEnabled && <RainCanvas theme={theme} />}
+        <GoogleAnalytics />
         <div className="page">
           <SiteNav signedIn={!!userData.user} />
           {children}
