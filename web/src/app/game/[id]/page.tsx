@@ -9,6 +9,30 @@ function teamDisplay(alias: string): string {
   return team ? `${team.market} ${team.name}` : alias;
 }
 
+// Per-game title/description (shown in search results, browser tabs,
+// and as the fallback text on a share preview) plus an explicit
+// "summary_large_image" Twitter card -- without this Twitter falls
+// back to its small thumbnail card even though opengraph-image.tsx
+// already supplies a full-size image.
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const game = await getGameDetail(id);
+  if (!game) return {};
+
+  const a = teamDisplay(game.teamA.alias);
+  const b = teamDisplay(game.teamB.alias);
+  const description =
+    game.status === "final"
+      ? `Final: ${a} ${game.teamA.score} — ${b} ${game.teamB.score}. See the model's pregame win probability and how it played out.`
+      : `${a} ${game.teamA.winProb}% to win vs ${b} ${game.teamB.winProb}% — from 100,000 simulated games.`;
+
+  return {
+    title: `${a} vs ${b} — Win Probability | Matrix Sports Analytics`,
+    description,
+    twitter: { card: "summary_large_image" },
+  };
+}
+
 export default async function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const game = await getGameDetail(id);
