@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 
-// A real 300x250 ("Medium Rectangle") ad unit -- the desktop AdFrame
-// is 360px wide, which overflows a typical ~320-375px phone screen
-// outright, so this isn't the same frame repositioned, it's a
-// genuinely smaller, differently-proportioned unit built for mobile.
-// Shown inline in the content flow at the same breakpoint where the
-// sidebar .promo-rail disappears (see .mobile-ad-wrap in
-// globals.css), so anything narrower than an ultra-wide desktop --
-// phones, tablets, ordinary laptops -- gets this instead of nothing.
+// The desktop AdFrame is a fixed 360px wide, which overflows a
+// typical ~320-375px phone screen outright, so this isn't the same
+// frame repositioned, it's a genuinely smaller unit built for
+// anything narrower than the ultra-wide desktop breakpoint where the
+// sidebar .promo-rail takes over. Its size (see .mobile-ad-frame in
+// globals.css) scales fluidly with the actual content column rather
+// than one fixed pixel size, so a phone, a tablet, and an ordinary
+// laptop each get a proportionate box instead of a phone-sized one
+// stranded in a much wider column.
 export default function MobileAdFrame({ children }: { children?: ReactNode }) {
   return (
     <div className="mobile-ad-frame">
