@@ -45,13 +45,13 @@ export default async function HomePage() {
           </p>
           <div className="hero-actions">
             <Link className="btn btn-primary" href="/home">
-              View This Week&apos;s Free Pick
+              View All Picks For This Week
             </Link>
             <Link className="btn btn-ghost" href="/signup">
               Get Early Access — Free
             </Link>
           </div>
-          <p className="hero-note">No credit card required. Cancel anytime — it&apos;s free.</p>
+          <p className="hero-note">No credit card required.</p>
         </section>
 
         <div className="value-grid">
