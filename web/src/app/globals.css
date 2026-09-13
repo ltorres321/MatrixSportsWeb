@@ -1417,8 +1417,10 @@ h1.glow span {
    with it, leaving group boundaries pressed together with no gap
    while a normal grid's own internal row-gap still applies further
    up. A flex gap on the shared parent instead means the space between
-   any two VISIBLE children is always the same 2rem, with no reliance
-   on a specific child's own margin still being there. Safe for
+   any two VISIBLE children is always the same -- set to 1.5rem to
+   exactly match .matchup-grid's own internal row-gap, so a group
+   boundary reads identically to an ordinary row boundary within one
+   group, not just consistent with itself. Safe for
    GameDetailView's single-child (non-slate) use of this same class --
    its one .matchup-grid child and its position:absolute .unlock-panel
    sibling are unaffected by a parent flex context. */
@@ -1426,7 +1428,7 @@ h1.glow span {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 /* Overrides .mobile-ad-wrap's own margin (needed for its several
