@@ -12,6 +12,16 @@ const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 // personalization consent is handled by Google's own consent
 // signals once real ad units are placed, not by whether this script
 // tag loaded.
+//
+// strategy="beforeInteractive" specifically, not the more common
+// afterInteractive -- afterInteractive only leaves a <link
+// rel="preload"> hint in the server-rendered HTML and injects the
+// real <script> tag via client-side JS after hydration, which Google's
+// AdSense verification crawler never sees (confirmed: verification
+// failed with afterInteractive, and the literal <script src="...">
+// tag was genuinely absent from the page source, only the preload
+// hint was present). beforeInteractive is the one strategy Next.js
+// renders as an actual <script> tag in the initial HTML.
 export default function AdSenseScript() {
   if (!ADSENSE_CLIENT_ID) return null;
 
@@ -20,7 +30,7 @@ export default function AdSenseScript() {
       async
       src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
       crossOrigin="anonymous"
-      strategy="afterInteractive"
+      strategy="beforeInteractive"
     />
   );
 }
