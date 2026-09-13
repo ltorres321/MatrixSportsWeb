@@ -898,6 +898,22 @@ h1.glow span {
   gap: 1.5rem;
 }
 
+/* Used only for the predictions page's full-week slate, which splits
+   into several separate .matchup-grid elements (one per group between
+   ad slots -- see splitIntoGroups() in PredictionsView.tsx). A fluid
+   auto-fit column count can't be reliably split into row-aligned
+   groups from server-rendered code, which has no way to know the
+   live viewport width -- fixing the column count at 3 for this
+   specific grid makes that row math exact instead of approximate.
+   Scoped to >=769px (the breakpoint the existing auto-fit rule was
+   already tuned around, see below) so the responsive column counts
+   at narrower widths are untouched. */
+@media (min-width: 769px) {
+  .matchup-grid-slate {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 .matchup-card-link {
   display: block;
   text-decoration: none;

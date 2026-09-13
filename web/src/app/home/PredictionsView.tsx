@@ -17,19 +17,38 @@ const LIVE_REFRESH_MS = 20_000;
 
 // This is the page people linger on scanning percentages across a
 // whole slate, so the full-week list gets more ad exposure than a
-// single slot -- split into 4 roughly-even groups (remainder games go
-// to the earlier groups) with an ad between each, rather than one ad
-// per game which would be excessive for a 13-16 game week.
-function splitIntoGroups<T>(items: T[], groups: number): T[][] {
-  if (items.length === 0) return Array.from({ length: groups }, () => []);
-  const base = Math.floor(items.length / groups);
-  const extra = items.length % groups;
+// single slot -- split into 4 groups (remainder rows go to the
+// earlier groups) with an ad between each, rather than one ad per
+// game which would be excessive for a 13-16 game week.
+//
+// Aligned to complete rows of ROW_SIZE, not raw game count -- each
+// group renders as its own separate .matchup-grid (see below), and
+// splitting by game count let an early group's boundary land mid-row,
+// leaving an orphaned 1-2 card row stranded right before an ad even
+// though later groups had plenty of games that could have filled it.
+// .matchup-grid-slate fixes that grid's column count at ROW_SIZE
+// specifically so this math is exact rather than a guess -- a fluid
+// auto-fit column count can't be reliably split into row-aligned
+// groups from server-rendered code, which has no way to know the
+// live viewport width. A genuine partial row is still possible, but
+// now only in the very last group, and only if the total isn't an
+// exact multiple of ROW_SIZE.
+const ROW_SIZE = 3;
+
+function splitIntoGroups<T>(items: T[], groups: number, itemsPerRow: number): T[][] {
+  if (items.length === 0) return [];
+  const totalRows = Math.ceil(items.length / itemsPerRow);
+  const baseRows = Math.floor(totalRows / groups);
+  const extraRows = totalRows % groups;
   const result: T[][] = [];
   let index = 0;
   for (let i = 0; i < groups; i++) {
-    const size = base + (i < extra ? 1 : 0);
-    result.push(items.slice(index, index + size));
-    index += size;
+    const rows = baseRows + (i < extraRows ? 1 : 0);
+    if (rows === 0) continue;
+    const count = Math.min(rows * itemsPerRow, items.length - index);
+    if (count <= 0) continue;
+    result.push(items.slice(index, index + count));
+    index += count;
   }
   return result;
 }
@@ -81,10 +100,10 @@ export default function PredictionsView({
   const premier = matchups.find((m) => m.premier);
   const rest = matchups.filter((m) => !m.premier);
   const locked = !isMember;
-  // Filtered so a light week (fewer than 4 games) can't produce an
-  // empty trailing group -- without this, the ad-between-groups logic
-  // below could render a dangling ad with nothing after it.
-  const gameGroups = splitIntoGroups(rest, 4).filter((group) => group.length > 0);
+  // Already skips empty groups internally (a light week with fewer
+  // than 4 rows worth of games can't produce a dangling ad with
+  // nothing after it).
+  const gameGroups = splitIntoGroups(rest, 4, ROW_SIZE);
 
   return (
     <>
@@ -182,7 +201,7 @@ export default function PredictionsView({
               <div className={`locked-section ${locked ? "is-locked" : ""}`}>
                 {gameGroups.map((group, i) => (
                   <Fragment key={i}>
-                    <div className="matchup-grid">
+                    <div className="matchup-grid matchup-grid-slate">
                       {group.map((m) => (
                         <MatchupCard key={m.id} matchup={m} />
                       ))}
