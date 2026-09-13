@@ -24,7 +24,7 @@ export default async function HomePage({
     return <PredictionsView seasons={[]} weeks={[]} activeSeason={null} activeWeek={null} matchups={[]} />;
   }
 
-  const fallbackSeason = getCurrentSeasonYear();
+  const fallbackSeason = await getCurrentSeasonYear();
   const requestedSeason = params.season ? Number(params.season) : NaN;
   const activeSeason = seasons.includes(requestedSeason)
     ? requestedSeason

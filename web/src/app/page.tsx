@@ -27,7 +27,7 @@ export default async function HomePage() {
   }
 
   const seasons = await getAvailableSeasons();
-  const fallbackSeason = getCurrentSeasonYear();
+  const fallbackSeason = await getCurrentSeasonYear();
   const season = seasons.includes(fallbackSeason) ? fallbackSeason : seasons[0];
 
   let premier: Matchup | undefined;
@@ -120,7 +120,7 @@ export default async function HomePage() {
 
 async function SignedInDashboard({ firstName, news }: { firstName?: string; news: NewsItem[] }) {
   const seasons = await getAvailableSeasons();
-  const fallbackSeason = getCurrentSeasonYear();
+  const fallbackSeason = await getCurrentSeasonYear();
   const season = seasons.includes(fallbackSeason) ? fallbackSeason : seasons[0];
 
   let premier: Matchup | undefined;

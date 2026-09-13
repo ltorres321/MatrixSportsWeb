@@ -4,6 +4,7 @@ import type { Matchup, TeamSide } from "@/lib/matchups";
 import type { GameStat, GameStatSide } from "@/lib/gameStats";
 import { getSeasonSchedule, getScheduleWeek, getScheduleWeeks, type ScheduleGame } from "@/lib/schedule";
 import { getAllLiveScores, getLiveScore, type LiveScore } from "@/lib/liveScores";
+import { getEffectiveNow } from "@/lib/admin";
 
 // Real data layer over the predictions/latest_predictions table that
 // SportsAnalytics (a separate repo/pipeline) writes into. This file
@@ -87,8 +88,15 @@ const PREDICTION_COLUMNS = `
 
 // NFL seasons span two calendar years -- "the current season" is this
 // year from Sept through Dec, then still-last-year's season Jan/Feb.
-export function getCurrentSeasonYear(): number {
-  const now = new Date();
+//
+// CHANGED: reads getEffectiveNow() (admin.ts) instead of `new Date()`
+// directly -- for everyone except a signed-in admin with an active
+// time override, that's exactly equivalent to `new Date()` (see
+// admin.ts's own docstring for why the override never touches the
+// real server clock, and is a no-op for non-admins even if someone
+// tries to forge the cookie by hand).
+export async function getCurrentSeasonYear(): Promise<number> {
+  const now = await getEffectiveNow();
   return now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear();
 }
 
@@ -96,8 +104,8 @@ export function getCurrentSeasonYear(): number {
 // no need to hit TheSportsDB for those on every request. Only the
 // current/future season(s), where the model hasn't caught up to every
 // game yet, need the schedule to show "games to come."
-function isScheduleEnabledSeason(season: number): boolean {
-  return season >= getCurrentSeasonYear();
+async function isScheduleEnabledSeason(season: number): Promise<boolean> {
+  return season >= (await getCurrentSeasonYear());
 }
 
 export async function getAvailableSeasons(): Promise<number[]> {
@@ -106,7 +114,7 @@ export async function getAvailableSeasons(): Promise<number[]> {
   );
   const seasons = new Set(rows.map((r) => r.season));
 
-  const currentSeason = getCurrentSeasonYear();
+  const currentSeason = await getCurrentSeasonYear();
   if (!seasons.has(currentSeason)) {
     const scheduleGames = await getSeasonSchedule(currentSeason);
     if (scheduleGames.length > 0) seasons.add(currentSeason);
@@ -122,7 +130,7 @@ export async function getWeeksForSeason(season: number): Promise<number[]> {
   );
   const weeks = new Set(rows.map((r) => r.week));
 
-  if (isScheduleEnabledSeason(season)) {
+  if (await isScheduleEnabledSeason(season)) {
     for (const w of await getScheduleWeeks(season)) weeks.add(w);
   }
 
@@ -150,7 +158,7 @@ export async function getDefaultWeek(season: number): Promise<number | null> {
   );
 
   const scheduleByWeek = new Map<number, ScheduleGame[]>();
-  if (isScheduleEnabledSeason(season)) {
+  if (await isScheduleEnabledSeason(season)) {
     for (const g of await getSeasonSchedule(season)) {
       const list = scheduleByWeek.get(g.week) ?? [];
       list.push(g);
@@ -203,7 +211,7 @@ async function getTeamRecords(season: number, throughWeek: number): Promise<Map<
   // 2026 game the model hasn't been re-run on since it finished) --
   // skip any id already counted above so a game is never double
   // counted once its prediction row does pick up a real score.
-  if (isScheduleEnabledSeason(season)) {
+  if (await isScheduleEnabledSeason(season)) {
     const alreadyCounted = new Set(rows.map((r) => r.universal_game_id));
     for (const g of await getSeasonSchedule(season)) {
       if (g.week >= throughWeek || !g.final || alreadyCounted.has(g.universal_game_id)) continue;
@@ -408,7 +416,7 @@ export async function getMatchupsForSeasonWeek(
   // never meaningful for a historical week, and ESPN's scoreboard is
   // always "the current week" anyway, so a lookup for any other week
   // just harmlessly finds nothing.
-  const liveScores = isScheduleEnabledSeason(season) ? await getAllLiveScores() : new Map<string, LiveScore>();
+  const liveScores = (await isScheduleEnabledSeason(season)) ? await getAllLiveScores() : new Map<string, LiveScore>();
   const liveFor = (away: string, home: string) => liveScores.get(`${away}@${home}`);
 
   // Schedule fills in games the model hasn't gotten to yet (or games
@@ -418,7 +426,7 @@ export async function getMatchupsForSeasonWeek(
   const combined: { date: Date; matchup: Matchup }[] = [];
   const seen = new Set<string>();
 
-  if (isScheduleEnabledSeason(season)) {
+  if (await isScheduleEnabledSeason(season)) {
     for (const g of await getScheduleWeek(season, week)) {
       seen.add(g.universal_game_id);
       const predictedEntry = predicted.get(g.universal_game_id);
@@ -490,7 +498,7 @@ export async function getPremierGame(season: number, week: number): Promise<Prem
   );
   if (rows.length === 0) return null;
 
-  const liveScores = isScheduleEnabledSeason(season) ? await getAllLiveScores() : new Map<string, LiveScore>();
+  const liveScores = (await isScheduleEnabledSeason(season)) ? await getAllLiveScores() : new Map<string, LiveScore>();
   const hasStarted = (r: (typeof rows)[number]) => {
     if (r.actual_home_score !== null && r.actual_away_score !== null) return true;
     const live = liveScores.get(`${r.away_team}@${r.home_team}`);
@@ -623,7 +631,7 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
   if (rows.length === 0) return null;
   const row = rows[0];
   const records = await getTeamRecords(row.season, row.week);
-  const live = isScheduleEnabledSeason(row.season) ? await getLiveScore(row.away_team, row.home_team) : null;
+  const live = (await isScheduleEnabledSeason(row.season)) ? await getLiveScore(row.away_team, row.home_team) : null;
   const game = rowToGameStat(row, records, live ?? undefined);
   const premier = await getPremierGame(row.season, row.week);
   if (premier && premier.id === row.universal_game_id) {
