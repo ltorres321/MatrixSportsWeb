@@ -916,11 +916,21 @@ h1.glow span {
 
 .matchup-card-link {
   display: block;
+  height: 100%;
   text-decoration: none;
   color: inherit;
 }
 
+/* height: 100% matters specifically inside .matchup-grid-slate's
+   fixed-3-column rows: the grid item (.matchup-card-link above)
+   already stretches to fill its row by default, but this inner div
+   -- the one with the actual visible border/background -- only wraps
+   its own content otherwise, floating at the top of that stretched
+   space. A card with extra content (the highlighted winner row on a
+   FINAL game) then looks taller than its row-mates, even though the
+   invisible grid cells were the same height all along. */
 .matchup-card {
+  height: 100%;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
