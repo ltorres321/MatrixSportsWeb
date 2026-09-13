@@ -168,7 +168,8 @@
    blur radius, a few px of spread, reads as a clean outline on white
    instead of a hazy glow. */
 :root[data-theme="light"] .field input:focus,
-:root[data-theme="light"] .field select:focus {
+:root[data-theme="light"] .field select:focus,
+:root[data-theme="light"] .field textarea:focus {
   box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.25);
 }
 
@@ -177,7 +178,8 @@
    low-contrast gray box. Trying a pale warm yellow instead of plain
    white so filled-in fields stay visually distinct from the page. */
 :root[data-theme="light"] .field input,
-:root[data-theme="light"] .field select {
+:root[data-theme="light"] .field select,
+:root[data-theme="light"] .field textarea {
   background: #fefce8;
   border-color: rgba(180, 150, 20, 0.35);
 }
@@ -1996,7 +1998,8 @@ h1.glow span {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   font-family: inherit;
   font-size: 0.9rem;
   background: rgba(0, 0, 0, 0.35);
@@ -2008,8 +2011,15 @@ h1.glow span {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+.field textarea {
+  resize: vertical;
+  min-height: 8rem;
+  line-height: 1.5;
+}
+
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   border-color: var(--green);
   box-shadow: 0 0 10px rgba(var(--glow-rgb), 0.2);
 }

@@ -174,10 +174,10 @@ export default function PrivacyPage() {
             <span className="dot" /> CONTACT
           </div>
           <p>
-            Questions about this policy or your data: reach us at{" "}
-            <a href="mailto:neo@matrixsports.net">neo@matrixsports.net</a>
-            . See also our <Link href="/about">About page</Link> for how the
-            prediction model itself works.
+            Questions about this policy or your data: reach us via our{" "}
+            <Link href="/contact">Contact Us</Link> page. See also our{" "}
+            <Link href="/about">About page</Link> for how the prediction
+            model itself works.
           </p>
         </section>
       </main>

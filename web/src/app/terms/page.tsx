@@ -183,9 +183,9 @@ export default function TermsPage() {
             <span className="dot" /> CONTACT
           </div>
           <p>
-            Questions about these terms: reach us at{" "}
-            <a href="mailto:privacy@matrixsports.net">privacy@matrixsports.net</a>
-            . See also our <Link href="/privacy">Privacy Policy</Link>.
+            Questions about these terms: reach us via our{" "}
+            <Link href="/contact">Contact Us</Link> page. See also our{" "}
+            <Link href="/privacy">Privacy Policy</Link>.
           </p>
         </section>
       </main>

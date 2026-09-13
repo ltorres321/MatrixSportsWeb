@@ -42,6 +42,9 @@ export default function SiteNav({ signedIn }: { signedIn: boolean }) {
         <Link href="/about" onClick={close}>
           About
         </Link>
+        <Link href="/contact" onClick={close}>
+          Contact Us
+        </Link>
         {signedIn ? (
           <Link href="/profile" onClick={close}>
             My Profile
