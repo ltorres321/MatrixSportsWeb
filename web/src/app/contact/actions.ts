@@ -19,6 +19,18 @@ export async function sendContactMessage(
   const email = String(formData.get("email") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
 
+  // TEMPORARY diagnostic -- tracking down whether autofilled field
+  // values are actually reaching the server action at all, or arriving
+  // empty/stale despite the browser showing them filled. Remove once
+  // resolved. Logs every raw field the server actually received, not
+  // just the trimmed versions used below.
+  console.log("Contact form: raw submission received", {
+    name: JSON.stringify(formData.get("name")),
+    email: JSON.stringify(formData.get("email")),
+    messageLength: String(formData.get("message") ?? "").length,
+    hp_field: JSON.stringify(formData.get("hp_field")),
+  });
+
   // Honeypot: a field real visitors never see or fill (display:none,
   // not a "hidden" input -- some bots skip those specifically) but a
   // form-filling bot fills in anyway. Fail silently as if it worked,
@@ -57,7 +69,7 @@ export async function sendContactMessage(
   }
 
   const resend = new Resend(apiKey);
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     // From address doesn't need to be a real inbox, but the domain
     // does need to be verified in Resend before this can send to
     // anyone other than the account's own signup email -- see
@@ -73,6 +85,10 @@ export async function sendContactMessage(
     console.error("Resend send failed:", error);
     return { error: "Something went wrong sending your message. Please try again shortly." };
   }
+
+  // TEMPORARY diagnostic -- the Resend message id, to cross-reference
+  // this exact send against what shows in the Resend dashboard.
+  console.log("Contact form: Resend accepted send", { id: data?.id, email });
 
   return { submitted: true };
 }
