@@ -256,7 +256,13 @@ a {
   justify-content: center;
 }
 
+/* Hidden rather than removed from markup -- an ad network's placement
+   scanner (or Google Site Kit / AdSense's own review) still needs to
+   find every slot in the page source, but showing literal "Ad space"
+   text to real visitors before any ad account is even approved reads
+   as an obviously unfinished page rather than one still in beta. */
 .slot-label {
+  display: none;
   color: var(--text-dim);
   font-family: 'Share Tech Mono', 'Courier New', monospace;
   font-size: 0.7rem;
