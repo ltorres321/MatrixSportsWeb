@@ -55,7 +55,7 @@ function TeamRow({
         {showScore ? (
           <>
             <div className="team-score">{side.score}</div>
-            {status === "final" && side.prob !== undefined && (
+            {(status === "final" || status === "live") && side.prob !== undefined && (
               <div className="team-prob-pregame">Predicted {side.prob}%</div>
             )}
           </>
