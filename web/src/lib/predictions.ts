@@ -461,20 +461,48 @@ export interface PremierGame {
 // Game of the Week: among this week's games, whichever the model is
 // most confident about (win probability furthest from a coin flip) --
 // i.e. whichever side has the single highest win probability this
-// week. Always picked (this is the free-preview game regardless of
-// confidence); getMatchupsForSeasonWeek/getGameDetail separately
-// decide whether its probability clears LOCK_OF_WEEK_THRESHOLD for
-// the gold "Lock of the Week" styling.
+// week. getMatchupsForSeasonWeek/getGameDetail separately decide
+// whether its probability clears LOCK_OF_WEEK_THRESHOLD for the gold
+// "Lock of the Week" styling.
+//
+// Restricted to games that haven't kicked off yet wherever possible --
+// otherwise the free-preview slot would keep spotlighting Sunday's
+// early games (already live or final, no longer anyone's betting
+// decision) straight through Monday night instead of handing the
+// slot to whatever's still actually upcoming. Only once every game in
+// the week has started does this fall back to the overall highest-
+// confidence game, so the slot never simply goes empty mid-week.
 export async function getPremierGame(season: number, week: number): Promise<PremierGame | null> {
-  const rows = await query<{ universal_game_id: string; home_win_probability: number }>(
-    `SELECT universal_game_id, home_win_probability FROM latest_predictions
+  const rows = await query<{
+    universal_game_id: string;
+    home_win_probability: number;
+    game_date: Date;
+    home_team: string;
+    away_team: string;
+    actual_home_score: number | null;
+    actual_away_score: number | null;
+  }>(
+    `SELECT universal_game_id, home_win_probability, game_date, home_team, away_team,
+            actual_home_score, actual_away_score
+     FROM latest_predictions
      WHERE season = $1 AND week = $2`,
     [season, week]
   );
   if (rows.length === 0) return null;
-  let best = rows[0];
+
+  const liveScores = isScheduleEnabledSeason(season) ? await getAllLiveScores() : new Map<string, LiveScore>();
+  const hasStarted = (r: (typeof rows)[number]) => {
+    if (r.actual_home_score !== null && r.actual_away_score !== null) return true;
+    const live = liveScores.get(`${r.away_team}@${r.home_team}`);
+    return live?.status === "in" || live?.status === "post";
+  };
+
+  const upcoming = rows.filter((r) => !hasStarted(r));
+  const candidates = upcoming.length > 0 ? upcoming : rows;
+
+  let best = candidates[0];
   let bestConfidence = Math.abs(best.home_win_probability - 0.5);
-  for (const r of rows) {
+  for (const r of candidates) {
     const confidence = Math.abs(r.home_win_probability - 0.5);
     if (confidence > bestConfidence) {
       best = r;
