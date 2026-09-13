@@ -22,8 +22,8 @@ export default function AdFrame({ children }: AdFrameProps) {
       >
         <defs>
           <radialGradient id="matrixAdBackground">
-            <stop offset="0" stopColor="#003315" />
-            <stop offset="1" stopColor="#000a04" />
+            <stop offset="0" stopColor="var(--ad-bg-inner)" />
+            <stop offset="1" stopColor="var(--ad-bg-outer)" />
           </radialGradient>
 
           <filter id="matrixAdGlow" x="-100%" y="-100%" width="300%" height="300%">
@@ -59,34 +59,34 @@ export default function AdFrame({ children }: AdFrameProps) {
         <use
           href="#matrixAdFramePath"
           fill="none"
-          stroke="#26ff64"
+          stroke="var(--ad-glow-color)"
           strokeWidth="3"
           opacity="0.55"
           filter="url(#matrixAdGlow)"
         />
 
-        <use href="#matrixAdFramePath" fill="none" stroke="#53ff79" strokeWidth="0.8" />
+        <use href="#matrixAdFramePath" fill="none" stroke="var(--ad-line-color)" strokeWidth="0.8" />
 
-        <g stroke="#28c858" strokeWidth="0.6" opacity="0.85">
+        <g stroke="var(--ad-trace-color)" strokeWidth="0.6" opacity="0.85">
           <use href="#matrixAdLeftTraces" />
           <use href="#matrixAdLeftTraces" transform="translate(360 0) scale(-1 1)" />
         </g>
 
-        <g fill="#7aff98" filter="url(#matrixAdGlow)">
+        <g fill="var(--ad-dot-glow)" filter="url(#matrixAdGlow)">
           <circle cx="46" cy="12" r="4" />
           <circle cx="314" cy="12" r="4" />
           <circle cx="46" cy="708" r="4" />
           <circle cx="314" cy="708" r="4" />
         </g>
 
-        <g fill="#c9ffd5">
+        <g fill="var(--ad-dot-core)">
           <circle cx="46" cy="12" r="1.8" />
           <circle cx="314" cy="12" r="1.8" />
           <circle cx="46" cy="708" r="1.8" />
           <circle cx="314" cy="708" r="1.8" />
         </g>
 
-        <g fill="#9affb4">
+        <g fill="var(--ad-tick-color)">
           <circle cx="168" cy="12" r="0.7" />
           <circle cx="174" cy="12" r="0.9" />
           <circle cx="180" cy="12" r="1.3" />

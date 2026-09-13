@@ -36,6 +36,21 @@
   --correct-rgb: 34, 197, 94;
   --wrong-rgb: 255, 59, 59;
   --gold-rgb: 232, 197, 71;
+
+  /* Ad frame (AdFrame.tsx/MobileAdFrame.tsx) HUD colors -- these are
+     plain SVG fill/stroke/stopColor attributes rather than CSS
+     properties on an HTML element, but browsers do resolve var() in
+     presentation attributes, so the same one-block re-theme pattern
+     as everything else here still works. Dark-theme values match the
+     original hand-picked hex palette exactly. */
+  --ad-bg-inner: #003315;
+  --ad-bg-outer: #000a04;
+  --ad-glow-color: #26ff64;
+  --ad-line-color: #53ff79;
+  --ad-trace-color: #28c858;
+  --ad-dot-glow: #7aff98;
+  --ad-dot-core: #c9ffd5;
+  --ad-tick-color: #9affb4;
 }
 
 /* Light theme -- an account preference set on the Profile page
@@ -66,6 +81,23 @@
   --wrong-rgb: 201, 42, 42;
   --gold: #8a6208;
   --gold-rgb: 138, 98, 8;
+
+  /* The black gradient + neon-green HUD reads great on the dark theme
+     it was designed for, but is jarring dropped into a light page --
+     swapped for a soft blue-white panel with flat blue linework
+     instead. Blur-glow layers go transparent rather than picking a
+     lighter shade, same reasoning as the box-shadow/text-shadow glow
+     kill elsewhere in this file: a haze that "pops" against black just
+     looks murky on white, so light theme drops it and relies on crisp
+     flat color instead. */
+  --ad-bg-inner: #e8f1fe;
+  --ad-bg-outer: #ffffff;
+  --ad-glow-color: transparent;
+  --ad-line-color: var(--green);
+  --ad-trace-color: var(--green-dim);
+  --ad-dot-glow: transparent;
+  --ad-dot-core: var(--green);
+  --ad-tick-color: var(--green-dim);
 }
 
 /* .week-pill.active's bright yellow (see that rule) is a dark-theme
