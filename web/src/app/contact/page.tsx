@@ -37,13 +37,22 @@ export default function ContactPage() {
                   </p>
                 )}
                 <div className="form-grid">
-                  {/* Honeypot -- visually hidden (not type="hidden",
-                      which some bots skip specifically), real visitors
-                      never see or fill this in. */}
-                  <div className="field full" style={{ position: "absolute", left: "-9999px" }} aria-hidden="true">
-                    <label htmlFor="company">Company</label>
-                    <input id="company" name="company" type="text" tabIndex={-1} autoComplete="off" />
-                  </div>
+                  {/* Honeypot -- genuinely hidden via display:none (an
+                      off-screen-positioned field is NOT enough: Chrome's
+                      autofill still recognizes a name/label like
+                      "company" and fills it from a saved profile
+                      regardless of position, which silently ate real
+                      visitor submissions before this fix -- a nonsense
+                      field name with no visible label avoids that
+                      autofill heuristic matching entirely). */}
+                  <input
+                    type="text"
+                    name="hp_field"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    style={{ display: "none" }}
+                    aria-hidden="true"
+                  />
 
                   <div className="field full">
                     <label htmlFor="name">Name</label>

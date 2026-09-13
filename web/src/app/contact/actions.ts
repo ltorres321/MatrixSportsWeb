@@ -19,11 +19,20 @@ export async function sendContactMessage(
   const email = String(formData.get("email") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
 
-  // Honeypot: a field real visitors never see or fill (hidden via CSS,
+  // Honeypot: a field real visitors never see or fill (display:none,
   // not a "hidden" input -- some bots skip those specifically) but a
   // form-filling bot fills in anyway. Fail silently as if it worked,
-  // rather than telling a bot its submission was rejected.
-  if (String(formData.get("company") ?? "").trim() !== "") {
+  // rather than telling a bot its submission was rejected. Logged
+  // (not silent server-side) since a false positive here means a real
+  // visitor's message never reaches Resend at all with zero trace --
+  // exactly what happened before this field was renamed away from
+  // "company", which Chrome's autofill matched and filled despite the
+  // field being positioned off-screen.
+  if (String(formData.get("hp_field") ?? "").trim() !== "") {
+    console.warn("Contact form: honeypot triggered, submission dropped", {
+      name: String(formData.get("name") ?? ""),
+      email: String(formData.get("email") ?? ""),
+    });
     return { submitted: true };
   }
 
