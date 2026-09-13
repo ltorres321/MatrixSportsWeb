@@ -110,6 +110,15 @@
   box-shadow: none;
 }
 
+/* .NET breaks from the rest of the brand wordmark here on purpose --
+   every other themed element in this file flips green-to-blue with
+   the accent, but .NET is red in Blue Pill theme specifically, not
+   blue, per the brand's own explicit choice. */
+:root[data-theme="light"] .navbar .brand .brand-tld {
+  color: var(--red);
+  text-shadow: none;
+}
+
 /* A blur glow on fine text reads as glare/haze on a light background
    regardless of hue (it "pops" on black because the glow is brighter
    than the backdrop; on white it's the opposite, so it just looks
@@ -450,6 +459,15 @@ a {
 .navbar .brand span {
   color: var(--text);
   text-shadow: none;
+}
+
+/* .NET is a distinct third segment, not swept up by the plain "span"
+   rule above -- Matrix (dark/"Red Pill") theme matches MATRIX's own
+   green exactly; Blue Pill theme below overrides it to red instead of
+   following the rest of the brand over to blue. */
+.navbar .brand .brand-tld {
+  color: var(--green);
+  text-shadow: 0 0 10px rgba(var(--glow-rgb), 0.5);
 }
 
 .navbar-links {

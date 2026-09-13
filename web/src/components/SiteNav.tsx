@@ -17,6 +17,7 @@ export default function SiteNav({ signedIn }: { signedIn: boolean }) {
     <nav className="navbar">
       <Link className="brand" href="/" onClick={close}>
         MATRIX<span>SPORTS</span>
+        <span className="brand-tld">.NET</span>
       </Link>
 
       <button
