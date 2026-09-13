@@ -907,10 +907,22 @@ h1.glow span {
    specific grid makes that row math exact instead of approximate.
    Scoped to >=769px (the breakpoint the existing auto-fit rule was
    already tuned around, see below) so the responsive column counts
-   at narrower widths are untouched. */
+   at narrower widths are untouched.
+
+   minmax(0, 1fr), not bare 1fr -- an `fr` track's implicit minimum is
+   auto, not 0, so a column whose content (a longer team name, say)
+   has a wider min-content size than an equal three-way split can
+   force itself wider, squeezing the other two. Since each group is a
+   separate grid instance, this made different groups compute
+   genuinely different column widths depending on which team names
+   happened to land in them -- one group's third column reaching
+   further right than another's, some crashing into the ad rail,
+   others falling short of it. minmax(0, 1fr) overrides that implicit
+   auto minimum, forcing all three columns to stay truly equal
+   regardless of content width. */
 @media (min-width: 769px) {
   .matchup-grid-slate {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
