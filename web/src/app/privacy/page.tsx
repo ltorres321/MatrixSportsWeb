@@ -175,7 +175,7 @@ export default function PrivacyPage() {
           </div>
           <p>
             Questions about this policy or your data: reach us at{" "}
-            <a href="mailto:privacy@matrixsports.net">privacy@matrixsports.net</a>
+            <a href="mailto:neo@matrixsports.net">neo@matrixsports.net</a>
             . See also our <Link href="/about">About page</Link> for how the
             prediction model itself works.
           </p>
