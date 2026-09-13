@@ -26,6 +26,20 @@ export default async function HomePage() {
     return <SignedInDashboard firstName={firstName} news={news} />;
   }
 
+  const seasons = await getAvailableSeasons();
+  const fallbackSeason = getCurrentSeasonYear();
+  const season = seasons.includes(fallbackSeason) ? fallbackSeason : seasons[0];
+
+  let premier: Matchup | undefined;
+  if (season !== undefined) {
+    const week = await getDefaultWeek(season);
+    if (week !== null) {
+      const premierGame = await getPremierGame(season, week);
+      const matchups = await getMatchupsForSeasonWeek(season, week, premierGame);
+      premier = matchups.find((m) => m.premier);
+    }
+  }
+
   return (
     <>
       <main>
@@ -53,6 +67,15 @@ export default async function HomePage() {
           </div>
           <p className="hero-note">No credit card required.</p>
         </section>
+
+        {premier && (
+          <div className="premier-wrap">
+            <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
+              {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : "★ GAME OF THE WEEK — FREE PREVIEW"}
+            </div>
+            <MatchupCard matchup={premier} premier linkHref="/login" />
+          </div>
+        )}
 
         <div className="value-grid">
           <div className="value-card">
