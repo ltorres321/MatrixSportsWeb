@@ -4,6 +4,7 @@ import "./globals.css";
 import RainCanvas from "@/components/RainCanvas";
 import SiteNav from "@/components/SiteNav";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import AdSenseScript from "@/components/AdSenseScript";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -58,6 +59,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         {rainEnabled && <RainCanvas theme={theme} />}
         <GoogleAnalytics />
+        <AdSenseScript />
         <div className="page">
           <SiteNav signedIn={!!userData.user} />
           {children}
