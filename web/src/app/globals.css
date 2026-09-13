@@ -110,6 +110,15 @@
   box-shadow: none;
 }
 
+:root[data-theme="light"] .gold-cta-link {
+  color: var(--green);
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .gold-cta-link:hover {
+  text-shadow: none;
+}
+
 /* .NET breaks from the rest of the brand wordmark here on purpose --
    every other themed element in this file flips green-to-blue with
    the accent, but .NET is red in Blue Pill theme specifically, not
@@ -944,6 +953,24 @@ h1.glow span {
   border-color: #ffd60a;
   color: #ffd60a;
   box-shadow: 0 0 12px rgba(255, 214, 10, 0.35);
+}
+
+/* Same machine-world amber, used inline to make a specific link read
+   as unmistakably clickable/important within a paragraph of plain
+   body text (e.g. the Contact Us link in Privacy/Terms) -- the glow
+   plus underline is "shiny," not just recolored text. Light theme
+   below reverts to the normal accent link color, same reasoning as
+   every other dark-only gold use in this file. */
+.gold-cta-link {
+  color: #ffd60a;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-shadow: 0 0 8px rgba(255, 214, 10, 0.65);
+}
+
+.gold-cta-link:hover {
+  text-shadow: 0 0 14px rgba(255, 214, 10, 0.9);
 }
 
 /* ---------------------------------------------------------------

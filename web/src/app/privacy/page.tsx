@@ -175,7 +175,7 @@ export default function PrivacyPage() {
           </div>
           <p>
             Questions about this policy or your data: reach us via our{" "}
-            <Link href="/contact">Contact Us</Link> page. See also our{" "}
+            <Link href="/contact" className="gold-cta-link">Contact Us</Link> page. See also our{" "}
             <Link href="/about">About page</Link> for how the prediction
             model itself works.
           </p>
