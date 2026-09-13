@@ -295,7 +295,7 @@ function resolveGameState(
       homeScore: live.home_score,
       awayScore: live.away_score,
       kickoffText: live.status_detail,
-      predictionCorrect: undefined,
+      predictionCorrect: computeCorrect(live.home_score, live.away_score, homeWinProbability),
     };
   }
 
