@@ -120,6 +120,54 @@ export async function getScheduleWeeks(season: number): Promise<number[]> {
   return Array.from(new Set(games.map((g) => g.week))).sort((a, b) => a - b);
 }
 
+// Admin diagnostic only -- not used by any real page. fetchSeasonEvents()
+// deliberately swallows every failure into a silent [] (a real visitor
+// should never see a broken page just because an external API hiccuped),
+// which makes "why is the schedule missing" impossible to tell apart
+// from "there are genuinely no games" from the outside. This repeats
+// the same fetch but reports exactly what happened, to answer that
+// question directly instead of guessing through more deploy round-trips.
+export interface ScheduleDiagnostics {
+  apiKeyPresent: boolean;
+  httpStatus: number | null;
+  fetchError: string | null;
+  eventsReturned: number | null;
+  gamesAfterFiltering: number | null;
+}
+
+export async function diagnoseScheduleFetch(season: number): Promise<ScheduleDiagnostics> {
+  const apiKey = process.env.THESPORTSDB_API_KEY;
+  if (!apiKey) {
+    return { apiKeyPresent: false, httpStatus: null, fetchError: null, eventsReturned: null, gamesAfterFiltering: null };
+  }
+
+  const url = `https://www.thesportsdb.com/api/v1/json/${apiKey}/eventsseason.php?id=${NFL_LEAGUE_ID}&s=${season}`;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      return { apiKeyPresent: true, httpStatus: res.status, fetchError: null, eventsReturned: null, gamesAfterFiltering: null };
+    }
+    const data = await res.json();
+    const events = (data.events ?? []) as SportsDbEvent[];
+    const games = await getSeasonSchedule(season);
+    return {
+      apiKeyPresent: true,
+      httpStatus: res.status,
+      fetchError: null,
+      eventsReturned: events.length,
+      gamesAfterFiltering: games.length,
+    };
+  } catch (err) {
+    return {
+      apiKeyPresent: true,
+      httpStatus: null,
+      fetchError: err instanceof Error ? err.message : String(err),
+      eventsReturned: null,
+      gamesAfterFiltering: null,
+    };
+  }
+}
+
 export async function getScheduledGame(universalGameId: string): Promise<ScheduleGame | null> {
   const seasonPart = universalGameId.slice(0, 4);
   const season = Number(seasonPart);

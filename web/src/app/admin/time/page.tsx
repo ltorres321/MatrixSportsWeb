@@ -6,6 +6,8 @@ import {
   getTimeOverrideRaw,
   setTimeOverride,
 } from "@/lib/admin";
+import { diagnoseScheduleFetch } from "@/lib/schedule";
+import { getCurrentSeasonYear } from "@/lib/predictions";
 
 // Admin-only testing aid: lets an admin preview how date-dependent
 // parts of the site look at a different date/time, WITHOUT touching
@@ -36,6 +38,8 @@ export default async function AdminTimePage() {
 
   const effectiveNow = await getEffectiveNow();
   const overrideRaw = await getTimeOverrideRaw();
+  const currentSeason = await getCurrentSeasonYear();
+  const scheduleDiagnostics = await diagnoseScheduleFetch(currentSeason);
 
   async function setOverride(formData: FormData) {
     "use server";
@@ -110,6 +114,36 @@ export default async function AdminTimePage() {
           Clear override (use real time)
         </button>
       </form>
+
+      <div className="mt-10 rounded border border-[var(--panel-border)] bg-[var(--panel)] p-4">
+        <div className="text-sm text-[var(--text-dim)]">
+          Schedule fetch diagnostics (season {currentSeason}) -- not visible to non-admins,
+          exists to answer &ldquo;is THESPORTSDB_API_KEY actually reaching this deployed
+          environment&rdquo; without needing function-log access.
+        </div>
+        <dl className="mt-3 space-y-1 font-mono text-sm">
+          <div>
+            <dt className="inline text-[var(--text-dim)]">apiKeyPresent: </dt>
+            <dd className="inline text-[var(--text-strong)]">{String(scheduleDiagnostics.apiKeyPresent)}</dd>
+          </div>
+          <div>
+            <dt className="inline text-[var(--text-dim)]">httpStatus: </dt>
+            <dd className="inline text-[var(--text-strong)]">{String(scheduleDiagnostics.httpStatus)}</dd>
+          </div>
+          <div>
+            <dt className="inline text-[var(--text-dim)]">fetchError: </dt>
+            <dd className="inline text-[var(--text-strong)]">{String(scheduleDiagnostics.fetchError)}</dd>
+          </div>
+          <div>
+            <dt className="inline text-[var(--text-dim)]">eventsReturned: </dt>
+            <dd className="inline text-[var(--text-strong)]">{String(scheduleDiagnostics.eventsReturned)}</dd>
+          </div>
+          <div>
+            <dt className="inline text-[var(--text-dim)]">gamesAfterFiltering: </dt>
+            <dd className="inline text-[var(--text-strong)]">{String(scheduleDiagnostics.gamesAfterFiltering)}</dd>
+          </div>
+        </dl>
+      </div>
     </main>
   );
 }
