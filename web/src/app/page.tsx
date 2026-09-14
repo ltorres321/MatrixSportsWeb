@@ -71,7 +71,7 @@ export default async function HomePage() {
         {premier && (
           <div className="premier-wrap">
             <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
-              {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : "★ GAME OF THE WEEK — FREE PREVIEW"}
+              {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
             </div>
             <MatchupCard matchup={premier} premier linkHref="/login" />
           </div>
@@ -164,7 +164,7 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
           {premier && (
             <div className="premier-wrap">
               <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
-                {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : "★ GAME OF THE WEEK — FREE PREVIEW"}
+                {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
               </div>
               <MatchupCard matchup={premier} premier />
               <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
