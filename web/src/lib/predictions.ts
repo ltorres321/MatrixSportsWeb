@@ -4,7 +4,7 @@ import type { Matchup, TeamSide } from "@/lib/matchups";
 import type { GameStat, GameStatSide } from "@/lib/gameStats";
 import { getSeasonSchedule, getScheduleWeek, getScheduleWeeks, type ScheduleGame } from "@/lib/schedule";
 import { getAllLiveScores, getLiveScore, type LiveScore } from "@/lib/liveScores";
-import { getEffectiveNow } from "@/lib/admin";
+import { getEffectiveNow, getActiveTimeOverride } from "@/lib/admin";
 
 // Real data layer over the predictions/latest_predictions table that
 // SportsAnalytics (a separate repo/pipeline) writes into. This file
@@ -144,18 +144,18 @@ export async function getWeeksForSeason(season: number): Promise<number[]> {
 // truth for "is this actually over"); otherwise falls back to whether
 // every game in that week has a real score in the DB. Falls back to
 // the latest week if the whole season is final.
+//
+// UNDER AN ACTIVE ADMIN TIME OVERRIDE, this switches to a genuinely
+// different algorithm (resolveWeekForSimulatedTime below) rather than
+// just feeding the override time into the same real-data-completeness
+// check: the whole point of the override is to preview a week whose
+// games may not have happened (or been predicted) yet at all, which
+// "is this week done in the DB" can never answer for a real user --
+// there's nothing there to be done. This path is admin-only and never
+// changes what a real visitor sees.
 export async function getDefaultWeek(season: number): Promise<number | null> {
   const weeks = await getWeeksForSeason(season);
   if (weeks.length === 0) return null;
-
-  const dbRows = await query<{ week: number; total: string; final_count: string }>(
-    `SELECT week, COUNT(*) AS total, COUNT(actual_home_score) AS final_count
-     FROM latest_predictions WHERE season = $1 GROUP BY week`,
-    [season]
-  );
-  const dbCompleteness = new Map(
-    dbRows.map((r) => [r.week, { total: Number(r.total), final: Number(r.final_count) }])
-  );
 
   const scheduleByWeek = new Map<number, ScheduleGame[]>();
   if (await isScheduleEnabledSeason(season)) {
@@ -166,6 +166,20 @@ export async function getDefaultWeek(season: number): Promise<number | null> {
     }
   }
 
+  const override = await getActiveTimeOverride();
+  if (override && scheduleByWeek.size > 0) {
+    return resolveWeekForSimulatedTime(weeks, scheduleByWeek, override);
+  }
+
+  const dbRows = await query<{ week: number; total: string; final_count: string }>(
+    `SELECT week, COUNT(*) AS total, COUNT(actual_home_score) AS final_count
+     FROM latest_predictions WHERE season = $1 GROUP BY week`,
+    [season]
+  );
+  const dbCompleteness = new Map(
+    dbRows.map((r) => [r.week, { total: Number(r.total), final: Number(r.final_count) }])
+  );
+
   for (const week of weeks) {
     const scheduled = scheduleByWeek.get(week);
     if (scheduled && scheduled.length > 0) {
@@ -174,6 +188,37 @@ export async function getDefaultWeek(season: number): Promise<number | null> {
     }
     const c = dbCompleteness.get(week);
     if (c && c.final < c.total) return week;
+  }
+  return weeks[weeks.length - 1];
+}
+
+// Admin-only: which week would be "current" if the real clock read
+// simulatedNow, reasoning purely from the real schedule's kickoff
+// times -- NOT from whether predictions exist yet for that week. A
+// week the model hasn't been run for at all is a completely valid,
+// expected thing to land on here (that's the "I ran the model early
+// for next week, does it look right" workflow this exists for) --
+// getMatchupsForSeasonWeek/getPremierGame just show whatever real
+// rows do or don't exist for whichever week this returns.
+//
+// A week counts as "done" once every one of its real scheduled games
+// is either actually final, or far enough past its own kickoff
+// (ASSUMED_GAME_DURATION_MS) that it would realistically be over by
+// simulatedNow -- same estimate getPremierGame() uses, so the two
+// stay consistent with each other for the same simulated instant.
+// Weeks are scanned in order; the first one that isn't done yet wins.
+function resolveWeekForSimulatedTime(
+  weeks: number[],
+  scheduleByWeek: Map<number, ScheduleGame[]>,
+  simulatedNow: Date
+): number {
+  for (const week of weeks) {
+    const games = scheduleByWeek.get(week);
+    if (!games || games.length === 0) continue;
+    const weekIsDone = games.every(
+      (g) => g.final || simulatedNow.getTime() >= g.game_date.getTime() + ASSUMED_GAME_DURATION_MS
+    );
+    if (!weekIsDone) return week;
   }
   return weeks[weeks.length - 1];
 }

@@ -36,15 +36,29 @@ const TIME_OVERRIDE_COOKIE = "admin_time_override";
 // sees as "current" -- no elevated data access), but there's no reason
 // not to gate it properly.
 export async function getEffectiveNow(): Promise<Date> {
+  const override = await getActiveTimeOverride();
+  return override ?? new Date();
+}
+
+// Distinct from getEffectiveNow(): returns null when there's no
+// active override (including "not an admin"), rather than silently
+// falling back to the real time. Callers that need to behave
+// DIFFERENTLY when a simulation is active (not just use a different
+// clock value) -- e.g. getDefaultWeek() switching from real-data
+// completeness to a hypothetical schedule-based guess -- need this,
+// not getEffectiveNow(), or they can't tell "it's genuinely this
+// instant" apart from "an admin explicitly asked to pretend it's
+// this instant."
+export async function getActiveTimeOverride(): Promise<Date | null> {
   const adminUserId = await getCurrentAdminUserId();
-  if (!adminUserId) return new Date();
+  if (!adminUserId) return null;
 
   const cookieStore = await cookies();
   const raw = cookieStore.get(TIME_OVERRIDE_COOKIE)?.value;
-  if (!raw) return new Date();
+  if (!raw) return null;
 
   const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 export async function getTimeOverrideRaw(): Promise<string | null> {
