@@ -246,6 +246,22 @@ export function formatKickoff(gameDate: Date): string {
   }).format(gameDate) + " ET";
 }
 
+// 0=Sunday ... 6=Saturday, evaluated in America/New_York local time --
+// NFL scheduling (and the broadcast-window slots getPremierGame() below
+// keys off) is ET-based, so a plain UTC Date.getDay() can land on the
+// wrong day for a game_date stored as, say, 00:15 UTC Tuesday that's
+// actually Monday night ET.
+function etWeekday(date: Date): number {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+  }).format(date);
+  const index: Record<string, number> = {
+    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+  };
+  return index[weekday] ?? -1;
+}
+
 // Was the model's favorite actually right? undefined when there's no
 // real score yet, homeWinProbability isn't known (a schedule-only
 // game with no prediction), or the game tied (rare in the NFL, but
@@ -466,20 +482,31 @@ export interface PremierGame {
   probability: number; // the favored side's win probability, 0-1
 }
 
-// Game of the Week: among this week's games, whichever the model is
-// most confident about (win probability furthest from a coin flip) --
-// i.e. whichever side has the single highest win probability this
-// week. getMatchupsForSeasonWeek/getGameDetail separately decide
-// whether its probability clears LOCK_OF_WEEK_THRESHOLD for the gold
-// "Lock of the Week" styling.
-//
-// Restricted to games that haven't kicked off yet wherever possible --
-// otherwise the free-preview slot would keep spotlighting Sunday's
-// early games (already live or final, no longer anyone's betting
-// decision) straight through Monday night instead of handing the
-// slot to whatever's still actually upcoming. Only once every game in
-// the week has started does this fall back to the overall highest-
-// confidence game, so the slot never simply goes empty mid-week.
+// A hypothetical/future game (no real score, no live-status row --
+// only possible under an admin's simulated-future time override, see
+// admin.ts) is assumed over once this long past its own kickoff. Real
+// data always overrides this the instant it exists; this only ever
+// matters when there isn't any yet.
+const ASSUMED_GAME_DURATION_MS = 3.5 * 60 * 60 * 1000;
+
+// Game of the Week: follows the NFL's own broadcast-window order, not
+// a single "whatever's most lopsided" pick across the whole week --
+//   1. Thursday Night Football, until it ends.
+//   2. Then the highest-confidence Sunday DAY game (the model's pick
+//      among that slate -- this is the one slot that's genuinely
+//      confidence-driven, since there's no single scheduled marquee
+//      Sunday-day game the way there is for the other three).
+//   3. Then Sunday Night Football.
+//   4. Then Monday Night Football.
+// Once a slot's game has actually ended, the slot is skipped and the
+// next one in line becomes the featured game -- so the first three
+// stay only until they're done, then hand off automatically. If every
+// slot for the week is over (or a slot doesn't exist that week -- a
+// bye affecting MNF, say), falls back to the single highest-confidence
+// game across the whole week so the spot never simply goes empty.
+// Not handled: holiday slates with more than one Thursday game (e.g.
+// Thanksgiving's three) -- picks the earliest chronologically among
+// them rather than trying to rank a multi-game Thursday slot.
 export async function getPremierGame(season: number, week: number): Promise<PremierGame | null> {
   const rows = await query<{
     universal_game_id: string;
@@ -497,38 +524,46 @@ export async function getPremierGame(season: number, week: number): Promise<Prem
     [season, week]
   );
   if (rows.length === 0) return null;
+  type Row = (typeof rows)[number];
 
   const liveScores = (await isScheduleEnabledSeason(season)) ? await getAllLiveScores() : new Map<string, LiveScore>();
-  // CHANGED: also treat kickoff-has-passed (per getEffectiveNow(), see
-  // admin.ts) as "started" for premier-game candidate filtering. Real
-  // score/live-status data is still checked first and always wins when
-  // present -- this only matters for an admin's simulated FUTURE time,
-  // where no real data can exist yet because the game genuinely hasn't
-  // been played (that's the whole point of previewing a future date).
-  // Without this, a past-kickoff game with no real data could never be
-  // excluded here, no matter how far the simulated clock was moved
-  // forward -- which is exactly the bug reported: setting the override
-  // to Tuesday still showed Monday's game as the premier pick.
   const effectiveNow = await getEffectiveNow();
-  const hasStarted = (r: (typeof rows)[number]) => {
+
+  const confidence = (r: Row) => Math.abs(r.home_win_probability - 0.5);
+  const mostConfident = (list: Row[]): Row =>
+    list.reduce((best, r) => (confidence(r) > confidence(best) ? r : best));
+  const earliest = (list: Row[]): Row =>
+    list.reduce((first, r) => (r.game_date < first.game_date ? r : first));
+  const latest = (list: Row[]): Row =>
+    list.reduce((last, r) => (r.game_date > last.game_date ? r : last));
+
+  // Real score/live status always wins when present; a hypothetical
+  // future game (simulated-time preview, no real data yet) is assumed
+  // over ASSUMED_GAME_DURATION_MS after its own kickoff.
+  const hasEnded = (r: Row): boolean => {
     if (r.actual_home_score !== null && r.actual_away_score !== null) return true;
     const live = liveScores.get(`${r.away_team}@${r.home_team}`);
-    if (live?.status === "in" || live?.status === "post") return true;
-    return effectiveNow >= r.game_date;
+    if (live?.status === "post") return true;
+    if (live?.status === "in") return false;
+    return effectiveNow.getTime() >= r.game_date.getTime() + ASSUMED_GAME_DURATION_MS;
   };
 
-  const upcoming = rows.filter((r) => !hasStarted(r));
-  const candidates = upcoming.length > 0 ? upcoming : rows;
+  const thursdayGames = rows.filter((r) => etWeekday(r.game_date) === 4);
+  const sundayGames = rows.filter((r) => etWeekday(r.game_date) === 0);
+  const mondayGames = rows.filter((r) => etWeekday(r.game_date) === 1);
 
-  let best = candidates[0];
-  let bestConfidence = Math.abs(best.home_win_probability - 0.5);
-  for (const r of candidates) {
-    const confidence = Math.abs(r.home_win_probability - 0.5);
-    if (confidence > bestConfidence) {
-      best = r;
-      bestConfidence = confidence;
-    }
-  }
+  const sundayNightGame = sundayGames.length > 0 ? latest(sundayGames) : undefined;
+  const sundayDayGames = sundayGames.filter((r) => r !== sundayNightGame);
+
+  const sequence = [
+    thursdayGames.length > 0 ? earliest(thursdayGames) : undefined,
+    sundayDayGames.length > 0 ? mostConfident(sundayDayGames) : undefined,
+    sundayNightGame,
+    mondayGames.length > 0 ? latest(mondayGames) : undefined,
+  ].filter((r): r is Row => r !== undefined);
+
+  const best = sequence.find((r) => !hasEnded(r)) ?? mostConfident(rows);
+
   const probability = best.home_win_probability >= 0.5 ? best.home_win_probability : 1 - best.home_win_probability;
   return { id: best.universal_game_id, probability };
 }
