@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAdminUserId } from "@/lib/admin";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://matrixsports.net"),
   title: "Matrix Sports Analytics",
   description: "AI-simulated NFL win probabilities.",
 };

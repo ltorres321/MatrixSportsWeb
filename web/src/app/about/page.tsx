@@ -1,3 +1,9 @@
+export const metadata = {
+  title: "How It Works — Matrix Sports Analytics",
+  description:
+    "How a Matrix Sports Analytics prediction gets made: the 100,000-run Monte Carlo model, what factors are tested, and what got cut.",
+};
+
 export default function AboutPage() {
   return (
     <>

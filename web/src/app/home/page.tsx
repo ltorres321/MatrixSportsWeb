@@ -8,6 +8,12 @@ import {
 } from "@/lib/predictions";
 import PredictionsView from "./PredictionsView";
 
+export const metadata = {
+  title: "NFL Predictions This Week — Matrix Sports Analytics",
+  description:
+    "Simulated win probabilities for every NFL matchup this week, run 100,000 times per game against the real betting line.",
+};
+
 // Server Component: season/week live in the URL (?season=&week=) so
 // each combination is a real server-rendered fetch against
 // latest_predictions, not client state holding a copy of every

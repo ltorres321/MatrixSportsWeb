@@ -108,10 +108,9 @@ export default async function HomePage() {
 
       <footer className="site-footer">
         <p>
-          Landing page prototype — probabilities referenced above describe the
-          product direction and are not live figures. See{" "}
-          <Link href="/home">the predictions page</Link> for the current design
-          of the game-viewing experience.
+          Simulated pre-game probabilities, updated as the market line moves. See{" "}
+          <Link href="/home">the predictions page</Link> for this week&apos;s full
+          slate.
         </p>
       </footer>
     </>
