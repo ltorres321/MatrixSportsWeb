@@ -635,6 +635,7 @@ export async function getPremierGame(season: number, week: number): Promise<Prem
 
   const liveScores = (await isScheduleEnabledSeason(season)) ? await getAllLiveScores() : new Map<string, LiveScore>();
   const effectiveNow = await getEffectiveNow();
+  const activeOverride = await getActiveTimeOverride();
 
   // -1 sorts below every real percentage (confidence is always >= 0),
   // so "no prediction yet" candidates never win a confidence
@@ -649,15 +650,26 @@ export async function getPremierGame(season: number, week: number): Promise<Prem
   const latest = (list: Candidate[]): Candidate =>
     list.reduce((last, c) => (c.game_date > last.game_date ? c : last));
 
-  // Real score/schedule-final/live status always wins when present; a
-  // hypothetical future game (simulated-time preview, no real data at
-  // all yet) is assumed over ASSUMED_GAME_DURATION_MS after kickoff.
+  // A real final score or the schedule's own final flag always wins --
+  // that's genuinely, permanently over regardless of any clock. "post"
+  // live status is the same kind of fact (definitely already ended),
+  // so it wins unconditionally too.
+  //
+  // "in" (currently, actually live right now) is different: under an
+  // ACTIVE admin override, whether a real game happens to still be
+  // playing in actual real-world time is irrelevant to the question
+  // being asked ("what would this look like at the simulated time") --
+  // it's simply not real-world evidence about anything at the
+  // simulated instant. So "in" only blocks advancement for a REAL
+  // visitor (no override); under a simulation, it's ignored and the
+  // assumed-duration clock estimate decides instead, same as a game
+  // with no live data at all.
   const hasEnded = (c: Candidate): boolean => {
     if (c.actual_home_score !== null && c.actual_away_score !== null) return true;
     if (c.scheduleFinal) return true;
     const live = liveScores.get(`${c.away_team}@${c.home_team}`);
     if (live?.status === "post") return true;
-    if (live?.status === "in") return false;
+    if (live?.status === "in" && !activeOverride) return false;
     return effectiveNow.getTime() >= c.game_date.getTime() + ASSUMED_GAME_DURATION_MS;
   };
 
