@@ -499,10 +499,22 @@ export async function getPremierGame(season: number, week: number): Promise<Prem
   if (rows.length === 0) return null;
 
   const liveScores = (await isScheduleEnabledSeason(season)) ? await getAllLiveScores() : new Map<string, LiveScore>();
+  // CHANGED: also treat kickoff-has-passed (per getEffectiveNow(), see
+  // admin.ts) as "started" for premier-game candidate filtering. Real
+  // score/live-status data is still checked first and always wins when
+  // present -- this only matters for an admin's simulated FUTURE time,
+  // where no real data can exist yet because the game genuinely hasn't
+  // been played (that's the whole point of previewing a future date).
+  // Without this, a past-kickoff game with no real data could never be
+  // excluded here, no matter how far the simulated clock was moved
+  // forward -- which is exactly the bug reported: setting the override
+  // to Tuesday still showed Monday's game as the premier pick.
+  const effectiveNow = await getEffectiveNow();
   const hasStarted = (r: (typeof rows)[number]) => {
     if (r.actual_home_score !== null && r.actual_away_score !== null) return true;
     const live = liveScores.get(`${r.away_team}@${r.home_team}`);
-    return live?.status === "in" || live?.status === "post";
+    if (live?.status === "in" || live?.status === "post") return true;
+    return effectiveNow >= r.game_date;
   };
 
   const upcoming = rows.filter((r) => !hasStarted(r));

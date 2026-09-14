@@ -8,18 +8,26 @@ import {
 } from "@/lib/admin";
 
 // Admin-only testing aid: lets an admin preview how date-dependent
-// parts of the site (currently just getCurrentSeasonYear() in
-// src/lib/predictions.ts -- which season/week defaults to "current")
-// look at a different date/time, WITHOUT touching the real server/VM
-// clock. The override is a per-browser HttpOnly cookie
-// (admin_time_override, see src/lib/admin.ts), only ever honored for
-// a request that independently re-verifies as an admin -- it can
-// never affect what any other visitor sees, and never changes
-// anything actually stored in the database (live scores, real
-// kickoff-based "has this game started" logic, etc. are driven by
-// real data, not this clock -- see src/lib/predictions.ts's
-// hasStarted()/isScheduleEnabledSeason() for what this override does
-// and doesn't reach).
+// parts of the site look at a different date/time, WITHOUT touching
+// the real server/VM clock. The override is a per-browser HttpOnly
+// cookie (admin_time_override, see src/lib/admin.ts), only ever
+// honored for a request that independently re-verifies as an admin --
+// it can never affect what any other visitor sees, and never writes
+// anything to the database.
+//
+// WHAT IT ACTUALLY AFFECTS, PRECISELY:
+//   - getCurrentSeasonYear() -- which season/week the site defaults to
+//     as "current."
+//   - getPremierGame()'s candidate filtering -- a game whose real
+//     kickoff (game_date) is before the simulated "now" is treated as
+//     no longer a candidate for the featured slot, even with no real
+//     score yet (there can't be one for a genuinely future simulated
+//     date -- the game hasn't actually been played). Real score/live
+//     data always wins when it exists; this is only a fallback.
+//   - It does NOT fake an actual live score or a "Final" result
+//     anywhere on the site (resolveGameState() in predictions.ts still
+//     only shows "live"/"final" off real data) -- previewing a future
+//     date shows upcoming games as upcoming, not with invented scores.
 export default async function AdminTimePage() {
   const adminUserId = await getCurrentAdminUserId();
   if (!adminUserId) {
@@ -53,11 +61,12 @@ export default async function AdminTimePage() {
         Admin: Simulated Time
       </h1>
       <p className="mt-2 text-sm text-[var(--text-dim)]">
-        Sets a per-browser override for this admin account only. Only
-        affects which season/week the site treats as &ldquo;current&rdquo;
-        (getCurrentSeasonYear()) -- live scores and actual game results
-        still come from real data, not this clock. The real server
-        clock is never touched.
+        Sets a per-browser override for this admin account only. Affects
+        which season/week the site treats as &ldquo;current&rdquo; and
+        which game is featured as the premier matchup once its kickoff
+        has passed the simulated time. Never invents a live score or a
+        final result -- those still only ever come from real data. The
+        real server clock is never touched.
       </p>
 
       <div className="mt-6 rounded border border-[var(--panel-border)] bg-[var(--panel)] p-4">
