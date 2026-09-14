@@ -181,8 +181,8 @@ export default function PredictionsView({
                     {premier.lockOfWeek
                       ? "🔒 LOCK OF THE WEEK"
                       : isRealMember
-                        ? "★ GAME OF THE WEEK — FREE PREVIEW"
-                        : "★ FREE GAME OF THE WEEK — FREE PREVIEW"}
+                        ? `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`
+                        : `★ FREE ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
                   </div>
                   <MatchupCard matchup={premier} premier />
                 </div>

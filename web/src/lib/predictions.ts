@@ -510,6 +510,7 @@ export async function getMatchupsForSeasonWeek(
   return combined.map(({ matchup }) => {
     if (premier && matchup.id === premier.id) {
       matchup.premier = true;
+      matchup.premierLabel = premier.label;
       matchup.lockOfWeek = premier.probability !== undefined && premier.probability >= LOCK_OF_WEEK_THRESHOLD;
     }
     return matchup;
@@ -529,6 +530,12 @@ export interface PremierGame {
   // still gets featured, just with no percentage to show, same as any
   // other not-yet-predicted matchup card.
   probability?: number;
+  // The ribbon's day-specific text fragment (e.g. "SUNDAY NIGHT
+  // SHOWDOWN") -- see premierLabelForGame() below. The UI wraps this
+  // in "★ {label} — FREE PREVIEW" (or "★ FREE {label} — FREE PREVIEW"
+  // for a non-member) -- PredictionsView.tsx owns that exact template,
+  // this is just which words go in the middle.
+  label: string;
 }
 
 // A hypothetical/future game (no real score, no live-status row --
@@ -605,6 +612,19 @@ async function getPremierCandidates(season: number, week: number): Promise<Premi
     if (!seen.has(r.universal_game_id)) candidates.push(r);
   }
   return candidates;
+}
+
+// The ribbon's day-specific text fragment for whichever game ends up
+// featured. Sunday is the one day that needs isSundayNight passed in
+// separately -- etWeekday() alone can't tell a Sunday day game from
+// Sunday Night Football, only getPremierGame() (which already knows
+// which candidate it picked as sundayNightGame) can.
+function premierLabelForGame(gameDate: Date, isSundayNight: boolean): string {
+  const day = etWeekday(gameDate);
+  if (day === 0) return isSundayNight ? "SUNDAY NIGHT SHOWDOWN" : "GAME OF THE WEEK";
+  if (day === 1) return "MONDAY NIGHT CLASH";
+  if (day === 6) return "SATURDAY  FOOTBALL SPECIAL";
+  return "MID-WEEK FOOTBALL CLASH"; // Wed/Thu/Fri (and the never-really-happens Tue)
 }
 
 // Game of the Week: follows the NFL's own broadcast-window order, not
@@ -695,7 +715,8 @@ export async function getPremierGame(season: number, week: number): Promise<Prem
       : best.home_win_probability >= 0.5
         ? best.home_win_probability
         : 1 - best.home_win_probability;
-  return { id: best.universal_game_id, probability };
+  const label = premierLabelForGame(best.game_date, best === sundayNightGame);
+  return { id: best.universal_game_id, probability, label };
 }
 
 // "-3.5" traditionally sits next to the favored team's name. Our

@@ -13,6 +13,9 @@ export interface TeamSide {
 export interface Matchup {
   id: string;
   premier?: boolean;
+  // Set only when premier is true -- see PremierGame.label in
+  // predictions.ts for what decides this and what it's for.
+  premierLabel?: string;
   status: "preview" | "live" | "final";
   kickoff: string;
   teamA: TeamSide;
