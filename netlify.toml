@@ -2,8 +2,11 @@
 # at the repo root) is NOT part of this deploy; it's a separate
 # process this config doesn't touch.
 #
-# (Trivial comment-only change to trigger the first ltorres-1 branch
-# deploy and confirm the Netlify branch-deploy config works end to end.)
+# (Trivial comment-only change to force a fresh ltorres-1 branch
+# deploy after adding THESPORTSDB_API_KEY to Netlify's env vars --
+# "Trigger deploy" in the Netlify UI defaulted to rebuilding
+# production instead of this branch, so a real push is the reliable
+# way to get the branch-deploy path to rebuild with the new variable.)
 [build]
   base = "web"
   command = "npm run build"
