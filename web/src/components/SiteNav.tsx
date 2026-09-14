@@ -8,8 +8,11 @@ import Link from "next/link";
 // component itself never re-checks auth, only the mobile menu's
 // open/closed state needs to be client-side. See layout.tsx's comment
 // for why a client-side auth check here specifically caused the old
-// "still shows Sign In after logging in" bug.
-export default function SiteNav({ signedIn }: { signedIn: boolean }) {
+// "still shows Sign In after logging in" bug. isAdmin follows the
+// same pattern (layout.tsx checks admin_users server-side via
+// getCurrentAdminUserId()) so the link only ever appears for a real
+// admin, never flashes for a moment before hiding.
+export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -52,6 +55,11 @@ export default function SiteNav({ signedIn }: { signedIn: boolean }) {
         ) : (
           <Link href="/login" onClick={close}>
             Sign In / Login
+          </Link>
+        )}
+        {isAdmin && (
+          <Link href="/admin/time" onClick={close}>
+            Admin
           </Link>
         )}
       </div>

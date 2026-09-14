@@ -6,6 +6,7 @@ import SiteNav from "@/components/SiteNav";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import AdSenseScript from "@/components/AdSenseScript";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentAdminUserId } from "@/lib/admin";
 
 export const metadata: Metadata = {
   title: "Matrix Sports Analytics",
@@ -53,6 +54,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   const { theme, rainEnabled } = await getAppearance(userData.user?.id);
+  const isAdmin = !!(await getCurrentAdminUserId());
 
   return (
     <html lang="en" data-theme={theme}>
@@ -61,7 +63,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <GoogleAnalytics />
         <AdSenseScript />
         <div className="page">
-          <SiteNav signedIn={!!userData.user} />
+          <SiteNav signedIn={!!userData.user} isAdmin={isAdmin} />
           {children}
           <div className="legal-footer">
             <Link href="/privacy">Privacy Policy</Link>
