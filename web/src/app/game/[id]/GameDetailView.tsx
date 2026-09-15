@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import { scalePosition, type GameStat, type GameStatSide } from "@/lib/gameStats";
+import type { Story } from "@/lib/stories";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 
@@ -256,7 +257,28 @@ function ResultCompare({ game }: { game: GameStat }) {
   );
 }
 
-export default function GameDetailView({ game }: { game: GameStat }) {
+// The AI-drafted recap, when one's been published for this game --
+// only ever rendered for a final game (see page.tsx, which only
+// looks one up once game.finalResult exists). Full 250-300 word body,
+// not a truncated teaser -- the teaser version lives on the home page
+// (see page.tsx's article-grid, which truncates for that card).
+function GameRecap({ story }: { story: Story | null }) {
+  if (!story) return null;
+
+  return (
+    <div className="stat-section">
+      <h2>{story.headline}</h2>
+      <p className="stat-sub">AI-drafted recap, grounded in this game&apos;s real result and pregame projection.</p>
+      {story.body.split("\n").map((paragraph, i) => (
+        <p key={i} style={{ color: "var(--text)", lineHeight: 1.7, marginTop: i === 0 ? 0 : "1rem" }}>
+          {paragraph}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+export default function GameDetailView({ game, story = null }: { game: GameStat; story?: Story | null }) {
   const { isMember, toggle } = useMemberPreview();
   const router = useRouter();
   const locked = !game.premier && !isMember;
@@ -318,6 +340,7 @@ export default function GameDetailView({ game }: { game: GameStat }) {
           ) : (
             <>
               <ResultCompare game={game} />
+              <GameRecap story={story} />
               <MarginSection game={game} />
               <TotalsSection game={game} />
               <PercentileSection game={game} />

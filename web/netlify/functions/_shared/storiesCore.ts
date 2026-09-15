@@ -35,16 +35,24 @@ export interface FinalGame {
   actual_home_score: number;
   actual_away_score: number;
   home_win_probability: number;
+  expected_home_score: number;
+  expected_away_score: number;
+  market_spread_line_current: number;
   game_date: Date;
 }
 
 // Every game in `week` that has a real final score already recorded --
 // nothing here is inferred or estimated, only what SportsAnalytics has
-// actually written back to latest_predictions.
+// actually written back to latest_predictions. Includes the model's
+// own pregame projection (expected_home_score/expected_away_score,
+// market_spread_line_current) alongside the real result specifically
+// so a recap can talk about how the simulation compared to what
+// actually happened, not just recite the final score.
 export async function finalGamesForWeek(season: number, week: number): Promise<FinalGame[]> {
   return query<FinalGame>(
     `SELECT universal_game_id, week, home_team, away_team,
-            actual_home_score, actual_away_score, home_win_probability, game_date
+            actual_home_score, actual_away_score, home_win_probability,
+            expected_home_score, expected_away_score, market_spread_line_current, game_date
      FROM latest_predictions
      WHERE season = $1 AND week = $2 AND actual_home_score IS NOT NULL AND actual_away_score IS NOT NULL
      ORDER BY game_date ASC`,
@@ -115,6 +123,14 @@ export interface GameFacts {
   was_upset: boolean;
   winner_record_after: string;
   loser_record_after: string;
+  // Added so a recap can talk about how the simulation compared to
+  // what actually happened, not just recite the final score -- see
+  // the module comment on generateStory for why this exists.
+  winner_expected_score: number;
+  loser_expected_score: number;
+  expected_margin: number; // winner_expected_score - loser_expected_score; negative means the model expected the eventual LOSER to win
+  market_favorite: string; // team the published betting line favored, independent of who the model favored
+  market_spread: number; // points the market favorite was favored by (always positive)
 }
 
 // Every number here comes straight from real DB columns -- this is
@@ -128,6 +144,16 @@ export async function buildGameFacts(game: FinalGame, season: number): Promise<G
   const winnerScore = homeWon ? game.actual_home_score : game.actual_away_score;
   const loserScore = homeWon ? game.actual_away_score : game.actual_home_score;
   const winnerPregameProb = homeWon ? game.home_win_probability : 1 - game.home_win_probability;
+  const winnerExpectedScore = homeWon ? game.expected_home_score : game.expected_away_score;
+  const loserExpectedScore = homeWon ? game.expected_away_score : game.expected_home_score;
+
+  // market_spread_line_current is stored "positive = good for home"
+  // (see predictions.ts's SIGN CONVENTION comment) -- same sign flip
+  // spreadDisplay() there uses, kept independent here since this file
+  // can't import a "server-only" Next.js module (see this file's
+  // header comment).
+  const marketFavorite = game.market_spread_line_current >= 0 ? game.home_team : game.away_team;
+  const marketSpread = Math.abs(game.market_spread_line_current);
 
   const [winnerRecordBefore, loserRecordBefore] = await Promise.all([
     teamRecordEntering(season, game.week, winner),
@@ -157,6 +183,11 @@ export async function buildGameFacts(game: FinalGame, season: number): Promise<G
     was_upset: winnerPregameProb < 0.5,
     winner_record_after: bump(winnerRecordBefore, "w"),
     loser_record_after: bump(loserRecordBefore, "l"),
+    winner_expected_score: Math.round(winnerExpectedScore * 10) / 10,
+    loser_expected_score: Math.round(loserExpectedScore * 10) / 10,
+    expected_margin: Math.round((winnerExpectedScore - loserExpectedScore) * 10) / 10,
+    market_favorite: marketFavorite,
+    market_spread: Math.round(marketSpread * 10) / 10,
   };
 }
 
@@ -176,7 +207,13 @@ export interface GeneratedStory {
 // it. This exists specifically because a plausible-but-wrong stat
 // (an LLM's or a radio host's) is worse for this brand than no story
 // at all -- see the sql/010 migration comment for the incident this
-// guards against.
+// guards against. That guardrail matters MORE now that body is a full
+// 250-300 word recap, not 2-3 sentences -- the extra length is filled
+// with deeper analysis of the numbers already in `facts` (the gap
+// between projected and actual score, the market line vs. the
+// model's own read, what the win probability said going in), never
+// with outside color commentary, trivia, or history the model wasn't
+// given.
 export async function generateStory(facts: GameFacts): Promise<GeneratedStory | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -184,11 +221,15 @@ export async function generateStory(facts: GameFacts): Promise<GeneratedStory | 
     return null;
   }
 
-  const systemPrompt = `You write short, punchy sports story blurbs for Matrix Sports Analytics, a site whose entire brand promise is factual honesty -- it never rounds a number up or invents a stat.
+  const systemPrompt = `You write game recap articles for Matrix Sports Analytics, a site whose entire brand promise is factual honesty -- it never rounds a number up or invents a stat.
 
-You will be given a JSON object of verified facts about one NFL game. Write ONLY from those facts. Do not add any statistic, date, streak, record, or historical claim that is not present in the JSON -- if you don't have a number for something, don't mention it. Do not guess at team history, prior seasons, or trivia not given to you.
+You will be given a JSON object of verified facts about one NFL game, including both the real final result AND the model's own pregame projection (expected score, win probability, and the published market betting line). Write ONLY from those facts. Do not add any statistic, date, streak, record, historical claim, player name, or piece of trivia that is not present in the JSON -- if you don't have a number for something, don't mention it. Do not guess at team history, prior seasons, injuries, weather, or anything else not given to you.
 
-Respond with ONLY a JSON object of this exact shape, no other text: {"headline": string (under 90 chars), "body": string (2-3 sentences)}`;
+The article's actual subject is the comparison between the model's simulation and what really happened -- not just a recap of the score. Structure it around: what the model projected before kickoff (expected score, win probability, and how that compared to the market's own line), what actually happened, the size of the gap between projection and result, and what that gap does or doesn't say about the model's read on this game. If the model called it correctly, say so plainly and explain by how much. If it was an upset (was_upset), say that plainly too, and use expected_margin vs the real margin to quantify how far off the projection was. Do not editorialize beyond what the numbers support -- a close miss and a blowout miss are different, so say which one this was.
+
+Write 250-300 words. Plain, direct sentences -- this is a numbers-first analytics brand, not a radio call. No filler sentences that don't carry a fact or a comparison.
+
+Respond with ONLY a JSON object of this exact shape, no other text: {"headline": string (under 90 chars), "body": string (250-300 words)}`;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -199,7 +240,7 @@ Respond with ONLY a JSON object of this exact shape, no other text: {"headline":
     },
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
-      max_tokens: 300,
+      max_tokens: 700,
       system: systemPrompt,
       messages: [{ role: "user", content: JSON.stringify(facts) }],
     }),

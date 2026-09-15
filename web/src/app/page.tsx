@@ -13,7 +13,18 @@ import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews, type NewsItem } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
-import { getPublishedStories } from "@/lib/stories";
+import { getPremierGameStories } from "@/lib/stories";
+
+// Home-page article cards are teasers, not the full recap -- the
+// 250-300 word body belongs on the game's own page (linked via "View
+// Game"). Cuts at the last whole word inside the limit rather than
+// mid-word, since this is a recap paragraph, not a hand-written blurb.
+function truncateTeaser(text: string, maxChars = 160): string {
+  if (text.length <= maxChars) return text;
+  const cut = text.slice(0, maxChars);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${cut.slice(0, lastSpace > 0 ? lastSpace : maxChars)}…`;
+}
 
 // Signed-out visitors get the marketing pitch below. Signed-in users
 // get a real dashboard instead -- see SignedInDashboard.
@@ -135,7 +146,10 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
   }
 
   const logoStrip = TEAMS.slice(0, 12);
-  const stories = await getPublishedStories(3);
+  // Home page only ever surfaces premier-game recaps, capped at 2 --
+  // every other final game still gets its own full recap, just on
+  // that game's own page (see game/[id]/GameDetailView.tsx), not here.
+  const stories = await getPremierGameStories(2);
 
   return (
     <>
@@ -236,14 +250,14 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
                   <Link key={story.id} className="article-card" href={`/game/${story.universal_game_id}`}>
                     <div className="thumb">📊</div>
                     <h3>{story.headline}</h3>
-                    <p>{story.body}</p>
+                    <p>{truncateTeaser(story.body)}</p>
                     <span className="read-more">View Game →</span>
                   </Link>
                 ) : (
                   <div key={story.id} className="article-card">
                     <div className="thumb">📊</div>
                     <h3>{story.headline}</h3>
-                    <p>{story.body}</p>
+                    <p>{truncateTeaser(story.body)}</p>
                   </div>
                 )
               )

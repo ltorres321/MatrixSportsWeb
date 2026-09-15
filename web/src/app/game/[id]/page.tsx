@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getGameDetail, formatKickoff } from "@/lib/predictions";
 import { getScheduledGame } from "@/lib/schedule";
+import { getStoryForGame } from "@/lib/stories";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import GameDetailView from "./GameDetailView";
 
@@ -36,7 +37,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const game = await getGameDetail(id);
-  if (game) return <GameDetailView game={game} />;
+  if (game) {
+    const story = game.finalResult ? await getStoryForGame(id) : null;
+    return <GameDetailView game={game} story={story} />;
+  }
 
   // No prediction row yet -- fall back to the schedule (kickoff time,
   // and the real score once it's played) rather than a dead end.
