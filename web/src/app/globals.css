@@ -1716,6 +1716,22 @@ h1.glow span {
   margin-bottom: 2.5rem;
 }
 
+/* AI recap specifically -- unlike the compact bars/numbers the rest
+   of .stat-section holds, this is 250-300 words of running prose, and
+   .stat-section itself has no background at all (transparent, just
+   spacing). Left as-is that reads fine over the Matrix rain canvas
+   for short labels, but a real paragraph with the rain's falling
+   glyphs showing straight through it is genuinely hard to read.
+   --panel-solid (fully opaque, unlike the translucent --panel used
+   for backdrop-blur cards elsewhere) so the rain shows around this
+   block but never through the text itself. */
+.story-recap {
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 1.75rem;
+}
+
 .stat-section h2 {
   font-family: 'Chakra Petch', monospace;
   color: var(--text);
