@@ -13,7 +13,7 @@ import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews, type NewsItem } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
-import { getPremierGameStories } from "@/lib/stories";
+import { getPublishedStories } from "@/lib/stories";
 
 // Home-page article cards are teasers, not the full recap -- the
 // 250-300 word body belongs on the game's own page (linked via "View
@@ -146,10 +146,11 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
   }
 
   const logoStrip = TEAMS.slice(0, 12);
-  // Home page only ever surfaces premier-game recaps, capped at 2 --
-  // every other final game still gets its own full recap, just on
-  // that game's own page (see game/[id]/GameDetailView.tsx), not here.
-  const stories = await getPremierGameStories(2);
+  // Home page surfaces the most recently published recaps, capped at
+  // 2 -- every other final game still gets its own full recap, just
+  // on that game's own page (see game/[id]/GameDetailView.tsx), not
+  // here.
+  const stories = await getPublishedStories(2);
 
   return (
     <>
@@ -248,7 +249,12 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
               stories.map((story) =>
                 story.universal_game_id ? (
                   <Link key={story.id} className="article-card" href={`/game/${story.universal_game_id}`}>
-                    <div className="thumb">📊</div>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- generated route, not a static asset next/image can optimize */}
+                    <img
+                      className="article-card-image"
+                      src={`/game/${story.universal_game_id}/opengraph-image`}
+                      alt=""
+                    />
                     <h3>{story.headline}</h3>
                     <p>{truncateTeaser(story.body)}</p>
                     <span className="read-more">View Game →</span>
