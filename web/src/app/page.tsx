@@ -13,6 +13,7 @@ import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews, type NewsItem } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
+import { getPublishedStories } from "@/lib/stories";
 
 // Signed-out visitors get the marketing pitch below. Signed-in users
 // get a real dashboard instead -- see SignedInDashboard.
@@ -134,6 +135,7 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
   }
 
   const logoStrip = TEAMS.slice(0, 12);
+  const stories = await getPublishedStories(3);
 
   return (
     <>
@@ -228,18 +230,37 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
               <span className="read-more">Read More →</span>
             </Link>
 
-            <div className="article-card disabled">
-              <div className="thumb">📊</div>
-              <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
-                COMING SOON
-              </span>
-              <h3>This Week&apos;s Model Insight</h3>
-              <p>
-                After Week {currentWeek} wraps, this space breaks down what the
-                simulations got right, what surprised us, and how the numbers
-                compared to what actually happened on the field.
-              </p>
-            </div>
+            {stories.length > 0 ? (
+              stories.map((story) =>
+                story.universal_game_id ? (
+                  <Link key={story.id} className="article-card" href={`/game/${story.universal_game_id}`}>
+                    <div className="thumb">📊</div>
+                    <h3>{story.headline}</h3>
+                    <p>{story.body}</p>
+                    <span className="read-more">View Game →</span>
+                  </Link>
+                ) : (
+                  <div key={story.id} className="article-card">
+                    <div className="thumb">📊</div>
+                    <h3>{story.headline}</h3>
+                    <p>{story.body}</p>
+                  </div>
+                )
+              )
+            ) : (
+              <div className="article-card disabled">
+                <div className="thumb">📊</div>
+                <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+                  COMING SOON
+                </span>
+                <h3>This Week&apos;s Model Insight</h3>
+                <p>
+                  After Week {currentWeek} wraps, this space breaks down what the
+                  simulations got right, what surprised us, and how the numbers
+                  compared to what actually happened on the field.
+                </p>
+              </div>
+            )}
 
             <div className="article-card disabled">
               <div className="thumb">🏈</div>

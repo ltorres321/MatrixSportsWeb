@@ -58,9 +58,14 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
           </Link>
         )}
         {isAdmin && (
-          <Link href="/admin/time" onClick={close}>
-            Admin
-          </Link>
+          <>
+            <Link href="/admin/time" onClick={close}>
+              Admin: Time
+            </Link>
+            <Link href="/admin/stories" onClick={close}>
+              Admin: Stories
+            </Link>
+          </>
         )}
       </div>
     </nav>
