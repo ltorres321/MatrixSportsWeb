@@ -211,8 +211,16 @@ Respond with ONLY a JSON object of this exact shape, no other text: {"headline":
   }
 
   const data = (await response.json()) as { content: { type: string; text?: string }[] };
-  const text = data.content.find((c) => c.type === "text")?.text;
-  if (!text) return null;
+  const rawText = data.content.find((c) => c.type === "text")?.text;
+  if (!rawText) return null;
+
+  // The system prompt asks for bare JSON, but the model sometimes
+  // wraps it in a ```json fence anyway -- strip one off if present
+  // rather than failing the whole draft over formatting.
+  const text = rawText
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
 
   try {
     const parsed = JSON.parse(text) as GeneratedStory;
