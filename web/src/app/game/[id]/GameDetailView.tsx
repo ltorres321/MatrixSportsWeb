@@ -269,9 +269,8 @@ function GameRecap({ story }: { story: Story | null }) {
     <div className="stat-section">
       <div className="story-recap">
         <h2>{story.headline}</h2>
-        <p className="stat-sub">AI-drafted recap, grounded in this game&apos;s real result and pregame projection.</p>
         {story.body.split("\n").map((paragraph, i) => (
-          <p key={i} style={{ color: "var(--text)", lineHeight: 1.7, marginTop: i === 0 ? 0 : "1rem" }}>
+          <p key={i} className="story-recap-body" style={{ marginTop: i === 0 ? 0 : "1rem" }}>
             {paragraph}
           </p>
         ))}

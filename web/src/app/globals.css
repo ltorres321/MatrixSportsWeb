@@ -119,6 +119,10 @@
   text-shadow: none;
 }
 
+:root[data-theme="light"] .story-recap-body {
+  color: var(--text);
+}
+
 /* .NET breaks from the rest of the brand wordmark here on purpose --
    every other themed element in this file flips green-to-blue with
    the accent, but .NET is red in Blue Pill theme specifically, not
@@ -1730,6 +1734,16 @@ h1.glow span {
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 1.75rem;
+}
+
+/* Same #ffd60a "machine-world" amber as .week-pill.active/.gold-cta-link
+   -- the source-code-on-a-terminal color from the films, here used for
+   the recap's actual body copy rather than just a badge/link. Dark
+   theme only, per the existing convention for every other use of this
+   color: light theme reverts to plain body text, not yellow-on-white. */
+.story-recap-body {
+  color: #ffd60a;
+  line-height: 1.7;
 }
 
 .stat-section h2 {
