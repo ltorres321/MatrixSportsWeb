@@ -87,7 +87,14 @@ export async function getSeasonSchedule(season: number): Promise<ScheduleGame[]>
     if (!homeAlias || !awayAlias) continue; // unresolved/placeholder team name -- skip rather than guess
 
     const week = Number(event.intRound);
-    const final = event.strStatus === "FT";
+    // "FT" (Full Time) covers a normal finish. TheSportsDB also uses
+    // "AOT" (After Over Time) for a game that went to overtime -- these
+    // are the two statuses actually observed coming back for finished
+    // NFL games. Missing "AOT" here left getDefaultWeek/getPremierGame
+    // permanently stuck on a week that had an OT game in it, since
+    // `scheduled.every(g => g.final)` could never become true no matter
+    // how much later than kickoff it got.
+    const final = event.strStatus === "FT" || event.strStatus === "AOT";
 
     games.push({
       // Same YYYYTWWAwyHom convention as SportsAnalytics's
