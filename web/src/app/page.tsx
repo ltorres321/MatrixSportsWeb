@@ -13,6 +13,7 @@ import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
+import ExternalWindowLink from "@/components/ExternalWindowLink";
 import { getPublishedStories, isStoryFeatured } from "@/lib/stories";
 
 // Home-page article cards are teasers, not the full recap -- the
@@ -240,7 +241,7 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
                   )
                 )}
                 {news.map((item) => (
-                  <a key={item.link} className="news-card" href={item.link} target="_blank" rel="noopener noreferrer">
+                  <ExternalWindowLink key={item.link} className="news-card" href={item.link}>
                     {item.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img className="news-card-image" src={item.image} alt="" />
@@ -252,7 +253,7 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
                       <p>{item.snippet}</p>
                       <span className="read-more">Read on ESPN →</span>
                     </div>
-                  </a>
+                  </ExternalWindowLink>
                 ))}
               </div>
             </div>
