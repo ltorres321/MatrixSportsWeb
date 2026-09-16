@@ -1,13 +1,17 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentAdminUserId } from "@/lib/admin";
-import { getStoriesForReview, publishStory, rejectStory, type Story } from "@/lib/stories";
+import { getStoriesForReview, publishStory, rejectStory, unpublishStory, type Story } from "@/lib/stories";
 
-// Review queue for AI-drafted stories (see netlify/functions/weekly-stories.mts).
-// Nothing a draft says reaches the public site until an admin approves
-// it here -- source_facts is shown alongside the generated copy so
-// approving is a real check against the actual DB facts, not a rubber
-// stamp on the model's prose.
+// Moderation view for AI-generated stories (see
+// netlify/functions/weekly-stories.mts) -- generation auto-publishes
+// immediately now, so this is no longer a required gate before
+// anything goes live. It's still where a bad one gets pulled: every
+// published story keeps its source_facts here so a claim can always
+// be checked against what actually grounded it, and "Take Down" is
+// the undo. The draft/approve flow below still exists for any story
+// that somehow lands as a draft (e.g. manual testing), but that's not
+// the normal path anymore.
 export default async function AdminStoriesPage() {
   const adminUserId = await getCurrentAdminUserId();
   if (!adminUserId) {
@@ -33,6 +37,15 @@ export default async function AdminStoriesPage() {
     if (typeof id !== "string") return;
     await rejectStory(id);
     revalidatePath("/admin/stories");
+  }
+
+  async function takeDown(formData: FormData) {
+    "use server";
+    const id = formData.get("id");
+    if (typeof id !== "string") return;
+    await unpublishStory(id);
+    revalidatePath("/admin/stories");
+    revalidatePath("/");
   }
 
   function StoryCard({ story }: { story: Story }) {
@@ -74,8 +87,19 @@ export default async function AdminStoriesPage() {
           </div>
         )}
         {story.status === "published" && (
-          <div className="mt-3 text-xs text-[var(--gold)]">
-            Published {story.published_at ? new Date(story.published_at).toLocaleString() : ""}
+          <div className="mt-4 flex items-center gap-3">
+            <span className="text-xs text-[var(--gold)]">
+              Published {story.published_at ? new Date(story.published_at).toLocaleString() : ""}
+            </span>
+            <form action={takeDown}>
+              <input type="hidden" name="id" value={story.id} />
+              <button
+                type="submit"
+                className="rounded border border-[var(--red)] px-3 py-1 text-xs text-[var(--red)] hover:bg-[var(--red)] hover:text-[var(--panel-solid)]"
+              >
+                Take Down
+              </button>
+            </form>
           </div>
         )}
       </div>
@@ -86,9 +110,9 @@ export default async function AdminStoriesPage() {
     <main className="mx-auto max-w-3xl px-6 py-16 text-[var(--text)]">
       <h1 className="text-2xl font-semibold text-[var(--text-strong)]">Admin: Stories</h1>
       <p className="mt-2 text-sm text-[var(--text-dim)]">
-        AI-drafted from real final scores and records only -- nothing here is published to the
-        site until you approve it. Check the source facts against the generated copy before
-        publishing.
+        AI-generated from real final scores and records only -- these publish automatically, no
+        review required first. Check the source facts against the generated copy, and use{" "}
+        <strong>Take Down</strong> on anything that shouldn&apos;t be live.
       </p>
 
       <h2 className="mt-8 text-lg font-semibold text-[var(--text-strong)]">

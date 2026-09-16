@@ -1324,22 +1324,6 @@ h1.glow span {
   cursor: default;
 }
 
-/* AI-story cards specifically -- reuses the exact matchup-card image
-   the game page already generates for social sharing (opengraph-image.tsx)
-   as a real thumbnail, instead of the small icon-in-a-box .thumb below,
-   which was never meant to hold a photo. Same crop treatment as the
-   ESPN news cards (.news-card-image) for visual consistency between
-   the two article sources sitting side by side in this grid. */
-.article-card-image {
-  width: 100%;
-  height: 160px;
-  object-fit: cover;
-  display: block;
-  border-radius: 10px;
-  margin-bottom: 1.1rem;
-  background: var(--panel-solid);
-}
-
 .article-card .thumb {
   width: 52px;
   height: 52px;
@@ -1383,14 +1367,6 @@ h1.glow span {
 
 .news-section {
   margin-bottom: 3rem;
-}
-
-.news-credit {
-  margin-left: 0.5rem;
-  font-size: 0.7rem;
-  color: var(--text-dim);
-  text-transform: none;
-  letter-spacing: 0.02em;
 }
 
 .news-grid {

@@ -63,3 +63,16 @@ export async function rejectStory(id: string): Promise<void> {
 
   await query("UPDATE stories SET status = 'rejected' WHERE id = $1 AND status = 'draft'", [id]);
 }
+
+// Takes a story back down after it's already live -- the safety net
+// that matters now that generation auto-publishes with no review
+// step first. Same 'rejected' status as rejecting a draft (it just
+// means "don't show this publicly" either way), but a separate
+// function/WHERE clause so a draft-only reject can't accidentally
+// also match a published row, or vice versa.
+export async function unpublishStory(id: string): Promise<void> {
+  const adminUserId = await getCurrentAdminUserId();
+  if (!adminUserId) throw new Error("Not authorized");
+
+  await query("UPDATE stories SET status = 'rejected' WHERE id = $1 AND status = 'published'", [id]);
+}

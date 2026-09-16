@@ -273,10 +273,18 @@ Respond with ONLY a JSON object of this exact shape, no other text: {"headline":
   }
 }
 
-export async function insertDraftStory(facts: GameFacts, story: GeneratedStory): Promise<void> {
+// Auto-publishes -- manual review at /admin/stories was the gate
+// while the prompt was still being proven out (see the git history on
+// this file for that iteration). Confirmed solid across a normal
+// game, a blown-margin blowout, and a real upset, so new recaps now
+// go live the moment they're generated. /admin/stories still lists
+// published stories, not just drafts, specifically so a bad one can
+// still be pulled after the fact -- this removed the gate, not the
+// ability to moderate.
+export async function insertStory(facts: GameFacts, story: GeneratedStory): Promise<void> {
   await query(
-    `INSERT INTO stories (season, week, universal_game_id, headline, body, source_facts, model_used, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
+    `INSERT INTO stories (season, week, universal_game_id, headline, body, source_facts, model_used, status, published_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', now())
      ON CONFLICT (universal_game_id) DO NOTHING`,
     [facts.season, facts.week, facts.universal_game_id, story.headline, story.body, JSON.stringify(facts), ANTHROPIC_MODEL]
   );

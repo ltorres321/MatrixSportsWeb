@@ -10,7 +10,7 @@ import {
 import type { Matchup } from "@/lib/matchups";
 import { teamLogoPath, TEAMS } from "@/lib/teams";
 import MatchupCard from "@/components/MatchupCard";
-import { getEspnNflNews, type NewsItem } from "@/lib/espnNews";
+import { getEspnNflNews } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import { getPublishedStories } from "@/lib/stories";
@@ -34,8 +34,7 @@ export default async function HomePage() {
 
   if (data.user) {
     const firstName = (data.user.user_metadata?.first_name as string | undefined) ?? undefined;
-    const news = await getEspnNflNews(6);
-    return <SignedInDashboard firstName={firstName} news={news} />;
+    return <SignedInDashboard firstName={firstName} />;
   }
 
   const seasons = await getAvailableSeasons();
@@ -129,7 +128,7 @@ export default async function HomePage() {
   );
 }
 
-async function SignedInDashboard({ firstName, news }: { firstName?: string; news: NewsItem[] }) {
+async function SignedInDashboard({ firstName }: { firstName?: string }) {
   const seasons = await getAvailableSeasons();
   const fallbackSeason = await getCurrentSeasonYear();
   const season = seasons.includes(fallbackSeason) ? fallbackSeason : seasons[0];
@@ -146,11 +145,14 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
   }
 
   const logoStrip = TEAMS.slice(0, 12);
-  // Home page surfaces the most recently published recaps, capped at
-  // 2 -- every other final game still gets its own full recap, just
-  // on that game's own page (see game/[id]/GameDetailView.tsx), not
-  // here.
-  const stories = await getPublishedStories(2);
+
+  // Site-written recaps get priority in the coverage grid; ESPN only
+  // fills whatever's left over, not a fixed separate 6 of its own --
+  // most weeks there are now enough real recaps (every final game
+  // gets one, see weekly-stories.mts) that ESPN fills few or no slots.
+  const COVERAGE_SLOTS = 6;
+  const stories = await getPublishedStories(COVERAGE_SLOTS);
+  const news = await getEspnNflNews(Math.max(COVERAGE_SLOTS - stories.length, 0));
 
   return (
     <>
@@ -197,13 +199,37 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
             </MobileAdFrame>
           </div>
 
-          {news.length > 0 && (
+          {(stories.length > 0 || news.length > 0) && (
             <div className="news-section">
               <div className="section-label">
-                <span className="dot" /> LATEST NFL NEWS
-                <span className="news-credit">via ESPN</span>
+                <span className="dot" /> LATEST NFL COVERAGE
               </div>
               <div className="news-grid">
+                {stories.map((story) =>
+                  story.universal_game_id ? (
+                    <Link key={story.id} className="news-card" href={`/game/${story.universal_game_id}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- generated route, not a static asset next/image can optimize */}
+                      <img
+                        className="news-card-image"
+                        src={`/game/${story.universal_game_id}/opengraph-image`}
+                        alt=""
+                      />
+                      <div className="news-card-body">
+                        <h3>{story.headline}</h3>
+                        <p>{truncateTeaser(story.body)}</p>
+                        <span className="read-more">View Game →</span>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div key={story.id} className="news-card">
+                      <div className="news-card-image news-card-image-fallback">📊</div>
+                      <div className="news-card-body">
+                        <h3>{story.headline}</h3>
+                        <p>{truncateTeaser(story.body)}</p>
+                      </div>
+                    </div>
+                  )
+                )}
                 {news.map((item) => (
                   <a key={item.link} className="news-card" href={item.link} target="_blank" rel="noopener noreferrer">
                     {item.image ? (
@@ -245,42 +271,18 @@ async function SignedInDashboard({ firstName, news }: { firstName?: string; news
               <span className="read-more">Read More →</span>
             </Link>
 
-            {stories.length > 0 ? (
-              stories.map((story) =>
-                story.universal_game_id ? (
-                  <Link key={story.id} className="article-card" href={`/game/${story.universal_game_id}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- generated route, not a static asset next/image can optimize */}
-                    <img
-                      className="article-card-image"
-                      src={`/game/${story.universal_game_id}/opengraph-image`}
-                      alt=""
-                    />
-                    <h3>{story.headline}</h3>
-                    <p>{truncateTeaser(story.body)}</p>
-                    <span className="read-more">View Game →</span>
-                  </Link>
-                ) : (
-                  <div key={story.id} className="article-card">
-                    <div className="thumb">📊</div>
-                    <h3>{story.headline}</h3>
-                    <p>{truncateTeaser(story.body)}</p>
-                  </div>
-                )
-              )
-            ) : (
-              <div className="article-card disabled">
-                <div className="thumb">📊</div>
-                <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
-                  COMING SOON
-                </span>
-                <h3>This Week&apos;s Model Insight</h3>
-                <p>
-                  After Week {currentWeek} wraps, this space breaks down what the
-                  simulations got right, what surprised us, and how the numbers
-                  compared to what actually happened on the field.
-                </p>
-              </div>
-            )}
+            <div className="article-card disabled">
+              <div className="thumb">📊</div>
+              <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+                COMING SOON
+              </span>
+              <h3>Weekly Model Performance</h3>
+              <p>
+                A running look at how the model&apos;s calls have tracked against
+                real results across the season so far -- not just one game, the
+                whole body of work.
+              </p>
+            </div>
 
             <div className="article-card disabled">
               <div className="thumb">🏈</div>
