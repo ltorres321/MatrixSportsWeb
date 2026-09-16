@@ -13,7 +13,7 @@ import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
-import { getPublishedStories } from "@/lib/stories";
+import { getPublishedStories, isStoryFeatured } from "@/lib/stories";
 
 // Home-page article cards are teasers, not the full recap -- the
 // 250-300 word body belongs on the game's own page (linked via "View
@@ -150,8 +150,13 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
   // fills whatever's left over, not a fixed separate 6 of its own --
   // most weeks there are now enough real recaps (every final game
   // gets one, see weekly-stories.mts) that ESPN fills few or no slots.
+  // Fetches a wider batch than the slot count since featuredCutoff()
+  // below drops some of them -- otherwise a week with, say, 10
+  // published recaps but only 4 still "fresh" would under-fill the
+  // grid even though older recaps exist to take their place.
   const COVERAGE_SLOTS = 6;
-  const stories = await getPublishedStories(COVERAGE_SLOTS);
+  const recentStories = await getPublishedStories(30);
+  const stories = recentStories.filter(isStoryFeatured).slice(0, COVERAGE_SLOTS);
   const news = await getEspnNflNews(Math.max(COVERAGE_SLOTS - stories.length, 0));
 
   return (

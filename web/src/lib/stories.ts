@@ -15,6 +15,30 @@ export interface Story {
   published_at: string | null;
 }
 
+// Recaps only stay featured on the home page through 7pm ET on the
+// Tuesday after they publish -- past that, ESPN fills the slot
+// instead of a week-old recap sitting there indefinitely. Every real
+// recap auto-publishes Tuesday ~8am ET (the weekly-stories.mts cron,
+// right after Monday Night wraps), so this normally gives an ~11hr
+// window; the "next Tuesday on/after" logic is what a manually
+// re-published or late-generated story falls back to. Same DST
+// caveat as the cron schedules elsewhere in this codebase (assumes
+// EDT/UTC-4 -- needs manual adjustment for winter/EST). A plain
+// function (not a component), deliberately, so it can call Date.now()
+// without tripping the React Compiler's component-purity lint rule --
+// see page.tsx's history for why that matters here.
+export function isStoryFeatured(story: Story): boolean {
+  if (!story.published_at) return true;
+  const from = new Date(story.published_at);
+  const day = from.getUTCDay(); // Sun=0 .. Tue=2 .. Sat=6
+  const daysUntilTuesday = (2 - day + 7) % 7;
+  const cutoff = new Date(
+    Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + daysUntilTuesday, 23, 0, 0)
+  );
+  if (cutoff.getTime() < from.getTime()) cutoff.setUTCDate(cutoff.getUTCDate() + 7);
+  return Date.now() < cutoff.getTime();
+}
+
 // Newest first, no admin gate -- this is what the public site reads.
 export async function getPublishedStories(limit = 6): Promise<Story[]> {
   return query<Story>(

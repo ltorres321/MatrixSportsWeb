@@ -1,10 +1,13 @@
 import { Pool } from "pg";
+import { TEAMS } from "@/lib/teams";
 
 // Same reasoning as digestCore.ts: Netlify Functions bundle
 // independently from the Next.js app, so this can't import
 // src/lib/db.ts ("server-only" is a Next.js-bundler-only marker) --
 // a second small Pool is a far smaller duplication than re-deriving
-// this file's query logic inside src/lib.
+// this file's query logic inside src/lib. teams.ts has no such marker
+// (plain data, no Next.js/DB dependency), so that one's imported
+// directly rather than duplicated.
 let pool: Pool | undefined;
 
 function getPool(): Pool {
@@ -27,6 +30,81 @@ export function currentSeasonYear(): number {
   return now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear();
 }
 
+// Fallback for when SportsAnalytics's own sync job hasn't written a
+// game's real score back to latest_predictions yet -- observed to lag
+// by DAYS in practice (a whole week's worth of games can sit with
+// actual_home_score still null well after they've actually been
+// played). Without this, mostRecentFinalWeek()/finalGamesForWeek()
+// would just never consider that week done, and no recap would ever
+// get written for it.
+//
+// Deliberately TheSportsDB's full-season endpoint, not ESPN's
+// scoreboard (which src/lib/liveScores.ts uses elsewhere) -- ESPN's
+// scoreboard only ever returns "the current week," so it can't
+// retroactively answer for a week that's already in the past by the
+// time this runs. TheSportsDB's season archive keeps every week's
+// real score regardless of how much later it's queried, same
+// endpoint src/lib/schedule.ts uses for the site itself; replicated
+// here rather than imported since that file is "server-only" (a
+// Next.js-bundler-only marker Netlify Functions don't understand).
+const NAME_TO_ALIAS = new Map(TEAMS.map((t) => [`${t.market} ${t.name}`, t.alias]));
+let sportsDbCache: { season: number; expires: number; byGameId: Map<string, { home: number; away: number }> } | null =
+  null;
+
+async function theSportsDbFinalScores(season: number): Promise<Map<string, { home: number; away: number }>> {
+  if (sportsDbCache && sportsDbCache.season === season && sportsDbCache.expires > Date.now()) {
+    return sportsDbCache.byGameId;
+  }
+
+  const byGameId = new Map<string, { home: number; away: number }>();
+  const apiKey = process.env.THESPORTSDB_API_KEY;
+
+  if (apiKey) {
+    try {
+      const res = await fetch(
+        `https://www.thesportsdb.com/api/v1/json/${apiKey}/eventsseason.php?id=4391&s=${season}`
+      );
+      if (res.ok) {
+        const data = (await res.json()) as {
+          events?: {
+            intRound?: string;
+            strHomeTeam?: string;
+            strAwayTeam?: string;
+            strStatus?: string;
+            intHomeScore?: string | null;
+            intAwayScore?: string | null;
+          }[];
+        };
+        for (const event of data.events ?? []) {
+          // "FT" (Full Time) covers a normal finish; "AOT" (After
+          // Over Time) is what TheSportsDB uses for a game that went
+          // to overtime -- same two statuses schedule.ts checks.
+          const final = event.strStatus === "FT" || event.strStatus === "AOT";
+          if (!final || event.intHomeScore == null || event.intAwayScore == null) continue;
+
+          const round = Number(event.intRound);
+          if (!Number.isFinite(round) || round < 1 || round > 18) continue; // regular season only
+
+          const homeAlias = NAME_TO_ALIAS.get(event.strHomeTeam ?? "");
+          const awayAlias = NAME_TO_ALIAS.get(event.strAwayTeam ?? "");
+          if (!homeAlias || !awayAlias) continue;
+
+          const week = String(round).padStart(2, "0");
+          const universalGameId = `${season.toString().padStart(4, "0")}R${week}${awayAlias}${homeAlias}`;
+          byGameId.set(universalGameId, { home: Number(event.intHomeScore), away: Number(event.intAwayScore) });
+        }
+      }
+    } catch {
+      // TheSportsDB hiccup -- caller just proceeds with whatever the
+      // DB already has, same as every other external-fetch fallback
+      // in this codebase.
+    }
+  }
+
+  sportsDbCache = { season, expires: Date.now() + 30 * 60 * 1000, byGameId };
+  return byGameId;
+}
+
 export interface FinalGame {
   universal_game_id: string;
   week: number;
@@ -41,38 +119,77 @@ export interface FinalGame {
   game_date: Date;
 }
 
-// Every game in `week` that has a real final score already recorded --
-// nothing here is inferred or estimated, only what SportsAnalytics has
-// actually written back to latest_predictions. Includes the model's
-// own pregame projection (expected_home_score/expected_away_score,
-// market_spread_line_current) alongside the real result specifically
-// so a recap can talk about how the simulation compared to what
-// actually happened, not just recite the final score.
+// Every game in `week` that has a real final score -- from the DB
+// when SportsAnalytics has already written it back to
+// latest_predictions, falling back to theSportsDbFinalScores()
+// otherwise (see that function's comment for why the fallback exists
+// at all). The DB's own number always wins when both exist; the
+// fallback only ever fills a genuine gap, never overrides. Includes
+// the model's own pregame projection (expected_home_score/
+// expected_away_score, market_spread_line_current) alongside the real
+// result specifically so a recap can talk about how the simulation
+// compared to what actually happened, not just recite the final score.
 export async function finalGamesForWeek(season: number, week: number): Promise<FinalGame[]> {
-  return query<FinalGame>(
+  const rows = await query<
+    FinalGame & { actual_home_score: number | null; actual_away_score: number | null }
+  >(
     `SELECT universal_game_id, week, home_team, away_team,
             actual_home_score, actual_away_score, home_win_probability,
             expected_home_score, expected_away_score, market_spread_line_current, game_date
      FROM latest_predictions
-     WHERE season = $1 AND week = $2 AND actual_home_score IS NOT NULL AND actual_away_score IS NOT NULL
+     WHERE season = $1 AND week = $2
      ORDER BY game_date ASC`,
     [season, week]
   );
+
+  const fallback = await theSportsDbFinalScores(season);
+  const finalGames: FinalGame[] = [];
+
+  for (const row of rows) {
+    if (row.actual_home_score !== null && row.actual_away_score !== null) {
+      finalGames.push(row as FinalGame);
+      continue;
+    }
+    const fromFallback = fallback.get(row.universal_game_id);
+    if (fromFallback) {
+      finalGames.push({ ...row, actual_home_score: fromFallback.home, actual_away_score: fromFallback.away });
+    }
+  }
+
+  return finalGames;
 }
 
 // The most recent week in `season` where every game that's kicked off
 // has a real final score -- i.e. "fully done," not "in progress."
 // Returns null if no week that season is fully final yet (e.g. Week 1
-// Sunday afternoon, before Sunday/Monday night games finish).
+// Sunday afternoon, before Sunday/Monday night games finish). Same
+// DB-first-then-TheSportsDB-fallback reasoning as finalGamesForWeek --
+// without the fallback, a week the DB sync job is behind on would
+// never register as "done" here even though it demonstrably is.
 export async function mostRecentFinalWeek(season: number): Promise<number | null> {
-  const rows = await query<{ week: number; total: string; final_count: string }>(
-    `SELECT week, COUNT(*) AS total, COUNT(actual_home_score) AS final_count
-     FROM latest_predictions WHERE season = $1 GROUP BY week`,
-    [season]
-  );
-  const fullyFinal = rows
-    .filter((r) => Number(r.total) > 0 && Number(r.final_count) === Number(r.total))
-    .map((r) => r.week);
+  const rows = await query<{
+    week: number;
+    universal_game_id: string;
+    actual_home_score: number | null;
+    actual_away_score: number | null;
+  }>(`SELECT week, universal_game_id, actual_home_score, actual_away_score FROM latest_predictions WHERE season = $1`, [
+    season,
+  ]);
+  if (rows.length === 0) return null;
+
+  const fallback = await theSportsDbFinalScores(season);
+  const byWeek = new Map<number, { total: number; final: number }>();
+
+  for (const row of rows) {
+    const entry = byWeek.get(row.week) ?? { total: 0, final: 0 };
+    entry.total++;
+    const isFinal =
+      (row.actual_home_score !== null && row.actual_away_score !== null) || fallback.has(row.universal_game_id);
+    if (isFinal) entry.final++;
+    byWeek.set(row.week, entry);
+  }
+
+  const fullyFinal = [...byWeek.entries()].filter(([, c]) => c.total > 0 && c.final === c.total).map(([week]) => week);
   if (fullyFinal.length === 0) return null;
   return Math.max(...fullyFinal);
 }
@@ -83,23 +200,38 @@ export async function mostRecentFinalWeek(season: number): Promise<number | null
 // the site already shows next to a team name elsewhere. Deliberately
 // NOT a multi-year streak/history lookup -- that needs a real
 // historical stats source, not something to approximate here.
+//
+// Same DB-first-then-TheSportsDB-fallback as finalGamesForWeek/
+// mostRecentFinalWeek -- without it, a record computed for Week 3+
+// would silently undercount any earlier game the DB sync job hasn't
+// caught up on yet, which is exactly the kind of quietly-wrong stat
+// this brand explicitly can't afford (see sql/010's incident note).
+// Inert for Week 1 specifically (nothing to count before it), which
+// is why this bug was invisible until recaps needed to reach Week 2+.
 export async function teamRecordEntering(season: number, throughWeek: number, team: string): Promise<string> {
-  const rows = await query<{ team_score: number; opp_score: number }>(
-    `SELECT actual_home_score AS team_score, actual_away_score AS opp_score
-       FROM latest_predictions
-       WHERE season = $1 AND week < $2 AND home_team = $3 AND actual_home_score IS NOT NULL
+  const rows = await query<{ universal_game_id: string; is_home: boolean; team_score: number | null; opp_score: number | null }>(
+    `SELECT universal_game_id, true AS is_home, actual_home_score AS team_score, actual_away_score AS opp_score
+       FROM latest_predictions WHERE season = $1 AND week < $2 AND home_team = $3
      UNION ALL
-     SELECT actual_away_score AS team_score, actual_home_score AS opp_score
-       FROM latest_predictions
-       WHERE season = $1 AND week < $2 AND away_team = $3 AND actual_home_score IS NOT NULL`,
+     SELECT universal_game_id, false AS is_home, actual_away_score AS team_score, actual_home_score AS opp_score
+       FROM latest_predictions WHERE season = $1 AND week < $2 AND away_team = $3`,
     [season, throughWeek, team]
   );
+  const fallback = await theSportsDbFinalScores(season);
   let w = 0,
     l = 0,
     t = 0;
   for (const r of rows) {
-    if (r.team_score > r.opp_score) w++;
-    else if (r.team_score < r.opp_score) l++;
+    let teamScore = r.team_score;
+    let oppScore = r.opp_score;
+    if (teamScore === null || oppScore === null) {
+      const fromFallback = fallback.get(r.universal_game_id);
+      if (!fromFallback) continue;
+      teamScore = r.is_home ? fromFallback.home : fromFallback.away;
+      oppScore = r.is_home ? fromFallback.away : fromFallback.home;
+    }
+    if (teamScore > oppScore) w++;
+    else if (teamScore < oppScore) l++;
     else t++;
   }
   return t > 0 ? `${w}-${l}-${t}` : `${w}-${l}`;
