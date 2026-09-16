@@ -9,6 +9,7 @@ import { scalePosition, type GameStat, type GameStatSide } from "@/lib/gameStats
 import type { Story } from "@/lib/stories";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
+import { TrendingUpArrow } from "@/components/MatchupCard";
 
 const LIVE_REFRESH_MS = 20_000;
 
@@ -39,11 +40,17 @@ function StickyBar({ game }: { game: GameStat }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={teamLogoPath(game.teamA.alias)} alt="" />
         <span>{game.teamA.alias}</span>
-        <span className="prob">{showScore ? game.teamA.score : `${game.teamA.winProb}%`}</span>
+        <span className="prob">
+          {showScore ? game.teamA.score : `${game.teamA.winProb}%`}
+          {!showScore && <TrendingUpArrow show={game.teamA.trendingUp} />}
+        </span>
       </div>
       <div className="vs">{statusWord}</div>
       <div className="side">
-        <span className="prob">{showScore ? game.teamB.score : `${game.teamB.winProb}%`}</span>
+        <span className="prob">
+          {!showScore && <TrendingUpArrow show={game.teamB.trendingUp} />}
+          {showScore ? game.teamB.score : `${game.teamB.winProb}%`}
+        </span>
         <span>{game.teamB.alias}</span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={teamLogoPath(game.teamB.alias)} alt="" />

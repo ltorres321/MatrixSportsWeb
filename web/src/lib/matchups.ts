@@ -8,6 +8,13 @@ export interface TeamSide {
   prob?: number;
   score?: number;
   winner?: boolean;
+  // True only for whichever side's win probability went UP since the
+  // previous prediction generated for this game (comparing the two
+  // most recent rows in predictions, not just "since yesterday") --
+  // never set for the side that went down, a tie, or when there's no
+  // prior prediction yet (a brand new game). See predictions.ts's
+  // fetchPriorHomeWinProbabilities().
+  trendingUp?: boolean;
 }
 
 export interface Matchup {

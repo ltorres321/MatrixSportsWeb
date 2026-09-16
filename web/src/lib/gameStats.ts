@@ -9,6 +9,9 @@ export interface GameStatSide {
   winProb?: number;
   score?: number;
   winner?: boolean;
+  // Same meaning as Matchup/TeamSide.trendingUp -- see predictions.ts's
+  // fetchPriorHomeWinProbabilities().
+  trendingUp?: boolean;
 }
 
 export interface GameStat {

@@ -2,6 +2,25 @@ import Link from "next/link";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import type { Matchup, TeamSide } from "@/lib/matchups";
 
+// Shown next to whichever side's win probability increased since the
+// previous prediction (Matchup/TeamSide.trendingUp -- see
+// predictions.ts's fetchPriorHomeWinProbabilities()). Never shown for
+// the side that went down, a tie, or a brand-new game with no prior
+// prediction to compare against.
+export function TrendingUpArrow({ show }: { show?: boolean }) {
+  if (!show) return null;
+  return (
+    <span
+      className="trending-up-arrow"
+      style={{ color: "var(--gold)", marginLeft: "0.25em" }}
+      title="Up since the last prediction"
+      aria-label="Trending up"
+    >
+      ▲
+    </span>
+  );
+}
+
 function StatusTag({ status }: { status: Matchup["status"] }) {
   if (status === "live") {
     return (
@@ -56,12 +75,18 @@ function TeamRow({
           <>
             <div className="team-score">{side.score}</div>
             {(status === "final" || status === "live") && side.prob !== undefined && (
-              <div className="team-prob-pregame">Predicted {side.prob}%</div>
+              <div className="team-prob-pregame">
+                Predicted {side.prob}%
+                <TrendingUpArrow show={side.trendingUp} />
+              </div>
             )}
           </>
         ) : side.prob !== undefined ? (
           <>
-            <div className="team-prob">{side.prob}%</div>
+            <div className="team-prob">
+              {side.prob}%
+              <TrendingUpArrow show={side.trendingUp} />
+            </div>
             <div className="prob-bar">
               <div className="prob-bar-fill" style={{ width: `${side.prob}%` }} />
             </div>

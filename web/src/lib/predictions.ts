@@ -387,7 +387,12 @@ function resolveGameState(
   };
 }
 
-function rowToMatchup(row: PredictionRow, records: Map<string, string>, live: LiveScore | undefined): Matchup {
+function rowToMatchup(
+  row: PredictionRow,
+  records: Map<string, string>,
+  live: LiveScore | undefined,
+  priorHomeWinProbability?: number
+): Matchup {
   const state = resolveGameState(
     row.game_date,
     row.actual_home_score,
@@ -399,6 +404,20 @@ function rowToMatchup(row: PredictionRow, records: Map<string, string>, live: Li
   const awayProb = 100 - homeProb;
   const showScore = state.status !== "preview";
 
+  // Whichever side's own probability went up since the prior
+  // prediction -- never both, never on a tie or a first-ever
+  // prediction (priorHomeWinProbability undefined). Compares the
+  // ROUNDED, displayed percentage, not the raw float: two predictions
+  // can differ in the 4th decimal place (real, but genuinely
+  // imperceptible) and still round to the exact same displayed number
+  // -- an arrow next to a percentage that visibly hasn't moved would
+  // just be confusing, so this only counts a change the user can
+  // actually see.
+  const priorHomeProb =
+    priorHomeWinProbability !== undefined ? Math.round(priorHomeWinProbability * 100) : undefined;
+  const homeTrendingUp = priorHomeProb !== undefined && homeProb > priorHomeProb;
+  const awayTrendingUp = priorHomeProb !== undefined && homeProb < priorHomeProb;
+
   const teamA: TeamSide = {
     alias: row.away_team,
     record: records.get(row.away_team) ?? "0-0",
@@ -407,6 +426,7 @@ function rowToMatchup(row: PredictionRow, records: Map<string, string>, live: Li
     prob: awayProb,
     score: showScore ? state.awayScore : undefined,
     winner: showScore && (state.awayScore ?? 0) > (state.homeScore ?? 0),
+    trendingUp: awayTrendingUp,
   };
   const teamB: TeamSide = {
     alias: row.home_team,
@@ -414,6 +434,7 @@ function rowToMatchup(row: PredictionRow, records: Map<string, string>, live: Li
     prob: homeProb,
     score: showScore ? state.homeScore : undefined,
     winner: showScore && (state.homeScore ?? 0) > (state.awayScore ?? 0),
+    trendingUp: homeTrendingUp,
   };
 
   return {
@@ -460,6 +481,30 @@ function scheduleGameToMatchup(game: ScheduleGame, records: Map<string, string>,
   };
 }
 
+// The SECOND-most-recent home_win_probability per game this week --
+// i.e. what the model said just before its current (latest_predictions)
+// number, so the UI can show a trending indicator. predictions is
+// append-only (sql/001_predictions_schema.sql) and gets a fresh row
+// every time serving/3 runs for a game, even when nothing about that
+// specific game changed (a full-slate rerun writes every game, a
+// selective rerun writes only the games that did change) -- so "the
+// row before the latest" is genuinely "the previous real prediction,"
+// not necessarily "yesterday's." A game with only one prediction ever
+// (brand new) simply has no entry here -- rn=2 doesn't exist for it.
+async function fetchPriorHomeWinProbabilities(season: number, week: number): Promise<Map<string, number>> {
+  const rows = await query<{ universal_game_id: string; home_win_probability: number }>(
+    `WITH ranked AS (
+       SELECT universal_game_id, home_win_probability,
+              ROW_NUMBER() OVER (PARTITION BY universal_game_id ORDER BY generated_at DESC) AS rn
+       FROM predictions
+       WHERE season = $1 AND week = $2
+     )
+     SELECT universal_game_id, home_win_probability FROM ranked WHERE rn = 2`,
+    [season, week]
+  );
+  return new Map(rows.map((r) => [r.universal_game_id, r.home_win_probability]));
+}
+
 export async function getMatchupsForSeasonWeek(
   season: number,
   week: number,
@@ -471,6 +516,7 @@ export async function getMatchupsForSeasonWeek(
     [season, week]
   );
   const records = await getTeamRecords(season, week);
+  const priorProbabilities = await fetchPriorHomeWinProbabilities(season, week);
   const predicted = new Map(rows.map((row) => [row.universal_game_id, { row, date: row.game_date }]));
 
   // Only fetches for the current/future season -- live status is
@@ -494,7 +540,10 @@ export async function getMatchupsForSeasonWeek(
       const live = liveFor(g.away_team, g.home_team);
       combined.push(
         predictedEntry
-          ? { date: predictedEntry.date, matchup: rowToMatchup(predictedEntry.row, records, live) }
+          ? {
+              date: predictedEntry.date,
+              matchup: rowToMatchup(predictedEntry.row, records, live, priorProbabilities.get(g.universal_game_id)),
+            }
           : { date: g.game_date, matchup: scheduleGameToMatchup(g, records, live) }
       );
     }
@@ -502,7 +551,10 @@ export async function getMatchupsForSeasonWeek(
 
   for (const [id, { row, date }] of predicted) {
     if (seen.has(id)) continue;
-    combined.push({ date, matchup: rowToMatchup(row, records, liveFor(row.away_team, row.home_team)) });
+    combined.push({
+      date,
+      matchup: rowToMatchup(row, records, liveFor(row.away_team, row.home_team), priorProbabilities.get(id)),
+    });
   }
 
   combined.sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -728,7 +780,12 @@ function spreadDisplay(row: PredictionRow): string {
   return `${favoredAlias} -${Math.abs(row.market_spread_line_current).toFixed(1)}`;
 }
 
-function rowToGameStat(row: PredictionRow, records: Map<string, string>, live: LiveScore | undefined): GameStat {
+function rowToGameStat(
+  row: PredictionRow,
+  records: Map<string, string>,
+  live: LiveScore | undefined,
+  priorHomeWinProbability?: number
+): GameStat {
   const state = resolveGameState(
     row.game_date,
     row.actual_home_score,
@@ -741,12 +798,21 @@ function rowToGameStat(row: PredictionRow, records: Map<string, string>, live: L
   const homeFavored = row.home_win_probability >= 0.5;
   const showScore = state.status !== "preview";
 
+  // Compares the ROUNDED, displayed percentage -- see rowToMatchup's
+  // identical comment for why (a real but sub-percentage-point change
+  // can round to the same displayed number either way).
+  const priorHomeProb =
+    priorHomeWinProbability !== undefined ? Math.round(priorHomeWinProbability * 100) : undefined;
+  const homeTrendingUp = priorHomeProb !== undefined && homeProb > priorHomeProb;
+  const awayTrendingUp = priorHomeProb !== undefined && homeProb < priorHomeProb;
+
   const teamA: GameStatSide = {
     alias: row.away_team,
     record: records.get(row.away_team) ?? "0-0",
     winProb: awayProb,
     score: showScore ? state.awayScore : undefined,
     winner: showScore && (state.awayScore ?? 0) > (state.homeScore ?? 0),
+    trendingUp: awayTrendingUp,
   };
   const teamB: GameStatSide = {
     alias: row.home_team,
@@ -754,6 +820,7 @@ function rowToGameStat(row: PredictionRow, records: Map<string, string>, live: L
     winProb: homeProb,
     score: showScore ? state.homeScore : undefined,
     winner: showScore && (state.homeScore ?? 0) > (state.awayScore ?? 0),
+    trendingUp: homeTrendingUp,
   };
 
   const marginBuckets = [
@@ -830,7 +897,16 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
   const row = rows[0];
   const records = await getTeamRecords(row.season, row.week);
   const live = (await isScheduleEnabledSeason(row.season)) ? await getLiveScore(row.away_team, row.home_team) : null;
-  const game = rowToGameStat(row, records, live ?? undefined);
+
+  const priorRows = await query<{ home_win_probability: number }>(
+    `SELECT home_win_probability FROM predictions
+     WHERE universal_game_id = $1
+     ORDER BY generated_at DESC OFFSET 1 LIMIT 1`,
+    [universalGameId]
+  );
+  const priorHomeWinProbability = priorRows[0]?.home_win_probability;
+
+  const game = rowToGameStat(row, records, live ?? undefined, priorHomeWinProbability);
   const premier = await getPremierGame(row.season, row.week);
   if (premier && premier.id === row.universal_game_id) {
     game.premier = true;
