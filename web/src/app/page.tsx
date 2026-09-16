@@ -146,18 +146,22 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
 
   const logoStrip = TEAMS.slice(0, 12);
 
-  // Site-written recaps get priority in the coverage grid; ESPN only
-  // fills whatever's left over, not a fixed separate 6 of its own --
-  // most weeks there are now enough real recaps (every final game
-  // gets one, see weekly-stories.mts) that ESPN fills few or no slots.
+  // Site-written recaps get priority in the coverage grid, but capped
+  // at SITE_MAX_SLOTS rather than free to fill all of COVERAGE_SLOTS --
+  // every final game gets its own recap now (see weekly-stories.mts),
+  // so a normal week has far more than 6 to choose from, which would
+  // crowd ESPN out entirely without this cap. ESPN is guaranteed at
+  // least COVERAGE_SLOTS - SITE_MAX_SLOTS slots as a result, so the
+  // grid always stays a real mix of both sources, never all-site.
   // Fetches a wider batch than the slot count since featuredCutoff()
   // below drops some of them -- otherwise a week with, say, 10
   // published recaps but only 4 still "fresh" would under-fill the
-  // grid even though older recaps exist to take their place.
+  // site side even though older recaps exist to take their place.
   const COVERAGE_SLOTS = 6;
+  const SITE_MAX_SLOTS = 3;
   const recentStories = await getPublishedStories(30);
-  const stories = recentStories.filter(isStoryFeatured).slice(0, COVERAGE_SLOTS);
-  const news = await getEspnNflNews(Math.max(COVERAGE_SLOTS - stories.length, 0));
+  const stories = recentStories.filter(isStoryFeatured).slice(0, SITE_MAX_SLOTS);
+  const news = await getEspnNflNews(COVERAGE_SLOTS - stories.length);
 
   return (
     <>
