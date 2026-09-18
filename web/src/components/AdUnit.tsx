@@ -1,3 +1,13 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
+declare global {
+  interface Window {
+    adsbygoogle?: unknown[];
+  }
+}
+
 const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 // One AdSense manual display unit per physical shape the site's frames
@@ -29,43 +39,55 @@ type AdUnitProps = {
 // own containers wherever its own heuristics prefer, ignoring custom
 // decorative frames like these). Auto ads can still be left on in the
 // AdSense dashboard on top of this; the two aren't mutually exclusive.
+//
+// The push() call happens in an effect, not an inline <script> sibling
+// of the <ins>. AdSense's own docs snippet is a plain <script> right
+// after the <ins>, which works on a static page -- but this page
+// hydrates: React reconciles the server-rendered <ins> against its own
+// tree, and a literal inline script can end up executing before that
+// settles (or, with several of these repeated on one page, racing each
+// other). Google's script then can't find the <ins> it's supposed to
+// fill and throws "no_div". Pushing from useEffect instead guarantees
+// the <ins> is actually committed to the DOM first, every time.
 export default function AdUnit({ kind }: AdUnitProps) {
   const slotId = SLOT_IDS[kind];
+  const pushed = useRef(false);
+
+  useEffect(() => {
+    if (!ADSENSE_CLIENT_ID || !slotId || pushed.current) return;
+    pushed.current = true;
+    // adsbygoogle.js loads async elsewhere (AdSenseScript.tsx) and may
+    // not have run yet -- pushing onto this array-or-queue is the
+    // documented safe pattern regardless of load order.
+    (window.adsbygoogle = window.adsbygoogle || []).push({});
+  }, [slotId]);
+
   if (!ADSENSE_CLIENT_ID || !slotId) return null;
 
-  const ins =
-    kind === "rail" ? (
-      // Fixed IAB "Half Page" size, matching AdFrame's own 300x600
-      // slot-panel exactly -- a real standard size fills better than
-      // forcing a responsive unit into a fixed frame.
+  if (kind === "rail") {
+    // Fixed IAB "Half Page" size, matching AdFrame's own 300x600
+    // slot-panel exactly -- a real standard size fills better than
+    // forcing a responsive unit into a fixed frame.
+    return (
       <ins
         className="adsbygoogle"
         style={{ display: "inline-block", width: 300, height: 600 }}
         data-ad-client={ADSENSE_CLIENT_ID}
         data-ad-slot={slotId}
       />
-    ) : (
-      // MobileAdFrame's panel is a non-IAB 7:2 shape, so this is a
-      // responsive unit that fills the panel's width instead.
-      <ins
-        className="adsbygoogle"
-        style={{ display: "block", width: "100%" }}
-        data-ad-client={ADSENSE_CLIENT_ID}
-        data-ad-slot={slotId}
-        data-ad-format="auto"
-        data-full-width-responsive="true"
-      />
     );
+  }
 
+  // MobileAdFrame's panel is a non-IAB 7:2 shape, so this is a
+  // responsive unit that fills the panel's width instead.
   return (
-    <>
-      {ins}
-      {/* Plain script, not next/script -- see AdSenseScript.tsx for why.
-          Each manual <ins> needs its own push call; Auto ads' single
-          site-wide push (if ever added) is separate from this. */}
-      <script
-        dangerouslySetInnerHTML={{ __html: "(adsbygoogle = window.adsbygoogle || []).push({});" }}
-      />
-    </>
+    <ins
+      className="adsbygoogle"
+      style={{ display: "block", width: "100%" }}
+      data-ad-client={ADSENSE_CLIENT_ID}
+      data-ad-slot={slotId}
+      data-ad-format="auto"
+      data-full-width-responsive="true"
+    />
   );
 }
