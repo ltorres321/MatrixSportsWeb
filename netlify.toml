@@ -7,6 +7,11 @@
 # "Trigger deploy" in the Netlify UI defaulted to rebuilding
 # production instead of this branch, so a real push is the reliable
 # way to get the branch-deploy path to rebuild with the new variable.)
+#
+# (Same deal again -- NEXT_PUBLIC_ADSENSE_CLIENT_ID was only scoped to
+# the Production deploy context, not Branch deploys, so the ltorres-1
+# branch deploy was silently missing AdSense entirely. Fixed in
+# Netlify's UI; this push is what actually picks it up.)
 [build]
   base = "web"
   command = "npm run build"
