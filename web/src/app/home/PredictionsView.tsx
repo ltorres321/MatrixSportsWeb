@@ -8,6 +8,7 @@ import type { Matchup } from "@/lib/matchups";
 import MatchupCard from "@/components/MatchupCard";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
+import AdUnit from "@/components/AdUnit";
 
 // How often to re-fetch while at least one game on screen is live --
 // short enough to feel real-time, long enough not to hammer the
@@ -161,9 +162,11 @@ export default function PredictionsView({
       <div className="content-split">
         <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
         </aside>
@@ -190,6 +193,7 @@ export default function PredictionsView({
 
               <div className="mobile-ad-wrap" aria-label="Promotional space">
                 <MobileAdFrame>
+                  <AdUnit kind="mobile" />
                   <span className="slot-label">Ad space</span>
                 </MobileAdFrame>
               </div>
@@ -209,6 +213,7 @@ export default function PredictionsView({
                     {i < gameGroups.length - 1 && (
                       <div className="mobile-ad-wrap" aria-label="Promotional space">
                         <MobileAdFrame>
+                          <AdUnit kind="mobile" />
                           <span className="slot-label">Ad space</span>
                         </MobileAdFrame>
                       </div>
@@ -245,9 +250,11 @@ export default function PredictionsView({
 
         <aside className="promo-rail promo-rail-right" aria-label="Promotional space">
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
         </aside>
