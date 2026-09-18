@@ -2,7 +2,7 @@ import "server-only";
 import { query } from "@/lib/db";
 import type { Matchup, TeamSide } from "@/lib/matchups";
 import type { GameStat, GameStatSide } from "@/lib/gameStats";
-import { getSeasonSchedule, getScheduleWeek, getScheduleWeeks, type ScheduleGame } from "@/lib/schedule";
+import { getSeasonSchedule, getScheduleWeek, getScheduleWeeks, getScheduledGame, type ScheduleGame } from "@/lib/schedule";
 import { getAllLiveScores, getLiveScore, type LiveScore } from "@/lib/liveScores";
 import { getEffectiveNow, getActiveTimeOverride } from "@/lib/admin";
 
@@ -341,12 +341,24 @@ interface ResolvedGameState {
 // and grades it against the model's probability immediately, rather
 // than leaving the site showing a stale pregame percentage until the
 // next scheduled sync.
+//
+// scheduleFinal is the last resort: TheSportsDB's own final score for
+// this game (via schedule.ts), used only when neither of the above
+// has one. This exists specifically because ESPN's live-scoreboard
+// fetch above ONLY ever covers "the current week" -- once the
+// calendar moves on to the next week, ESPN simply stops returning
+// anything for last week's games at all, which (before this fallback
+// existed) made a fully-graded past week's scores/right-or-wrong
+// silently revert to "preview" the moment the next week started,
+// even though the DB sync job may still not have caught up. Same
+// fallback source storiesCore.ts already uses for the same reason.
 function resolveGameState(
   gameDate: Date,
   dbActualHome: number | null,
   dbActualAway: number | null,
   live: LiveScore | undefined,
-  homeWinProbability: number | undefined
+  homeWinProbability: number | undefined,
+  scheduleFinal?: { home: number; away: number }
 ): ResolvedGameState {
   if (dbActualHome !== null && dbActualAway !== null) {
     return {
@@ -378,6 +390,16 @@ function resolveGameState(
     };
   }
 
+  if (scheduleFinal) {
+    return {
+      status: "final",
+      homeScore: scheduleFinal.home,
+      awayScore: scheduleFinal.away,
+      kickoffText: "Final",
+      predictionCorrect: computeCorrect(scheduleFinal.home, scheduleFinal.away, homeWinProbability),
+    };
+  }
+
   return {
     status: "preview",
     homeScore: undefined,
@@ -391,14 +413,16 @@ function rowToMatchup(
   row: PredictionRow,
   records: Map<string, string>,
   live: LiveScore | undefined,
-  priorHomeWinProbability?: number
+  priorHomeWinProbability?: number,
+  scheduleFinal?: { home: number; away: number }
 ): Matchup {
   const state = resolveGameState(
     row.game_date,
     row.actual_home_score,
     row.actual_away_score,
     live,
-    row.home_win_probability
+    row.home_win_probability,
+    scheduleFinal
   );
   const homeProb = Math.round(row.home_win_probability * 100);
   const awayProb = 100 - homeProb;
@@ -538,11 +562,29 @@ export async function getMatchupsForSeasonWeek(
       seen.add(g.universal_game_id);
       const predictedEntry = predicted.get(g.universal_game_id);
       const live = liveFor(g.away_team, g.home_team);
+      // TheSportsDB's own final score for this game, used inside
+      // rowToMatchup only as a last-resort fallback (see
+      // resolveGameState's comment) -- once a week is no longer "the
+      // current week," ESPN's live-scoreboard fetch above stops
+      // returning anything for it at all, so without this a fully-
+      // final past week whose DB sync hadn't caught up would silently
+      // revert to showing no score/no grading the moment the next
+      // week started.
+      const scheduleFinal =
+        g.final && g.actual_home_score !== null && g.actual_away_score !== null
+          ? { home: g.actual_home_score, away: g.actual_away_score }
+          : undefined;
       combined.push(
         predictedEntry
           ? {
               date: predictedEntry.date,
-              matchup: rowToMatchup(predictedEntry.row, records, live, priorProbabilities.get(g.universal_game_id)),
+              matchup: rowToMatchup(
+                predictedEntry.row,
+                records,
+                live,
+                priorProbabilities.get(g.universal_game_id),
+                scheduleFinal
+              ),
             }
           : { date: g.game_date, matchup: scheduleGameToMatchup(g, records, live) }
       );
@@ -784,14 +826,16 @@ function rowToGameStat(
   row: PredictionRow,
   records: Map<string, string>,
   live: LiveScore | undefined,
-  priorHomeWinProbability?: number
+  priorHomeWinProbability?: number,
+  scheduleFinal?: { home: number; away: number }
 ): GameStat {
   const state = resolveGameState(
     row.game_date,
     row.actual_home_score,
     row.actual_away_score,
     live,
-    row.home_win_probability
+    row.home_win_probability,
+    scheduleFinal
   );
   const homeProb = Math.round(row.home_win_probability * 100);
   const awayProb = 100 - homeProb;
@@ -906,7 +950,17 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
   );
   const priorHomeWinProbability = priorRows[0]?.home_win_probability;
 
-  const game = rowToGameStat(row, records, live ?? undefined, priorHomeWinProbability);
+  // Same last-resort fallback as getMatchupsForSeasonWeek -- see
+  // resolveGameState's comment for why this is needed at all (ESPN's
+  // live fetch above only ever covers "the current week," so a past
+  // week's game silently loses its score/grading here too without it).
+  const scheduled = (await isScheduleEnabledSeason(row.season)) ? await getScheduledGame(universalGameId) : null;
+  const scheduleFinal =
+    scheduled?.final && scheduled.actual_home_score !== null && scheduled.actual_away_score !== null
+      ? { home: scheduled.actual_home_score, away: scheduled.actual_away_score }
+      : undefined;
+
+  const game = rowToGameStat(row, records, live ?? undefined, priorHomeWinProbability, scheduleFinal);
   const premier = await getPremierGame(row.season, row.week);
   if (premier && premier.id === row.universal_game_id) {
     game.premier = true;
