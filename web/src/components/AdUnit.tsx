@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 declare global {
   interface Window {
@@ -51,15 +51,32 @@ type AdUnitProps = {
 // the <ins> is actually committed to the DOM first, every time.
 export default function AdUnit({ kind }: AdUnitProps) {
   const slotId = SLOT_IDS[kind];
-  const pushed = useRef(false);
 
   useEffect(() => {
-    if (!ADSENSE_CLIENT_ID || !slotId || pushed.current) return;
-    pushed.current = true;
-    // adsbygoogle.js loads async elsewhere (AdSenseScript.tsx) and may
-    // not have run yet -- pushing onto this array-or-queue is the
-    // documented safe pattern regardless of load order.
-    (window.adsbygoogle = window.adsbygoogle || []).push({});
+    if (!ADSENSE_CLIENT_ID || !slotId) return;
+
+    // One more frame's delay before push(), not just "after commit" --
+    // a responsive unit's container (the mobile slot, sized via
+    // percentage inset inside an aspect-ratio box) can still measure
+    // 0-width right at commit time if layout hasn't fully settled yet,
+    // which throws "No slot size for availableWidth=0". rAF waits for
+    // that to finish first. requestAnimationFrame's own cleanup also
+    // naturally dedupes StrictMode's dev-only mount/unmount/remount
+    // cycle down to exactly one real push, same as a ref guard would,
+    // without needing one.
+    const id = requestAnimationFrame(() => {
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch {
+        // adsbygoogle.js can throw synchronously (availableWidth=0
+        // above, "no_div", or other internal AdSense edge cases).
+        // A third-party ad script failing must never take down the
+        // page -- left uncaught, this would propagate out of the
+        // effect and trip Next's error boundary for the whole route.
+      }
+    });
+
+    return () => cancelAnimationFrame(id);
   }, [slotId]);
 
   if (!ADSENSE_CLIENT_ID || !slotId) return null;
