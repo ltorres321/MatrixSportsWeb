@@ -131,6 +131,13 @@ export default async function HomePage() {
             </div>
           </div>
 
+          <div className="mobile-ad-wrap" aria-label="Promotional space">
+            <MobileAdFrame>
+              <AdUnit kind="mobile" />
+              <span className="slot-label">Ad space</span>
+            </MobileAdFrame>
+          </div>
+
           <div className="pricing-strip">
             <span>
               🔒 Early subscribers get <strong>preferential pricing</strong> — sign up free
@@ -139,6 +146,13 @@ export default async function HomePage() {
             <Link className="btn btn-primary" href="/signup">
               Claim Your Spot
             </Link>
+          </div>
+
+          <div className="mobile-ad-wrap" aria-label="Promotional space">
+            <MobileAdFrame>
+              <AdUnit kind="mobile" />
+              <span className="slot-label">Ad space</span>
+            </MobileAdFrame>
           </div>
         </main>
 
