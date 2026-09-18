@@ -303,19 +303,29 @@ a {
    header/selector controls end -- so the rails always clear those
    controls without a hardcoded pixel offset that would only happen to
    be right on one page's header height.
-   left/right are plain constants (40px gap + 360px rail width = 400),
+   left/right are plain constants (24px gap + 360px rail width = 384),
    NOT measured from the viewport -- left/right on an absolutely
    positioned element are always relative to the positioned ancestor's
    own edge, which here is .content-split, not the true viewport edge.
-   .content-split's own box already sits centered by .page's own
-   max-width:1200px/margin:auto, so a plain negative offset from ITS
-   edges lands the rails just outside .page with no vw math needed --
-   a vw-based formula here double-counts .page's own centering, and
-   the further .content-split sits from the true viewport edge (i.e.
-   the wider the monitor), the further inward the rails would drift.
-   Hidden below 2050px rather than shrinking: a real ad unit doesn't
-   get to shrink to fit a laptop screen, so it's all-or-nothing,
-   wide-desktop-only for now.
+   .content-split's own box sits centered by .page's own max-width/
+   margin:auto, so a plain negative offset from ITS edges lands the
+   rails just outside .page with no vw math needed.
+   The margin available for that offset is (viewport - .page's own
+   rendered width) / 2, minus .page's own 24px side padding (the rail
+   offset is measured from .content-split's edge, which already sits
+   24px inside .page's outer edge). At .page's original max-width of
+   1200px, fitting a 384px rail margin needs a ~2000px+ viewport --
+   effectively nobody's desktop, including a plain 1920px monitor
+   (whose actual usable browser width is closer to ~1900px once the
+   scrollbar is subtracted). So .page itself gets narrower specifically
+   on rail-bearing pages once the rails are shown (below, via :has()) --
+   trading a modestly narrower main column (1200px -> 1120px) at wide
+   viewports for the rails actually being reachable on a common desktop,
+   rather than sitting hidden behind a threshold nothing reaches.
+   Still hidden below the breakpoint rather than shrinking further: a
+   real ad unit doesn't get to shrink to fit a laptop screen, so below
+   this point it's all-or-nothing (see .mobile-ad-wrap for what covers
+   that range instead).
    --------------------------------------------------------------- */
 
 .content-split {
@@ -332,22 +342,26 @@ a {
 }
 
 .promo-rail-left {
-  left: -400px;
+  left: -384px;
 }
 
 .promo-rail-right {
-  right: -400px;
+  right: -384px;
 }
 
-@media (min-width: 2050px) {
+@media (min-width: 1900px) {
   .promo-rail {
     display: flex;
+  }
+
+  .page:has(.content-split) {
+    max-width: 1120px;
   }
 }
 
 /* ---------------------------------------------------------------
    Mobile/inline ad slot (MobileAdFrame.tsx) -- shown inline in the
-   content flow wherever .promo-rail isn't (below 2050px), covering
+   content flow wherever .promo-rail isn't (below 1900px), covering
    phones, tablets, and ordinary laptops. The desktop rail's 360px-
    wide frame doesn't just need repositioning here -- it's wider than
    a typical phone's usable content width and would overflow outright.
@@ -375,7 +389,7 @@ a {
   margin: 2rem 0;
 }
 
-@media (min-width: 2050px) {
+@media (min-width: 1900px) {
   .mobile-ad-wrap {
     display: none;
   }

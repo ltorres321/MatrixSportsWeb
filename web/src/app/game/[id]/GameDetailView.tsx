@@ -9,6 +9,7 @@ import { scalePosition, type GameStat, type GameStatSide } from "@/lib/gameStats
 import type { Story } from "@/lib/stories";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
+import AdUnit from "@/components/AdUnit";
 import { TrendingUpArrow } from "@/components/MatchupCard";
 
 const LIVE_REFRESH_MS = 20_000;
@@ -304,9 +305,11 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
       <div className="content-split">
         <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
         </aside>
@@ -320,6 +323,7 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
 
           <div className="mobile-ad-wrap" aria-label="Promotional space">
             <MobileAdFrame>
+              <AdUnit kind="mobile" />
               <span className="slot-label">Ad space</span>
             </MobileAdFrame>
           </div>
@@ -366,9 +370,11 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
 
         <aside className="promo-rail promo-rail-right" aria-label="Promotional space">
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
         </aside>

@@ -13,6 +13,7 @@ import MatchupCard from "@/components/MatchupCard";
 import { getEspnNflNews } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
+import AdUnit from "@/components/AdUnit";
 import ExternalWindowLink from "@/components/ExternalWindowLink";
 import { getPublishedStories, isStoryFeatured } from "@/lib/stories";
 
@@ -54,69 +55,104 @@ export default async function HomePage() {
 
   return (
     <>
-      <main>
-        <section className="hero">
-          <div className="hero-eyebrow">
-            <span className="dot"></span> FREE DURING BETA
-          </div>
-          <h1 className="hero-title">
-            SEE THE GAME
-            <br />
-            <span>BEFORE IT&apos;S PLAYED</span>
-          </h1>
-          <p className="hero-sub">
-            Matrix Sports Analytics simulates every NFL matchup 100,000 times,
-            grounded in the real betting line — not a boosted number. Free
-            model picks for early users, every week.
-          </p>
-          <div className="hero-actions">
-            <Link className="btn btn-primary" href="/home">
-              View All Picks For This Week
-            </Link>
-            <Link className="btn btn-ghost" href="/signup">
-              Get Early Access — Free
-            </Link>
-          </div>
-          <p className="hero-note">No credit card required.</p>
-        </section>
+      {/* Signed-out visitors -- including Google's own AdSense crawler,
+          which never logs in -- only ever see this branch, never
+          SignedInDashboard below. Ad placements have to live here too,
+          not just there, or the site's actual entry page has none. */}
+      <div className="content-split">
+        <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
+          <AdFrame>
+            <AdUnit kind="rail" />
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+          <AdFrame>
+            <AdUnit kind="rail" />
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+        </aside>
 
-        {premier && (
-          <div className="premier-wrap">
-            <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
-              {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
+        <main className="content-main">
+          <section className="hero">
+            <div className="hero-eyebrow">
+              <span className="dot"></span> FREE DURING BETA
             </div>
-            <MatchupCard matchup={premier} premier linkHref="/login" />
-          </div>
-        )}
+            <h1 className="hero-title">
+              SEE THE GAME
+              <br />
+              <span>BEFORE IT&apos;S PLAYED</span>
+            </h1>
+            <p className="hero-sub">
+              Matrix Sports Analytics simulates every NFL matchup 100,000 times,
+              grounded in the real betting line — not a boosted number. Free
+              model picks for early users, every week.
+            </p>
+            <div className="hero-actions">
+              <Link className="btn btn-primary" href="/home">
+                View All Picks For This Week
+              </Link>
+              <Link className="btn btn-ghost" href="/signup">
+                Get Early Access — Free
+              </Link>
+            </div>
+            <p className="hero-note">No credit card required.</p>
+          </section>
 
-        <div className="value-grid">
-          <div className="value-card">
-            <span className="icon">🎯</span>
-            <h3>Model-Driven Probabilities</h3>
-            <p>Every matchup gets a simulated win probability, refreshed as the market line moves.</p>
-          </div>
-          <div className="value-card">
-            <span className="icon">🔓</span>
-            <h3>One Free Game a Week</h3>
-            <p>Anyone can view our marquee Game of the Week. Sign up free to see the full slate.</p>
-          </div>
-          <div className="value-card">
-            <span className="icon">🏷️</span>
-            <h3>Early Subscriber Pricing</h3>
-            <p>Free accounts created now lock in preferential pricing when paid tiers launch later.</p>
-          </div>
-        </div>
+          {premier && (
+            <div className="premier-wrap">
+              <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
+                {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
+              </div>
+              <MatchupCard matchup={premier} premier linkHref="/login" />
+            </div>
+          )}
 
-        <div className="pricing-strip">
-          <span>
-            🔒 Early subscribers get <strong>preferential pricing</strong> — sign up free
-            during beta to lock in your rate before paid tiers launch.
-          </span>
-          <Link className="btn btn-primary" href="/signup">
-            Claim Your Spot
-          </Link>
-        </div>
-      </main>
+          <div className="mobile-ad-wrap" aria-label="Promotional space">
+            <MobileAdFrame>
+              <AdUnit kind="mobile" />
+              <span className="slot-label">Ad space</span>
+            </MobileAdFrame>
+          </div>
+
+          <div className="value-grid">
+            <div className="value-card">
+              <span className="icon">🎯</span>
+              <h3>Model-Driven Probabilities</h3>
+              <p>Every matchup gets a simulated win probability, refreshed as the market line moves.</p>
+            </div>
+            <div className="value-card">
+              <span className="icon">🔓</span>
+              <h3>One Free Game a Week</h3>
+              <p>Anyone can view our marquee Game of the Week. Sign up free to see the full slate.</p>
+            </div>
+            <div className="value-card">
+              <span className="icon">🏷️</span>
+              <h3>Early Subscriber Pricing</h3>
+              <p>Free accounts created now lock in preferential pricing when paid tiers launch later.</p>
+            </div>
+          </div>
+
+          <div className="pricing-strip">
+            <span>
+              🔒 Early subscribers get <strong>preferential pricing</strong> — sign up free
+              during beta to lock in your rate before paid tiers launch.
+            </span>
+            <Link className="btn btn-primary" href="/signup">
+              Claim Your Spot
+            </Link>
+          </div>
+        </main>
+
+        <aside className="promo-rail promo-rail-right" aria-label="Promotional space">
+          <AdFrame>
+            <AdUnit kind="rail" />
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+          <AdFrame>
+            <AdUnit kind="rail" />
+            <span className="slot-label">Ad space</span>
+          </AdFrame>
+        </aside>
+      </div>
 
       <footer className="site-footer">
         <p>
@@ -181,9 +217,11 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
       <div className="content-split">
         <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
         </aside>
@@ -205,6 +243,7 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
 
           <div className="mobile-ad-wrap" aria-label="Promotional space">
             <MobileAdFrame>
+              <AdUnit kind="mobile" />
               <span className="slot-label">Ad space</span>
             </MobileAdFrame>
           </div>
@@ -261,6 +300,7 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
 
           <div className="mobile-ad-wrap" aria-label="Promotional space">
             <MobileAdFrame>
+              <AdUnit kind="mobile" />
               <span className="slot-label">Ad space</span>
             </MobileAdFrame>
           </div>
@@ -314,6 +354,7 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
               every 3rd card rather than add a slot per article. */}
           <div className="mobile-ad-wrap" aria-label="Promotional space">
             <MobileAdFrame>
+              <AdUnit kind="mobile" />
               <span className="slot-label">Ad space</span>
             </MobileAdFrame>
           </div>
@@ -321,9 +362,11 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
 
         <aside className="promo-rail promo-rail-right" aria-label="Promotional space">
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
           <AdFrame>
+            <AdUnit kind="rail" />
             <span className="slot-label">Ad space</span>
           </AdFrame>
         </aside>
