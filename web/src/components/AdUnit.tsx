@@ -96,7 +96,15 @@ export default function AdUnit({ kind }: AdUnitProps) {
   }
 
   // MobileAdFrame's panel is a non-IAB 7:2 shape, so this is a
-  // responsive unit that fills the panel's width instead.
+  // responsive unit that sizes itself to the panel's own width.
+  // Deliberately NOT data-full-width-responsive -- that flag tells
+  // Google's script to size against a *wider ancestor* instead of
+  // this ins's immediate container, specifically so an ad can break
+  // out of a narrow sidebar to look "full width" on a traditional
+  // content site. Here the immediate container (.mobile-ad-panel) is
+  // the actual intended size; with the flag on, the ad ignored that
+  // entirely and rendered at roughly the page's content width,
+  // spilling out past the decorative frame's border on every side.
   return (
     <ins
       className="adsbygoogle"
@@ -104,7 +112,6 @@ export default function AdUnit({ kind }: AdUnitProps) {
       data-ad-client={ADSENSE_CLIENT_ID}
       data-ad-slot={slotId}
       data-ad-format="auto"
-      data-full-width-responsive="true"
     />
   );
 }
