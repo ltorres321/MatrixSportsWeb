@@ -4,7 +4,6 @@ import type { CSSProperties } from "react";
 import type { IconType } from "react-icons";
 import {
   FaGoogle,
-  FaApple,
   FaDiscord,
   FaGithub,
   FaLinkedinIn,
@@ -17,7 +16,6 @@ import { createClient } from "@/lib/supabase/client";
 // (LinkedIn deprecated the old OAuth API Supabase used to target).
 type Provider =
   | "google"
-  | "apple"
   | "discord"
   | "github"
   | "linkedin_oidc"
@@ -42,13 +40,6 @@ const PROVIDERS: ProviderConfig[] = [
     Icon: FaGoogle,
     enabled: true,
     style: { background: "#fff", color: "#3c4043", border: "1px solid #dadce0" },
-  },
-  {
-    provider: "apple",
-    label: "Continue with Apple",
-    Icon: FaApple,
-    enabled: false,
-    style: { background: "#fff", color: "#000", border: "1px solid #dadce0" },
   },
   {
     provider: "discord",
