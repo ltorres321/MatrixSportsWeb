@@ -22,7 +22,7 @@ export function spotlightCaption(matchup: Matchup): string {
     "",
     probLine,
     "",
-    "Full breakdown, free → matrixsports.net",
+    "Full breakdown, free → https://matrixsports.net",
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -66,7 +66,7 @@ export function recapCaption(season: number, week: number, matchups: Matchup[]):
     "",
     `${record.total} game${record.total === 1 ? "" : "s"}, ${season} season.`,
     "",
-    "See every pick → matrixsports.net"
+    "See every pick → https://matrixsports.net"
   );
   return lines.join("\n");
 }
@@ -82,7 +82,7 @@ export function insightCaption(insight: WeeklyInsight): string {
       matchupLine,
       `Called at ${insight.winProb}% before kickoff — and nailed it.`,
       "",
-      "matrixsports.net",
+      "https://matrixsports.net",
     ].join("\n");
   }
 
@@ -92,6 +92,6 @@ export function insightCaption(insight: WeeklyInsight): string {
     matchupLine,
     `Decided by just ${insight.margin} point${insight.margin === 1 ? "" : "s"}.`,
     "",
-    "matrixsports.net",
+    "https://matrixsports.net",
   ].join("\n");
 }
