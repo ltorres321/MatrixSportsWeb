@@ -2297,10 +2297,25 @@ h1.glow span {
 }
 
 /* Sits below every page's own footer/content (rendered in the root
-   layout, not per-page) so a Privacy Policy link exists site-wide
-   without every page needing its own copy of it. */
-.legal-footer {
+   layout, not per-page) so a Follow Us row + Privacy Policy link exist
+   site-wide without every page needing its own copy of them. */
+.follow-us {
   margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--panel-border);
+  text-align: center;
+}
+
+.follow-us-label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+}
+
+.legal-footer {
+  margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--panel-border);
   text-align: center;
