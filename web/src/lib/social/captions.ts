@@ -25,13 +25,23 @@ export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "linkedin_com
 // at all since its caption text is never clickable regardless of
 // format, and Facebook/Instagram/X's in-app browsers often strip or
 // generic-ize the referrer even when a link IS clickable elsewhere.
-// Instagram gets "Link in bio" instead of a URL for that same reason
-// -- the bio link itself should carry its own utm_source=instagram
-// tag, a one-time manual change in the Instagram app, not generated
-// per-post here.
-function siteLink(platform: Platform, campaign: string): string {
-  if (platform === "instagram") return "Link in bio";
-  return `https://matrixsports.net/?utm_source=${platform}&utm_medium=social&utm_campaign=${campaign}`;
+//
+// medium/campaign are the same fixed values for every platform --
+// there's only one kind of link being tracked right now (organic
+// posts driving people to the same "link in bio"-style destination),
+// so utm_source alone (which platform) is what actually answers "where
+// are people coming from." Revisit campaign only once there's a
+// genuinely different push to compare against (a paid campaign, a
+// one-off promotion, etc.).
+//
+// "Link in Bio!!!" is prepended for Instagram only -- that's an
+// Instagram-specific convention that exists because ITS caption links
+// are never clickable; on Facebook/X/LinkedIn the link right here IS
+// clickable, so telling someone to go hunt for it in the bio instead
+// would just add friction.
+function siteLink(platform: Platform): string {
+  const url = `https://matrixsports.net/?utm_source=${platform}&utm_medium=bio&utm_campaign=link_in_bio`;
+  return platform === "instagram" ? `(Link in Bio!!!) 🐇 ${url}` : `🐇 ${url}`;
 }
 
 export function spotlightCaption(matchup: Matchup, platform: Platform): string {
@@ -46,7 +56,7 @@ export function spotlightCaption(matchup: Matchup, platform: Platform): string {
     "",
     probLine,
     "",
-    `Full breakdown, free → ${siteLink(platform, "premier_game")}`,
+    `Full breakdown, free → ${siteLink(platform)}`,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -90,7 +100,7 @@ export function recapCaption(season: number, week: number, matchups: Matchup[], 
     "",
     `${record.total} game${record.total === 1 ? "" : "s"}, ${season} season.`,
     "",
-    `See every pick → ${siteLink(platform, "weekly_recap")}`
+    `See every pick → ${siteLink(platform)}`
   );
   return lines.join("\n");
 }
@@ -98,7 +108,7 @@ export function recapCaption(season: number, week: number, matchups: Matchup[], 
 export function insightCaption(insight: WeeklyInsight, platform: Platform): string {
   const { matchup } = insight;
   const matchupLine = `${teamDisplay(matchup.teamA.alias)} ${matchup.teamA.score} — ${matchup.teamB.score} ${teamDisplay(matchup.teamB.alias)}`;
-  const link = siteLink(platform, "weekly_insight");
+  const link = siteLink(platform);
 
   if (insight.kind === "bestPick") {
     return [
