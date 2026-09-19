@@ -3,11 +3,11 @@ import { teamByAlias } from "@/lib/teams";
 import type { Matchup, TeamSide } from "@/lib/matchups";
 import { logoDataUri } from "./logoDataUri";
 
-// 4:5 (portrait), not the 1200x630 landscape used by the link-preview
-// OG image -- this is sized for the feed post itself (Instagram in
-// particular crops landscape images badly in-feed), not for a link
-// unfurl card. Works fine un-cropped on Facebook/X/LinkedIn too.
-export const socialCardSize = { width: 1080, height: 1350 };
+// Matches the live homepage MatchupCard's own screenshot proportions
+// (1248x990) -- the earlier 4:5 portrait (1080x1350) read as too
+// tall/empty for how little content there is. Still well within
+// Instagram's supported feed range (4:5 to 1.91:1).
+export const socialCardSize = { width: 1248, height: 990 };
 
 function teamDisplay(alias: string): string {
   const team = teamByAlias(alias);
@@ -35,40 +35,40 @@ function TeamRow({ side, logo }: { side: TeamSide; logo: string }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 32,
-        padding: "30px 16px",
+        gap: 28,
+        padding: "18px 16px",
         borderRadius: 14,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={logo}
-        width={110}
-        height={110}
+        width={90}
+        height={90}
         alt=""
         style={{ borderRadius: 999, border: `2px solid ${COLORS.panelBorder}` }}
       />
       <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-        <div style={{ display: "flex", fontSize: 42, fontWeight: 700, color: COLORS.text }}>
+        <div style={{ display: "flex", fontSize: 36, fontWeight: 700, color: COLORS.text }}>
           {teamDisplay(side.alias)}
         </div>
-        <div style={{ display: "flex", fontSize: 26, color: COLORS.textDim, marginTop: 6 }}>
+        <div style={{ display: "flex", fontSize: 22, color: COLORS.textDim, marginTop: 4 }}>
           {side.record}
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", width: 240 }}>
-        <div style={{ display: "flex", fontSize: 56, fontWeight: 800, color: COLORS.green }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", width: 220 }}>
+        <div style={{ display: "flex", fontSize: 48, fontWeight: 800, color: COLORS.green }}>
           {side.prob !== undefined ? `${side.prob}%` : "—"}
         </div>
         {side.prob !== undefined && (
           <div
             style={{
               display: "flex",
-              width: 220,
-              height: 12,
-              borderRadius: 6,
+              width: 200,
+              height: 10,
+              borderRadius: 5,
               background: "rgba(0, 255, 65, 0.15)",
-              marginTop: 12,
+              marginTop: 10,
               overflow: "hidden",
             }}
           >
@@ -109,10 +109,10 @@ export async function renderSpotlightCard(matchup: Matchup): Promise<ImageRespon
           alignItems: "center",
           justifyContent: "center",
           background: `radial-gradient(circle at 50% 30%, #052210 0%, ${COLORS.bg} 70%)`,
-          padding: 70,
+          padding: 48,
         }}
       >
-        <div style={{ display: "flex", fontSize: 36, letterSpacing: 12, fontWeight: 700, color: COLORS.green, marginBottom: 50 }}>
+        <div style={{ display: "flex", fontSize: 30, letterSpacing: 10, fontWeight: 700, color: COLORS.green, marginBottom: 26 }}>
           MATRIX SPORTS ANALYTICS
         </div>
 
@@ -120,26 +120,26 @@ export async function renderSpotlightCard(matchup: Matchup): Promise<ImageRespon
           style={{
             display: "flex",
             alignItems: "center",
-            fontSize: 27,
+            fontSize: 22,
             fontWeight: 700,
-            letterSpacing: 3,
+            letterSpacing: 2,
             color: COLORS.green,
             background: COLORS.greenFaint,
             border: `1px solid ${COLORS.panelBorder}`,
             borderRadius: 999,
-            padding: "18px 40px",
-            marginBottom: 56,
+            padding: "14px 32px",
+            marginBottom: 28,
             textAlign: "center",
           }}
         >
           <div
             style={{
               display: "flex",
-              width: 16,
-              height: 16,
+              width: 14,
+              height: 14,
               background: COLORS.green,
               transform: "rotate(45deg)",
-              marginRight: 18,
+              marginRight: 16,
             }}
           />
           {ribbonText}
@@ -153,7 +153,7 @@ export async function renderSpotlightCard(matchup: Matchup): Promise<ImageRespon
             background: COLORS.panel,
             border: `1px solid ${COLORS.panelBorder}`,
             borderRadius: 24,
-            padding: 56,
+            padding: 40,
           }}
         >
           <div
@@ -161,36 +161,36 @@ export async function renderSpotlightCard(matchup: Matchup): Promise<ImageRespon
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 28,
+              marginBottom: 16,
             }}
           >
             <div
               style={{
                 display: "flex",
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: 700,
                 letterSpacing: 2,
                 color: COLORS.previewTag,
                 border: `1px solid rgba(127, 209, 255, 0.4)`,
                 borderRadius: 6,
-                padding: "10px 22px",
+                padding: "8px 18px",
               }}
             >
               UPCOMING
             </div>
-            <div style={{ display: "flex", fontSize: 28, color: COLORS.textDim }}>
+            <div style={{ display: "flex", fontSize: 24, color: COLORS.textDim }}>
               {matchup.kickoff}
             </div>
           </div>
 
           <TeamRow side={matchup.teamA} logo={logoA} />
-          <div style={{ display: "flex", justifyContent: "center", fontSize: 24, letterSpacing: 6, color: COLORS.textDim, margin: "10px 0" }}>
+          <div style={{ display: "flex", justifyContent: "center", fontSize: 20, letterSpacing: 6, color: COLORS.textDim, margin: "4px 0" }}>
             VS
           </div>
           <TeamRow side={matchup.teamB} logo={logoB} />
         </div>
 
-        <div style={{ display: "flex", marginTop: 56, fontSize: 26, color: COLORS.textDim }}>
+        <div style={{ display: "flex", marginTop: 26, fontSize: 22, color: COLORS.textDim }}>
           100,000 Monte Carlo simulations · matrixsports.net
         </div>
       </div>
