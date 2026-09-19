@@ -12,6 +12,13 @@
 # the Production deploy context, not Branch deploys, so the ltorres-1
 # branch deploy was silently missing AdSense entirely. Fixed in
 # Netlify's UI; this push is what actually picks it up.)
+#
+# (Third time -- an EMPTY commit (git commit --allow-empty) does NOT
+# work for this, even though it worked for the two notes above: the
+# Netlify build log shows "Canceled build due to no content change,"
+# since there's genuinely no file diff for it to build. Needs an
+# actual content change somewhere -- this comment edit, e.g., after
+# adding CONTENT_JOB_SECRET/RESEND_API_KEY to Branch deploy scope.)
 [build]
   base = "web"
   command = "npm run build"
