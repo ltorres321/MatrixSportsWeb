@@ -4,7 +4,6 @@ import type { CSSProperties } from "react";
 import type { IconType } from "react-icons";
 import {
   FaGoogle,
-  FaApple,
   FaDiscord,
   FaGithub,
   FaLinkedinIn,
@@ -17,7 +16,6 @@ import { createClient } from "@/lib/supabase/client";
 // (LinkedIn deprecated the old OAuth API Supabase used to target).
 type Provider =
   | "google"
-  | "apple"
   | "discord"
   | "github"
   | "linkedin_oidc"
@@ -32,9 +30,9 @@ interface ProviderConfig {
   style: CSSProperties;
 }
 
-// Only Google has real credentials in Supabase right now -- the rest
-// render with their real brand colors/icons so the roadmap is visible,
-// but are disabled until each one is actually configured there.
+// Google and Discord have real credentials in Supabase right now -- the
+// rest render with their real brand colors/icons so the roadmap is
+// visible, but are disabled until each one is actually configured there.
 const PROVIDERS: ProviderConfig[] = [
   {
     provider: "google",
@@ -44,17 +42,10 @@ const PROVIDERS: ProviderConfig[] = [
     style: { background: "#fff", color: "#3c4043", border: "1px solid #dadce0" },
   },
   {
-    provider: "apple",
-    label: "Continue with Apple",
-    Icon: FaApple,
-    enabled: false,
-    style: { background: "#fff", color: "#000", border: "1px solid #dadce0" },
-  },
-  {
     provider: "discord",
     label: "Continue with Discord",
     Icon: FaDiscord,
-    enabled: false,
+    enabled: true,
     style: { background: "#5865F2", color: "#fff" },
   },
   {
