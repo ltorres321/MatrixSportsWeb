@@ -30,12 +30,10 @@ interface ProviderConfig {
   style: CSSProperties;
 }
 
-// Google, Discord, GitHub, and LinkedIn have real credentials in
-// Supabase right now -- the rest render with their real brand
-// colors/icons so the roadmap is visible, but are disabled until each
-// one is actually configured there. Facebook has credentials wired up
-// too, but stays disabled until business verification + App Review are
-// done, since only admin/tester accounts can use it until then.
+// Google, Discord, GitHub, LinkedIn, and Twitch have real credentials
+// in Supabase right now -- Facebook has credentials wired up too, but
+// stays disabled until business verification + App Review are done,
+// since only admin/tester accounts can use it until then.
 const PROVIDERS: ProviderConfig[] = [
   {
     provider: "google",
@@ -76,7 +74,7 @@ const PROVIDERS: ProviderConfig[] = [
     provider: "twitch",
     label: "Continue with Twitch",
     Icon: FaTwitch,
-    enabled: false,
+    enabled: true,
     style: { background: "#9146ff", color: "#fff" },
   },
 ];
