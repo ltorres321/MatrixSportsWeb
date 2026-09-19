@@ -3,7 +3,7 @@
 // into a platform's post body / alt text), not part of the PNG.
 import { teamByAlias } from "@/lib/teams";
 import type { Matchup } from "@/lib/matchups";
-import type { WeekRecord, WeeklyInsight } from "./weeklyStats";
+import { getWeekRecord, getBestPick, getBiggestMiss, type WeeklyInsight } from "./weeklyStats";
 
 function teamDisplay(alias: string): string {
   const team = teamByAlias(alias);
@@ -28,17 +28,47 @@ export function spotlightCaption(matchup: Matchup): string {
     .join("\n");
 }
 
-export function recapCaption(season: number, week: number, record: WeekRecord): string {
+// Grounded entirely in real DB data (record + the week's single most
+// confident correct/incorrect call) -- deliberately doesn't attempt
+// to explain WHY a pick landed or missed (injuries, weather,
+// turnovers, etc.), since this pipeline has no data source for that
+// and fabricating plausible-sounding reasons would just be making
+// things up under the brand's name. That "why" layer would need
+// either a real contextual data feed or an LLM narrative (the
+// existing weekly-stories.mts/storiesCore.ts pipeline already does
+// something similar for individual games) -- a reasonable follow-up,
+// not attempted here.
+export function recapCaption(season: number, week: number, matchups: Matchup[]): string {
+  const record = getWeekRecord(matchups);
   const wrong = record.total - record.correct;
   const pct = record.total > 0 ? Math.round((record.correct / record.total) * 100) : 0;
+  const bestPick = getBestPick(matchups);
+  const biggestMiss = getBiggestMiss(matchups);
 
-  return [
-    `📊 Week ${week} model record: ${record.correct}-${wrong} (${pct}%)`,
+  const lines = [`📊 Week ${week} model record: ${record.correct}-${wrong} (${pct}%)`, ""];
+
+  if (bestPick) {
+    const winner = bestPick.matchup.teamA.winner ? bestPick.matchup.teamA : bestPick.matchup.teamB;
+    lines.push(`✅ Best call: ${teamDisplay(winner.alias)} won as our ${bestPick.winProb}% favorite.`);
+  }
+  if (biggestMiss) {
+    const favored =
+      (biggestMiss.matchup.teamA.prob ?? 0) >= (biggestMiss.matchup.teamB.prob ?? 0)
+        ? biggestMiss.matchup.teamA
+        : biggestMiss.matchup.teamB;
+    const other = favored === biggestMiss.matchup.teamA ? biggestMiss.matchup.teamB : biggestMiss.matchup.teamA;
+    lines.push(
+      `❌ Biggest miss: ${teamDisplay(favored.alias)} was a ${biggestMiss.winProb}% favorite and lost to ${teamDisplay(other.alias)}.`
+    );
+  }
+
+  lines.push(
     "",
-    `${record.total} games, ${season} season.`,
+    `${record.total} game${record.total === 1 ? "" : "s"}, ${season} season.`,
     "",
-    "See every pick → matrixsports.net",
-  ].join("\n");
+    "See every pick → matrixsports.net"
+  );
+  return lines.join("\n");
 }
 
 export function insightCaption(insight: WeeklyInsight): string {

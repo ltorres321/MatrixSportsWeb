@@ -62,6 +62,27 @@ export function getBestPick(matchups: Matchup[]): { matchup: Matchup; winProb: n
   return best;
 }
 
+// Opposite of getBestPick: the highest pre-game confidence among
+// INCORRECTLY-called final games -- the model's most confident wrong
+// pick, a natural "predicted poorly" highlight for the weekly recap.
+// Uses whichever side had the higher `prob` (the model's actual pick),
+// not the winner -- for an incorrect call those are, by definition,
+// different sides.
+export function getBiggestMiss(matchups: Matchup[]): { matchup: Matchup; winProb: number } | null {
+  let worst: { matchup: Matchup; winProb: number } | null = null;
+
+  for (const m of matchups) {
+    if (m.status !== "final" || m.predictionCorrect !== false) continue;
+    const favored = (m.teamA.prob ?? 0) >= (m.teamB.prob ?? 0) ? m.teamA : m.teamB;
+    if (favored.prob === undefined) continue;
+    if (!worst || favored.prob > worst.winProb) {
+      worst = { matchup: m, winProb: favored.prob };
+    }
+  }
+
+  return worst;
+}
+
 export type WeeklyInsight =
   | { kind: "bestPick"; matchup: Matchup; winProb: number }
   | { kind: "closestGame"; matchup: Matchup; margin: number };

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentAdminUserId } from "@/lib/admin";
 import { getCurrentSpotlightMatchup } from "@/lib/social/currentSpotlight";
 import { getMostRecentCompletedWeek } from "@/lib/social/recentCompletedWeek";
-import { getWeekRecord, pickWeeklyInsight } from "@/lib/social/weeklyStats";
+import { pickWeeklyInsight } from "@/lib/social/weeklyStats";
 import { spotlightCaption, recapCaption, insightCaption } from "@/lib/social/captions";
 
 // Preview-only: renders the three social-post templates (game
@@ -19,8 +19,7 @@ export default async function AdminSocialPage() {
   const spotlightText = spotlightMatchup ? spotlightCaption(spotlightMatchup) : null;
 
   const completed = await getMostRecentCompletedWeek();
-  const record = completed ? getWeekRecord(completed.matchups) : null;
-  const recapText = completed && record ? recapCaption(completed.season, completed.week, record) : null;
+  const recapText = completed ? recapCaption(completed.season, completed.week, completed.matchups) : null;
 
   const insight = completed ? pickWeeklyInsight(completed.matchups) : null;
   const insightText = insight ? insightCaption(insight) : null;
