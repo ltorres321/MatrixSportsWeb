@@ -10,8 +10,14 @@ function teamDisplay(alias: string): string {
   return team ? `${team.market} ${team.name}` : alias;
 }
 
-export type Platform = "facebook" | "x" | "linkedin" | "instagram";
-export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "instagram"];
+// "linkedin" is Leo Torres's personal profile (see
+// feedback-sportsweb-workflow's reasoning for why that's the one used
+// for LinkedIn sign-in); "linkedin_company" is the separate Data
+// Insight, LLC company Page -- kept as its own utm_source rather than
+// folded into "linkedin" so GA4 can tell which LinkedIn identity is
+// actually driving traffic once both post.
+export type Platform = "facebook" | "x" | "linkedin" | "linkedin_company" | "instagram";
+export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "linkedin_company", "instagram"];
 
 // UTM-tagged per platform so Google Analytics (already installed --
 // see components/GoogleAnalytics.tsx) can attribute traffic reliably.
