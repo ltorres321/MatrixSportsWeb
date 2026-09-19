@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import RainCanvas from "@/components/RainCanvas";
 import SiteNav from "@/components/SiteNav";
+import FollowUsLinks from "@/components/FollowUsLinks";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import AdSenseScript from "@/components/AdSenseScript";
 import { createClient } from "@/lib/supabase/server";
@@ -66,6 +67,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <div className="page">
           <SiteNav signedIn={!!userData.user} isAdmin={isAdmin} />
           {children}
+          <FollowUsLinks />
           <div className="legal-footer">
             <Link href="/privacy">Privacy Policy</Link>
             <span aria-hidden="true"> · </span>
