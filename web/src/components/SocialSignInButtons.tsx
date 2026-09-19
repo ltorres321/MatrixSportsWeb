@@ -30,9 +30,10 @@ interface ProviderConfig {
   style: CSSProperties;
 }
 
-// Google and Discord have real credentials in Supabase right now -- the
-// rest render with their real brand colors/icons so the roadmap is
-// visible, but are disabled until each one is actually configured there.
+// Google, Discord, and GitHub have real credentials in Supabase right
+// now -- the rest render with their real brand colors/icons so the
+// roadmap is visible, but are disabled until each one is actually
+// configured there.
 const PROVIDERS: ProviderConfig[] = [
   {
     provider: "google",
@@ -52,7 +53,7 @@ const PROVIDERS: ProviderConfig[] = [
     provider: "github",
     label: "Continue with GitHub",
     Icon: FaGithub,
-    enabled: false,
+    enabled: true,
     style: { background: "#24292f", color: "#fff", border: "1px solid rgba(255,255,255,0.25)" },
   },
   {
