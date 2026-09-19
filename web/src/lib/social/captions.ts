@@ -10,7 +10,25 @@ function teamDisplay(alias: string): string {
   return team ? `${team.market} ${team.name}` : alias;
 }
 
-export function spotlightCaption(matchup: Matchup): string {
+export type Platform = "facebook" | "x" | "linkedin" | "instagram";
+export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "instagram"];
+
+// UTM-tagged per platform so Google Analytics (already installed --
+// see components/GoogleAnalytics.tsx) can attribute traffic reliably.
+// A raw referrer alone doesn't cut it here: Instagram never sends one
+// at all since its caption text is never clickable regardless of
+// format, and Facebook/Instagram/X's in-app browsers often strip or
+// generic-ize the referrer even when a link IS clickable elsewhere.
+// Instagram gets "Link in bio" instead of a URL for that same reason
+// -- the bio link itself should carry its own utm_source=instagram
+// tag, a one-time manual change in the Instagram app, not generated
+// per-post here.
+function siteLink(platform: Platform, campaign: string): string {
+  if (platform === "instagram") return "Link in bio";
+  return `https://matrixsports.net/?utm_source=${platform}&utm_medium=social&utm_campaign=${campaign}`;
+}
+
+export function spotlightCaption(matchup: Matchup, platform: Platform): string {
   const favored = (matchup.teamA.prob ?? 0) >= (matchup.teamB.prob ?? 0) ? matchup.teamA : matchup.teamB;
   const probLine =
     favored.prob !== undefined
@@ -22,7 +40,7 @@ export function spotlightCaption(matchup: Matchup): string {
     "",
     probLine,
     "",
-    "Full breakdown, free → https://matrixsports.net",
+    `Full breakdown, free → ${siteLink(platform, "premier_game")}`,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -38,7 +56,7 @@ export function spotlightCaption(matchup: Matchup): string {
 // existing weekly-stories.mts/storiesCore.ts pipeline already does
 // something similar for individual games) -- a reasonable follow-up,
 // not attempted here.
-export function recapCaption(season: number, week: number, matchups: Matchup[]): string {
+export function recapCaption(season: number, week: number, matchups: Matchup[], platform: Platform): string {
   const record = getWeekRecord(matchups);
   const wrong = record.total - record.correct;
   const pct = record.total > 0 ? Math.round((record.correct / record.total) * 100) : 0;
@@ -66,14 +84,15 @@ export function recapCaption(season: number, week: number, matchups: Matchup[]):
     "",
     `${record.total} game${record.total === 1 ? "" : "s"}, ${season} season.`,
     "",
-    "See every pick → https://matrixsports.net"
+    `See every pick → ${siteLink(platform, "weekly_recap")}`
   );
   return lines.join("\n");
 }
 
-export function insightCaption(insight: WeeklyInsight): string {
+export function insightCaption(insight: WeeklyInsight, platform: Platform): string {
   const { matchup } = insight;
   const matchupLine = `${teamDisplay(matchup.teamA.alias)} ${matchup.teamA.score} — ${matchup.teamB.score} ${teamDisplay(matchup.teamB.alias)}`;
+  const link = siteLink(platform, "weekly_insight");
 
   if (insight.kind === "bestPick") {
     return [
@@ -82,7 +101,7 @@ export function insightCaption(insight: WeeklyInsight): string {
       matchupLine,
       `Called at ${insight.winProb}% before kickoff — and nailed it.`,
       "",
-      "https://matrixsports.net",
+      link,
     ].join("\n");
   }
 
@@ -92,6 +111,6 @@ export function insightCaption(insight: WeeklyInsight): string {
     matchupLine,
     `Decided by just ${insight.margin} point${insight.margin === 1 ? "" : "s"}.`,
     "",
-    "https://matrixsports.net",
+    link,
   ].join("\n");
 }

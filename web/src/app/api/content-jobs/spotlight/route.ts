@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthorizedContentJob } from "@/lib/contentJobAuth";
 import { getCurrentSpotlightMatchup } from "@/lib/social/currentSpotlight";
 import { renderSpotlightCard, renderSpotlightCardSquare } from "@/lib/social/renderSpotlightCard";
-import { spotlightCaption } from "@/lib/social/captions";
+import { spotlightCaption, PLATFORMS } from "@/lib/social/captions";
 
 const DAY_ABBRS = new Set(["sun", "mon", "tue", "wed", "thu", "fri", "sat"]);
 
@@ -42,10 +42,15 @@ export async function GET(request: Request) {
     imageSquareResponse.arrayBuffer().then(Buffer.from),
   ]);
 
+  const captions = Object.fromEntries(PLATFORMS.map((p) => [p, spotlightCaption(matchup, p)])) as Record<
+    (typeof PLATFORMS)[number],
+    string
+  >;
+
   return NextResponse.json({
     gameId: matchup.id,
     day: dayAbbrFromKickoff(matchup.kickoff),
-    caption: spotlightCaption(matchup),
+    captions,
     imageBase64: imageBuffer.toString("base64"),
     imageSquareBase64: imageSquareBuffer.toString("base64"),
   });

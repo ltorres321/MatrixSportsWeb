@@ -3,7 +3,7 @@ import { isAuthorizedContentJob } from "@/lib/contentJobAuth";
 import { getMostRecentCompletedWeek } from "@/lib/social/recentCompletedWeek";
 import { getWeekRecord } from "@/lib/social/weeklyStats";
 import { renderRecapCard } from "@/lib/social/renderRecapCard";
-import { recapCaption } from "@/lib/social/captions";
+import { recapCaption, PLATFORMS } from "@/lib/social/captions";
 
 // Machine-to-machine endpoint for the standalone content-generation
 // jobs in /home/neo/SportsContentCreation -- see contentJobAuth.ts.
@@ -21,11 +21,15 @@ export async function GET(request: Request) {
   const imageResponse = await renderRecapCard(completed.season, completed.week, record);
   const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
+  const captions = Object.fromEntries(
+    PLATFORMS.map((p) => [p, recapCaption(completed.season, completed.week, completed.matchups, p)])
+  ) as Record<(typeof PLATFORMS)[number], string>;
+
   return NextResponse.json({
     weekKey: `${completed.season}-w${completed.week}`,
     season: completed.season,
     week: completed.week,
-    caption: recapCaption(completed.season, completed.week, completed.matchups),
+    captions,
     imageBase64: imageBuffer.toString("base64"),
   });
 }

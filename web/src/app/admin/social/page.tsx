@@ -3,7 +3,7 @@ import { getCurrentAdminUserId } from "@/lib/admin";
 import { getCurrentSpotlightMatchup } from "@/lib/social/currentSpotlight";
 import { getMostRecentCompletedWeek } from "@/lib/social/recentCompletedWeek";
 import { pickWeeklyInsight } from "@/lib/social/weeklyStats";
-import { spotlightCaption, recapCaption, insightCaption } from "@/lib/social/captions";
+import { spotlightCaption, recapCaption, insightCaption, PLATFORMS } from "@/lib/social/captions";
 
 // Preview-only: renders the three social-post templates (game
 // spotlight, weekly win/loss recap, weekend data insight) against
@@ -16,13 +16,15 @@ export default async function AdminSocialPage() {
   }
 
   const spotlightMatchup = await getCurrentSpotlightMatchup();
-  const spotlightText = spotlightMatchup ? spotlightCaption(spotlightMatchup) : null;
+  const spotlightTexts = spotlightMatchup
+    ? PLATFORMS.map((p) => ({ platform: p, text: spotlightCaption(spotlightMatchup, p) }))
+    : null;
 
   const completed = await getMostRecentCompletedWeek();
-  const recapText = completed ? recapCaption(completed.season, completed.week, completed.matchups) : null;
+  const recapText = completed ? recapCaption(completed.season, completed.week, completed.matchups, "facebook") : null;
 
   const insight = completed ? pickWeeklyInsight(completed.matchups) : null;
-  const insightText = insight ? insightCaption(insight) : null;
+  const insightText = insight ? insightCaption(insight, "facebook") : null;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-16 text-[var(--text)]">
@@ -42,9 +44,14 @@ export default async function AdminSocialPage() {
               alt="Game spotlight preview"
               className="mt-4 w-full max-w-sm rounded border border-[var(--panel-border)]"
             />
-            <pre className="mt-4 whitespace-pre-wrap rounded border border-[var(--panel-border)] bg-[var(--panel)] p-4 text-sm text-[var(--text)]">
-              {spotlightText}
-            </pre>
+            {spotlightTexts?.map(({ platform, text }) => (
+              <div key={platform} className="mt-4">
+                <div className="text-xs uppercase tracking-wide text-[var(--text-dim)]">{platform}</div>
+                <pre className="mt-1 whitespace-pre-wrap rounded border border-[var(--panel-border)] bg-[var(--panel)] p-4 text-sm text-[var(--text)]">
+                  {text}
+                </pre>
+              </div>
+            ))}
           </>
         ) : (
           <p className="mt-2 text-sm text-[var(--text-dim)]">No premier game found for the current week.</p>
