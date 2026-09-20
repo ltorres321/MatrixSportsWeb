@@ -96,12 +96,24 @@ export async function getStoryForGame(universalGameId: string): Promise<Story | 
   return rows[0] ?? null;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // A single published story by id, regardless of whether it's tied to
 // a game -- what the standalone article page (/stories/[id]) reads.
 // No admin gate (public page), but still 'published'-only: a draft
 // awaiting approval at /admin/stories must not be reachable by a
 // direct link either.
+//
+// Validates the id looks like a UUID before querying -- `id` is a
+// Postgres UUID column, so a malformed value (a bot probing
+// /stories/whatever, a typo'd link) makes the driver throw a type-cast
+// error instead of just matching zero rows, which surfaced as a raw
+// 500 rather than the page's own notFound() -- confirmed against the
+// live site on 2026-09-20 (/stories/doesnotexist -> 500,
+// /stories/<real-shaped-but-missing-uuid> -> a normal 404).
 export async function getStoryById(id: string): Promise<Story | null> {
+  if (!UUID_RE.test(id)) return null;
+
   const rows = await query<Story>(
     `SELECT id, season, week, universal_game_id, headline, body, source_facts, status, created_at, published_at, featured_from, featured_until
      FROM stories WHERE id = $1 AND status = 'published' LIMIT 1`,
