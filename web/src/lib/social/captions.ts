@@ -55,7 +55,14 @@ export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "linkedin_com
 // a per-post caption link, and they have no utm_content since one bio
 // link is shared across every post.
 function siteLink(platform: Platform, campaign: string, content: string): string {
-  if (platform === "instagram") return "Link in bio";
+  if (platform === "instagram") {
+    // No UTM query string here -- untrackable on this platform anyway
+    // (see the comment above), so a long tagged URL would just be
+    // noise. Still shows the real, bare domain -- legible and
+    // copyable by hand -- alongside the "check the bio" convention,
+    // rather than only the "Link in bio" phrase with no URL at all.
+    return "🐇 https://matrixsports.net — Link in bio";
+  }
   const url = `https://matrixsports.net/?utm_source=${platform}&utm_medium=social&utm_campaign=${campaign}&utm_content=${content}`;
   return `🐇 ${url}`;
 }
