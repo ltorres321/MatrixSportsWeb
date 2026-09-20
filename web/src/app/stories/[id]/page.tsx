@@ -48,7 +48,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
         </p>
       </header>
 
-      <main className="about-main">
+      <main className="story-page-main">
         {heroImage && (
           // eslint-disable-next-line @next/next/no-img-element -- a
           // static designer-provided asset, not something next/image
@@ -56,17 +56,21 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
           <img
             src={heroImage}
             alt=""
-            style={{ width: "100%", maxWidth: "100%", borderRadius: "12px", marginBottom: "2rem" }}
+            style={{ width: "100%", maxWidth: "100%", borderRadius: "12px", marginBottom: "2rem", display: "block" }}
           />
         )}
 
-        <section className="about-block story-recap">
+        {/* Same .story-recap/.story-recap-body pair GameRecap uses on
+            /game/[id] -- same dark card, same gold body copy -- kept
+            deliberately identical rather than this page inventing its
+            own look. */}
+        <div className="story-recap">
           {story.body.split("\n").map((paragraph, i) => (
             <p key={i} className="story-recap-body" style={{ marginTop: i === 0 ? 0 : "1rem" }}>
               {paragraph}
             </p>
           ))}
-        </section>
+        </div>
 
         <p style={{ textAlign: "center", marginTop: "2rem" }}>
           <Link className="btn btn-primary" href="/home">
