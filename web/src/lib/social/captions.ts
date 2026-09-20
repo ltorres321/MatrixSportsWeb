@@ -3,6 +3,7 @@
 // into a platform's post body / alt text), not part of the PNG.
 import { teamByAlias } from "@/lib/teams";
 import type { Matchup } from "@/lib/matchups";
+import type { Story } from "@/lib/stories";
 import { getWeekRecord, getBestPick, getBiggestMiss, type WeeklyInsight } from "./weeklyStats";
 
 function teamDisplay(alias: string): string {
@@ -54,7 +55,15 @@ export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "linkedin_com
 // link_in_bio -- that combination genuinely describes those, just not
 // a per-post caption link, and they have no utm_content since one bio
 // link is shared across every post.
-function siteLink(platform: Platform, campaign: string, content: string): string {
+// `path` defaults to "" (the bare homepage) -- every caption function
+// below except performanceReviewCaption relies on that default, since
+// none of them have ever pointed anywhere more specific than "go see
+// this week's slate." performanceReviewCaption is the first content
+// type that links straight to its own standalone page (/stories/[id])
+// rather than the homepage -- explicitly asked for, since a "tease" post
+// only works if the click lands on the actual article, not a generic
+// front page the reader then has to go find it from.
+function siteLink(platform: Platform, campaign: string, content: string, path = ""): string {
   if (platform === "instagram") {
     // No UTM query string here -- untrackable on this platform anyway
     // (see the comment above), so a long tagged URL would just be
@@ -63,7 +72,7 @@ function siteLink(platform: Platform, campaign: string, content: string): string
     // rather than only the "Link in bio" phrase with no URL at all.
     return "🐇 https://matrixsports.net — Link in bio";
   }
-  const url = `https://matrixsports.net/?utm_source=${platform}&utm_medium=social&utm_campaign=${campaign}&utm_content=${content}`;
+  const url = `https://matrixsports.net${path}?utm_source=${platform}&utm_medium=social&utm_campaign=${campaign}&utm_content=${content}`;
   return `🐇 ${url}`;
 }
 
@@ -157,4 +166,37 @@ export function insightCaption(insight: WeeklyInsight, platform: Platform): stri
     "",
     link,
   ].join("\n");
+}
+
+// Cuts at the last whole word inside the limit -- same approach as
+// the home page's truncateTeaser (src/app/page.tsx), duplicated here
+// rather than imported since that one lives in a page component file,
+// not a shared lib.
+function truncateForTease(text: string, maxChars = 150): string {
+  if (text.length <= maxChars) return text;
+  const cut = text.slice(0, maxChars);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${cut.slice(0, lastSpace > 0 ? lastSpace : maxChars)}…`;
+}
+
+// A TEASE, not a recap -- deliberately doesn't restate the article's
+// own numbers beyond the headline and its opening hook. The whole
+// point of this content type is to pull a reader onto the site to
+// read the full 250-300 word breakdown themselves; a caption that
+// already gives the analysis away has no reason for anyone to click
+// through. Every platform links straight to the article's OWN page
+// (/stories/[id]), not the homepage -- the first caption in this file
+// to do that (see siteLink's `path` param) -- since a tease only works
+// if the click lands on the actual piece, not a front page the reader
+// then has to go find it from.
+export function performanceReviewCaption(story: Story, platform: Platform): string {
+  const hook = truncateForTease(story.body);
+  const link = siteLink(
+    platform,
+    "WeeklyModelPerformanceReview",
+    `${story.season}-w${story.week}`,
+    `/stories/${story.id}`
+  );
+
+  return [`📈 ${story.headline}`, "", hook, "", `Read the full breakdown → ${link}`].join("\n");
 }

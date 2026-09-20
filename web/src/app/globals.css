@@ -1736,6 +1736,21 @@ h1.glow span {
   line-height: 1.7;
 }
 
+/* Standalone article page (/stories/[id]) container -- deliberately
+   NOT .about-main/.about-block (the About page's layout): that pair's
+   ".about-block p { color: var(--text-strong) }" rule is MORE specific
+   than ".story-recap-body" alone (one class+element beats one class),
+   so combining them silently overrode the gold recap color with plain
+   body text -- confirmed the actual bug behind a reported "font/spacing
+   looks wrong" report. This class only ever wraps .story-recap directly,
+   the same structure GameRecap (game/[id]/GameDetailView.tsx) already
+   uses, so the two pages render identically. */
+.story-page-main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 clamp(1.25rem, 5vw, 3rem);
+}
+
 .stat-section h2 {
   font-family: 'Chakra Petch', monospace;
   color: var(--text);

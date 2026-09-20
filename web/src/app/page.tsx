@@ -15,7 +15,9 @@ import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
 import ExternalWindowLink from "@/components/ExternalWindowLink";
-import { getPublishedStories, isStoryFeatured } from "@/lib/stories";
+import { getPublishedStories, isStoryFeatured, getLatestPerformanceReview, isPerformanceReviewFeatured } from "@/lib/stories";
+import { getEffectiveNow } from "@/lib/admin";
+import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
 
 // Home-page article cards are teasers, not the full recap -- the
 // 250-300 word body belongs on the game's own page (linked via "View
@@ -212,7 +214,21 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
   const SITE_MAX_SLOTS = 3;
   const recentStories = await getPublishedStories(30);
   const stories = recentStories.filter(isStoryFeatured).slice(0, SITE_MAX_SLOTS);
-  const news = await getEspnNflNews(COVERAGE_SLOTS - stories.length);
+
+  // The weekly performance review, when featured, takes the FIRST slot
+  // in the coverage grid -- ahead of per-game recaps and ESPN -- at the
+  // cost of one ESPN slot (not a per-game recap slot; those keep their
+  // own SITE_MAX_SLOTS cap). Explicitly asked for: "it should be the
+  // first article, you can drop an ESPN article."
+  const effectiveNow = await getEffectiveNow();
+  const latestPerformanceReview = await getLatestPerformanceReview();
+  const performanceReviewFeatured =
+    latestPerformanceReview !== null && isPerformanceReviewFeatured(latestPerformanceReview, effectiveNow);
+  const performanceReviewAccuracyPct = latestPerformanceReview ? accuracyPctFromStory(latestPerformanceReview) : null;
+  const performanceReviewImage =
+    performanceReviewAccuracyPct !== null ? performanceTierImagePath(performanceReviewAccuracyPct) : null;
+
+  const news = await getEspnNflNews(COVERAGE_SLOTS - stories.length - (performanceReviewFeatured ? 1 : 0));
 
   return (
     <>
@@ -262,12 +278,27 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
             </MobileAdFrame>
           </div>
 
-          {(stories.length > 0 || news.length > 0) && (
+          {(performanceReviewFeatured || stories.length > 0 || news.length > 0) && (
             <div className="news-section">
               <div className="section-label">
                 <span className="dot" /> LATEST NFL COVERAGE
               </div>
               <div className="news-grid">
+                {performanceReviewFeatured && latestPerformanceReview && (
+                  <Link className="news-card" href={`/stories/${latestPerformanceReview.id}`}>
+                    {performanceReviewImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className="news-card-image" src={performanceReviewImage} alt="" />
+                    ) : (
+                      <div className="news-card-image news-card-image-fallback">📊</div>
+                    )}
+                    <div className="news-card-body">
+                      <h3>{latestPerformanceReview.headline}</h3>
+                      <p>{truncateTeaser(latestPerformanceReview.body)}</p>
+                      <span className="read-more">Read More →</span>
+                    </div>
+                  </Link>
+                )}
                 {stories.map((story) =>
                   story.universal_game_id ? (
                     <Link key={story.id} className="news-card" href={`/game/${story.universal_game_id}`}>
@@ -335,6 +366,11 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
               <span className="read-more">Read More →</span>
             </Link>
 
+            {/* The real Weekly Model Performance article shows in the
+                LATEST NFL COVERAGE grid above (first slot) once
+                featured -- not duplicated here too. This card stays a
+                placeholder until there's a second insights-style piece
+                to fill it with. */}
             <div className="article-card disabled">
               <div className="thumb">📊</div>
               <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
