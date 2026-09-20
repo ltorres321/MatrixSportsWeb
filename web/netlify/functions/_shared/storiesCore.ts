@@ -159,8 +159,52 @@ export async function finalGamesForWeek(season: number, week: number): Promise<F
   return finalGames;
 }
 
+// Every final game in `season`, across every week -- not gated on the
+// whole week being done. Used by weekly-stories.mts instead of
+// mostRecentFinalWeek()/finalGamesForWeek() so a recap can be
+// generated for an individual game (Sunday afternoon's early slate,
+// say) without waiting on that same week's Sunday/Monday night games
+// to finish too -- explicit ask 2026-09-20: replace a week's recap
+// slots on the home page as games complete, not once a week on a
+// fixed cron. storyAlreadyExists() in the caller's loop is what makes
+// this safe to call every run (already-covered games are just
+// skipped), so there's no need to track "which games are new" here.
+export async function allFinalGamesInSeason(season: number): Promise<FinalGame[]> {
+  const rows = await query<
+    FinalGame & { actual_home_score: number | null; actual_away_score: number | null }
+  >(
+    `SELECT universal_game_id, week, home_team, away_team,
+            actual_home_score, actual_away_score, home_win_probability,
+            expected_home_score, expected_away_score, market_spread_line_current, game_date
+     FROM latest_predictions
+     WHERE season = $1
+     ORDER BY game_date ASC`,
+    [season]
+  );
+
+  const fallback = await theSportsDbFinalScores(season);
+  const finalGames: FinalGame[] = [];
+
+  for (const row of rows) {
+    if (row.actual_home_score !== null && row.actual_away_score !== null) {
+      finalGames.push(row as FinalGame);
+      continue;
+    }
+    const fromFallback = fallback.get(row.universal_game_id);
+    if (fromFallback) {
+      finalGames.push({ ...row, actual_home_score: fromFallback.home, actual_away_score: fromFallback.away });
+    }
+  }
+
+  return finalGames;
+}
+
 // The most recent week in `season` where every game that's kicked off
 // has a real final score -- i.e. "fully done," not "in progress."
+// Kept for src/lib/social/recentCompletedWeek.ts's documented future
+// use (a stricter "whole week done" check for a not-yet-built
+// scheduled poster) even though weekly-stories.mts itself no longer
+// calls this -- see allFinalGamesInSeason() above for why.
 // Returns null if no week that season is fully final yet (e.g. Week 1
 // Sunday afternoon, before Sunday/Monday night games finish). Same
 // DB-first-then-TheSportsDB-fallback reasoning as finalGamesForWeek --
