@@ -21,27 +21,40 @@ export interface Story {
   featured_until: string | null;
 }
 
-// Recaps only stay featured on the home page through 7pm ET on the
-// Tuesday after they publish -- past that, ESPN fills the slot
-// instead of a week-old recap sitting there indefinitely. Every real
-// recap auto-publishes Tuesday ~8am ET (the weekly-stories.mts cron,
-// right after Monday Night wraps), so this normally gives an ~11hr
-// window; the "next Tuesday on/after" logic is what a manually
-// re-published or late-generated story falls back to. Same DST
-// caveat as the cron schedules elsewhere in this codebase (assumes
-// EDT/UTC-4 -- needs manual adjustment for winter/EST). A plain
-// function (not a component), deliberately, so it can call Date.now()
-// without tripping the React Compiler's component-purity lint rule --
-// see page.tsx's history for why that matters here.
+// Recaps only stay featured on the home page through midnight ET at
+// the start of the next Thursday -- past that, ESPN fills the slot
+// instead of a week-old recap sitting there (explicit ask 2026-09-20:
+// a Week 1 recap should be gone before Week 2's Thursday Night
+// Football kicks off, not lingering into Sunday).
+//
+// FIXED 2026-09-20: this used to read the UTC weekday of published_at
+// directly, but publishing happens in ET -- a late-evening ET publish
+// (e.g. ~10pm Tuesday, from a manual run) is already past midnight
+// UTC, so getUTCDay() read it as Wednesday instead of Tuesday. That
+// undercounted "days until Thursday" by a full week, leaving Week 1's
+// recaps featured for 7+ days instead of the intended ~1-2 day
+// window. Fixed by shifting into ET before reading the weekday, same
+// EDT/UTC-4 DST caveat as the cron schedules elsewhere in this
+// codebase (needs manual adjustment for winter/EST).
+//
+// A plain function (not a component), deliberately, so it can call
+// Date.now() without tripping the React Compiler's component-purity
+// lint rule -- see page.tsx's history for why that matters here.
+const ET_OFFSET_HOURS = 4;
+
 export function isStoryFeatured(story: Story): boolean {
   if (!story.published_at) return true;
   const from = new Date(story.published_at);
-  const day = from.getUTCDay(); // Sun=0 .. Tue=2 .. Sat=6
-  const daysUntilTuesday = (2 - day + 7) % 7;
-  const cutoff = new Date(
-    Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + daysUntilTuesday, 23, 0, 0)
+  const etFrom = new Date(from.getTime() - ET_OFFSET_HOURS * 60 * 60 * 1000);
+  const day = etFrom.getUTCDay(); // ET weekday: Sun=0 .. Thu=4 .. Sat=6
+  // "|| 7" rather than allowing 0: a story published ON a Thursday
+  // still gets a real window until the FOLLOWING Thursday, not an
+  // instant (zero-width) cutoff.
+  const daysUntilThursday = (4 - day + 7) % 7 || 7;
+  const cutoffEt = new Date(
+    Date.UTC(etFrom.getUTCFullYear(), etFrom.getUTCMonth(), etFrom.getUTCDate() + daysUntilThursday, 0, 0, 0)
   );
-  if (cutoff.getTime() < from.getTime()) cutoff.setUTCDate(cutoff.getUTCDate() + 7);
+  const cutoff = new Date(cutoffEt.getTime() + ET_OFFSET_HOURS * 60 * 60 * 1000);
   return Date.now() < cutoff.getTime();
 }
 
