@@ -17,6 +17,7 @@ import AdUnit from "@/components/AdUnit";
 import ExternalWindowLink from "@/components/ExternalWindowLink";
 import { getPublishedStories, isStoryFeatured, getLatestPerformanceReview, isPerformanceReviewFeatured } from "@/lib/stories";
 import { getEffectiveNow } from "@/lib/admin";
+import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
 
 // Home-page article cards are teasers, not the full recap -- the
 // 250-300 word body belongs on the game's own page (linked via "View
@@ -223,6 +224,9 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
   const latestPerformanceReview = await getLatestPerformanceReview();
   const performanceReviewFeatured =
     latestPerformanceReview !== null && isPerformanceReviewFeatured(latestPerformanceReview, effectiveNow);
+  const performanceReviewAccuracyPct = latestPerformanceReview ? accuracyPctFromStory(latestPerformanceReview) : null;
+  const performanceReviewImage =
+    performanceReviewAccuracyPct !== null ? performanceTierImagePath(performanceReviewAccuracyPct) : null;
 
   const news = await getEspnNflNews(COVERAGE_SLOTS - stories.length - (performanceReviewFeatured ? 1 : 0));
 
@@ -282,7 +286,12 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
               <div className="news-grid">
                 {performanceReviewFeatured && latestPerformanceReview && (
                   <Link className="news-card" href={`/stories/${latestPerformanceReview.id}`}>
-                    <div className="news-card-image news-card-image-fallback">📊</div>
+                    {performanceReviewImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className="news-card-image" src={performanceReviewImage} alt="" />
+                    ) : (
+                      <div className="news-card-image news-card-image-fallback">📊</div>
+                    )}
                     <div className="news-card-body">
                       <h3>{latestPerformanceReview.headline}</h3>
                       <p>{truncateTeaser(latestPerformanceReview.body)}</p>

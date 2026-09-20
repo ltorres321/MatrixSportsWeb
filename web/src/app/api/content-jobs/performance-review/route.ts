@@ -1,13 +1,13 @@
+import { readFile } from "fs/promises";
+import path from "path";
 import { NextResponse } from "next/server";
 import { isAuthorizedContentJob } from "@/lib/contentJobAuth";
 import { getLatestPerformanceReview } from "@/lib/stories";
 import { performanceReviewCaption, PLATFORMS } from "@/lib/social/captions";
+import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
 
 // Machine-to-machine endpoint for the standalone content-generation
 // jobs in /home/neo/SportsContentCreation -- see contentJobAuth.ts.
-// Deliberately text-only (no image, unlike spotlight/recap) -- this
-// content type was only ever asked to produce post captions, not a
-// rendered card.
 //
 // Only ever returns a PUBLISHED review -- SportsLLM (a separate repo)
 // writes these as drafts; a story sitting unreviewed at
@@ -27,11 +27,25 @@ export async function GET(request: Request) {
     PLATFORMS.map((p) => [p, performanceReviewCaption(story, p)])
   ) as Record<(typeof PLATFORMS)[number], string>;
 
+  // One of the three tier images (public/assets/icons/), same one the
+  // article page itself shows -- read straight off disk and
+  // base64-encoded, same shape spotlight/recap already return
+  // (imageBase64), so SportsContentCreation's job can use the same
+  // writePostFolder() as those instead of a text-only variant.
+  const accuracyPct = accuracyPctFromStory(story);
+  let imageBase64: string | null = null;
+  if (accuracyPct !== null) {
+    const imagePath = performanceTierImagePath(accuracyPct);
+    const fileBuffer = await readFile(path.join(process.cwd(), "public", imagePath));
+    imageBase64 = fileBuffer.toString("base64");
+  }
+
   return NextResponse.json({
     storyId: story.id,
     season: story.season,
     week: story.week,
     headline: story.headline,
     captions,
+    imageBase64,
   });
 }

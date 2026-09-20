@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoryById } from "@/lib/stories";
+import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
 
 // Standalone article page for a story with no universal_game_id (a
 // weekly performance review, not a per-game recap -- see
@@ -16,10 +17,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const story = await getStoryById(id);
   if (!story) return {};
 
+  const accuracyPct = accuracyPctFromStory(story);
+  const image = accuracyPct !== null ? performanceTierImagePath(accuracyPct) : undefined;
+
   return {
     title: `${story.headline} | Matrix Sports Analytics`,
     description: story.body.slice(0, 200),
-    twitter: { card: "summary_large_image" },
+    openGraph: image ? { images: [{ url: image, width: 1774, height: 887 }] } : undefined,
+    twitter: { card: "summary_large_image", images: image ? [image] : undefined },
   };
 }
 
@@ -29,6 +34,8 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   if (!story) notFound();
 
   const published = story.published_at ? new Date(story.published_at) : null;
+  const accuracyPct = accuracyPctFromStory(story);
+  const heroImage = accuracyPct !== null ? performanceTierImagePath(accuracyPct) : null;
 
   return (
     <>
@@ -42,6 +49,17 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
       </header>
 
       <main className="about-main">
+        {heroImage && (
+          // eslint-disable-next-line @next/next/no-img-element -- a
+          // static designer-provided asset, not something next/image
+          // needs to optimize per-request.
+          <img
+            src={heroImage}
+            alt=""
+            style={{ width: "100%", maxWidth: "100%", borderRadius: "12px", marginBottom: "2rem" }}
+          />
+        )}
+
         <section className="about-block story-recap">
           {story.body.split("\n").map((paragraph, i) => (
             <p key={i} className="story-recap-body" style={{ marginTop: i === 0 ? 0 : "1rem" }}>
