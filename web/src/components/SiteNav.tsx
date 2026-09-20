@@ -19,6 +19,8 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
   return (
     <nav className="navbar">
       <Link className="brand" href="/" onClick={close}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- fixed brand asset, next/image adds no benefit here */}
+        <img className="brand-logo" src="/assets/brand/mx-logo.png" alt="" width={32} height={32} />
         MATRIX<span>SPORTS</span>
         <span className="brand-tld">.NET</span>
       </Link>
