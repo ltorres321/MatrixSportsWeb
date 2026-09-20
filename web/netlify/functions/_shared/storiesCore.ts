@@ -119,6 +119,47 @@ export interface FinalGame {
   game_date: Date;
 }
 
+// SportsAnalytics reruns its model hourly, including for games that
+// have already kicked off, so latest_predictions' own projection
+// fields (home_win_probability, expected_home_score,
+// expected_away_score, market_spread_line_current) drift toward the
+// real outcome after the fact -- same root cause src/lib/predictions.ts
+// was fixed for (see its getFrozenProjectionsForWeek comment).
+// Confirmed live 2026-09-20: a recap claimed a "99% win probability"
+// for a team the model actually favored at 58% pregame, because
+// buildGameFacts() was reading straight off latest_predictions here.
+// This file can't import predictions.ts ("server-only" is a Next.js-
+// bundler-only marker, see this file's header comment), so the same
+// freeze is duplicated rather than shared: for any of `games` that has
+// one, swap in the LAST row generated_at at or before that game's own
+// game_date -- the real last pregame prediction -- for every
+// projection field. Falls back to the row's own value when no
+// pre-kickoff row exists at all.
+async function freezeProjections<T extends FinalGame>(games: T[]): Promise<T[]> {
+  if (games.length === 0) return games;
+  const rows = await query<{
+    universal_game_id: string;
+    home_win_probability: number;
+    expected_home_score: number;
+    expected_away_score: number;
+    market_spread_line_current: number;
+  }>(
+    `SELECT DISTINCT ON (universal_game_id) universal_game_id,
+            home_win_probability, expected_home_score, expected_away_score,
+            market_spread_line_current
+     FROM predictions
+     WHERE universal_game_id = ANY($1) AND generated_at <= game_date
+     ORDER BY universal_game_id, generated_at DESC`,
+    [games.map((g) => g.universal_game_id)]
+  );
+  const frozen = new Map(rows.map((r) => [r.universal_game_id, r]));
+
+  return games.map((g) => {
+    const f = frozen.get(g.universal_game_id);
+    return f ? { ...g, ...f } : g;
+  });
+}
+
 // Every game in `week` that has a real final score -- from the DB
 // when SportsAnalytics has already written it back to
 // latest_predictions, falling back to theSportsDbFinalScores()
@@ -156,7 +197,7 @@ export async function finalGamesForWeek(season: number, week: number): Promise<F
     }
   }
 
-  return finalGames;
+  return freezeProjections(finalGames);
 }
 
 // Every final game in `season`, across every week -- not gated on the
@@ -196,7 +237,7 @@ export async function allFinalGamesInSeason(season: number): Promise<FinalGame[]
     }
   }
 
-  return finalGames;
+  return freezeProjections(finalGames);
 }
 
 // The most recent week in `season` where every game that's kicked off
