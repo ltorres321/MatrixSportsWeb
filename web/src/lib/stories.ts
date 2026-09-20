@@ -39,6 +39,30 @@ export function isStoryFeatured(story: Story): boolean {
   return Date.now() < cutoff.getTime();
 }
 
+// Same idea as isStoryFeatured, but for the weekly performance-review
+// article (universal_game_id IS NULL), which runs on its own cadence:
+// SportsLLM's job runs Tuesday 8am ET, but the story still needs
+// manual approval at /admin/stories before published_at is set -- so
+// this stays featured through 6pm ET the THURSDAY after it actually
+// goes live, not a fixed number of hours after Tuesday. Explicitly
+// asked for by the user ("as a feature article on the site until
+// Thursday 6PM") rather than mirroring isStoryFeatured's Tuesday
+// window, since this content's whole cadence (weekly cycle, review
+// gate) is different from the per-game recap's same-day auto-publish.
+// Same DST caveat as every other ET-based schedule in this codebase
+// (assumes EDT/UTC-4 -- needs manual adjustment for winter/EST).
+export function isPerformanceReviewFeatured(story: Story): boolean {
+  if (!story.published_at) return true;
+  const from = new Date(story.published_at);
+  const day = from.getUTCDay(); // Sun=0 .. Thu=4 .. Sat=6
+  const daysUntilThursday = (4 - day + 7) % 7;
+  const cutoff = new Date(
+    Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + daysUntilThursday, 22, 0, 0) // 6pm ET = 22:00 UTC (EDT)
+  );
+  if (cutoff.getTime() < from.getTime()) cutoff.setUTCDate(cutoff.getUTCDate() + 7);
+  return Date.now() < cutoff.getTime();
+}
+
 // Newest first, no admin gate -- this is what the public site reads.
 export async function getPublishedStories(limit = 6): Promise<Story[]> {
   return query<Story>(
@@ -57,6 +81,36 @@ export async function getStoryForGame(universalGameId: string): Promise<Story | 
     `SELECT id, season, week, universal_game_id, headline, body, source_facts, status, created_at, published_at
      FROM stories WHERE universal_game_id = $1 AND status = 'published' LIMIT 1`,
     [universalGameId]
+  );
+  return rows[0] ?? null;
+}
+
+// A single published story by id, regardless of whether it's tied to
+// a game -- what the standalone article page (/stories/[id]) reads.
+// No admin gate (public page), but still 'published'-only: a draft
+// awaiting approval at /admin/stories must not be reachable by a
+// direct link either.
+export async function getStoryById(id: string): Promise<Story | null> {
+  const rows = await query<Story>(
+    `SELECT id, season, week, universal_game_id, headline, body, source_facts, status, created_at, published_at
+     FROM stories WHERE id = $1 AND status = 'published' LIMIT 1`,
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
+// The most recent published weekly performance-review story -- the
+// one kind of story with universal_game_id IS NULL (every per-game
+// recap always has one, so this is an unambiguous discriminator, not
+// a new column). What the home page's "Weekly Model Performance" card
+// and the /api/content-jobs/performance-review social-caption job both
+// read. Written by SportsLLM (a separate repo) as a 'draft'; only
+// becomes visible here once approved at /admin/stories.
+export async function getLatestPerformanceReview(): Promise<Story | null> {
+  const rows = await query<Story>(
+    `SELECT id, season, week, universal_game_id, headline, body, source_facts, status, created_at, published_at
+     FROM stories WHERE universal_game_id IS NULL AND status = 'published'
+     ORDER BY published_at DESC LIMIT 1`
   );
   return rows[0] ?? null;
 }

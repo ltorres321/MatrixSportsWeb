@@ -15,7 +15,7 @@ import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
 import ExternalWindowLink from "@/components/ExternalWindowLink";
-import { getPublishedStories, isStoryFeatured } from "@/lib/stories";
+import { getPublishedStories, isStoryFeatured, getLatestPerformanceReview, isPerformanceReviewFeatured } from "@/lib/stories";
 
 // Home-page article cards are teasers, not the full recap -- the
 // 250-300 word body belongs on the game's own page (linked via "View
@@ -214,6 +214,10 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
   const stories = recentStories.filter(isStoryFeatured).slice(0, SITE_MAX_SLOTS);
   const news = await getEspnNflNews(COVERAGE_SLOTS - stories.length);
 
+  const latestPerformanceReview = await getLatestPerformanceReview();
+  const performanceReviewFeatured =
+    latestPerformanceReview !== null && isPerformanceReviewFeatured(latestPerformanceReview);
+
   return (
     <>
       <header className="site-header">
@@ -335,18 +339,27 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
               <span className="read-more">Read More →</span>
             </Link>
 
-            <div className="article-card disabled">
-              <div className="thumb">📊</div>
-              <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
-                COMING SOON
-              </span>
-              <h3>Weekly Model Performance</h3>
-              <p>
-                A running look at how the model&apos;s calls have tracked against
-                real results across the season so far -- not just one game, the
-                whole body of work.
-              </p>
-            </div>
+            {performanceReviewFeatured && latestPerformanceReview ? (
+              <Link className="article-card" href={`/stories/${latestPerformanceReview.id}`}>
+                <div className="thumb">📊</div>
+                <h3>{latestPerformanceReview.headline}</h3>
+                <p>{truncateTeaser(latestPerformanceReview.body)}</p>
+                <span className="read-more">Read More →</span>
+              </Link>
+            ) : (
+              <div className="article-card disabled">
+                <div className="thumb">📊</div>
+                <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+                  COMING SOON
+                </span>
+                <h3>Weekly Model Performance</h3>
+                <p>
+                  A running look at how the model&apos;s calls have tracked against
+                  real results across the season so far -- not just one game, the
+                  whole body of work.
+                </p>
+              </div>
+            )}
 
             <div className="article-card disabled">
               <div className="thumb">🏈</div>
