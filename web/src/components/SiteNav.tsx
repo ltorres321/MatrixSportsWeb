@@ -65,6 +65,9 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
             <Link href="/admin/stories" onClick={close}>
               Admin: Stories
             </Link>
+            <Link href="/admin/social" onClick={close}>
+              Admin: Social
+            </Link>
           </>
         )}
       </div>
