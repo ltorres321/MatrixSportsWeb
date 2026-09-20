@@ -5,13 +5,6 @@ import { headers } from "next/headers";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const TEAM_ALIASES = new Set([
-  "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN",
-  "DET", "GB", "HOU", "IND", "JAX", "KC", "LAC", "LAR", "LV", "MIA",
-  "MIN", "NE", "NO", "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB",
-  "TEN", "WAS",
-]);
-
 export type SignupState = {
   formError?: string;
   fieldErrors?: Record<string, string>;
@@ -32,8 +25,6 @@ export async function signup(
   const email = str(formData, "email").toLowerCase();
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
-  const favoriteTeamRaw = str(formData, "favoriteTeam");
-  const favoriteTeam = TEAM_ALIASES.has(favoriteTeamRaw) ? favoriteTeamRaw : null;
 
   const fieldErrors: Record<string, string> = {};
   if (!firstName) fieldErrors.firstName = "Required";
@@ -62,7 +53,6 @@ export async function signup(
         first_name: firstName,
         middle_name: middleName,
         last_name: lastName,
-        favorite_team: favoriteTeam,
       },
     },
   });

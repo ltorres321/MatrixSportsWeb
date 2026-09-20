@@ -3,7 +3,6 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { signup, type SignupState } from "./actions";
-import { TEAMS } from "@/lib/teams";
 import SocialSignInButtons from "@/components/SocialSignInButtons";
 
 const initialState: SignupState = {};
@@ -89,20 +88,6 @@ export default function SignupPage() {
                 <label htmlFor="confirmPassword">Confirm Password</label>
                 <input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" className={errors.confirmPassword ? "invalid" : ""} />
                 <div className="error-msg">{errors.confirmPassword}</div>
-              </div>
-
-              <div className="field full">
-                <label htmlFor="favoriteTeam">
-                  Favorite Team <span className="optional-tag">(optional)</span>
-                </label>
-                <select id="favoriteTeam" name="favoriteTeam" defaultValue="">
-                  <option value="">No preference</option>
-                  {TEAMS.map((team) => (
-                    <option key={team.alias} value={team.alias}>
-                      {team.market} {team.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <p className="form-footer-note">
