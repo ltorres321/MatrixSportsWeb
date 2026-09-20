@@ -26,36 +26,43 @@ export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "linkedin_com
 // format, and Facebook/Instagram/X's in-app browsers often strip or
 // generic-ize the referrer even when a link IS clickable elsewhere.
 //
-// utm_medium reflects how the link was actually delivered, not a fixed
-// value -- "bio" only for Instagram (the only platform where a click
-// can ONLY happen via the profile bio link, since IG captions are
-// never clickable); "social" for everywhere else, since the link
-// sits directly in the post itself. Using "bio" for all of them (an
-// earlier version of this) was wrong: it made every platform's data
-// look like it came from a profile-bio click even when it didn't.
+// Instagram gets NO url at all here, just plain "Link in bio" text --
+// its caption is never clickable regardless of format, and its bio
+// link is one static URL shared by every post, so there's no real
+// click to attribute to a specific game/week even if a tagged URL
+// were shown. Putting a per-post UTM-tagged link in Instagram's
+// caption text would be pure theater: it implies tracking precision
+// (which post drove this click) that doesn't exist for that platform.
+// Real Instagram attribution is aggregate-only, via the separately
+// (manually) set bio link -- see the note below.
 //
-// utm_campaign is the CONTENT TYPE ("premier_game", "weekly_recap",
-// "weekly_insight" -- passed in by each caption function below), not
-// a static label -- that's accurate for every platform (it describes
-// what the post IS, not how the link got delivered) and, unlike a
-// fixed string, sets up a real comparison later: once more than one
-// content type is actually posting, GA can show which one drives more
-// traffic.
+// For every other platform:
+// - utm_medium is "social" -- the link sits directly in the post.
+// - utm_campaign is the CONTENT TYPE ("premier_game", "weekly_recap",
+//   "weekly_insight" -- passed in by each caption function below),
+//   not a static label -- accurate for every platform (it describes
+//   what the post IS) and sets up a content-type comparison once more
+//   than one type is posting regularly.
+// - utm_content identifies the SPECIFIC matchup/week this exact post
+//   is about (team aliases for a single-game post, "{season}-w{week}"
+//   for a whole-week recap) -- this is what actually lets a later GA
+//   report answer "did the Chiefs-Broncos post outperform the
+//   Cardinals-Chargers one," not just "which platform."
 //
 // The profile BIO LINKS themselves (set manually on each platform,
 // not generated here) correctly keep utm_medium=bio&utm_campaign=
 // link_in_bio -- that combination genuinely describes those, just not
-// a per-post caption link.
-//
-// "Link in Bio!!!" is prepended for Instagram only -- that's an
-// Instagram-specific convention that exists because ITS caption links
-// are never clickable; on Facebook/X/LinkedIn the link right here IS
-// clickable, so telling someone to go hunt for it in the bio instead
-// would just add friction.
-function siteLink(platform: Platform, campaign: string): string {
-  const medium = platform === "instagram" ? "bio" : "social";
-  const url = `https://matrixsports.net/?utm_source=${platform}&utm_medium=${medium}&utm_campaign=${campaign}`;
-  return platform === "instagram" ? `(Link in Bio!!!) 🐇 ${url}` : `🐇 ${url}`;
+// a per-post caption link, and they have no utm_content since one bio
+// link is shared across every post.
+function siteLink(platform: Platform, campaign: string, content: string): string {
+  if (platform === "instagram") return "Link in bio";
+  const url = `https://matrixsports.net/?utm_source=${platform}&utm_medium=social&utm_campaign=${campaign}&utm_content=${content}`;
+  return `🐇 ${url}`;
+}
+
+// "MIA-SF" style identifier for a single matchup's utm_content.
+function matchupContent(matchup: Matchup): string {
+  return `${matchup.teamA.alias}-${matchup.teamB.alias}`.toLowerCase();
 }
 
 export function spotlightCaption(matchup: Matchup, platform: Platform): string {
@@ -70,7 +77,7 @@ export function spotlightCaption(matchup: Matchup, platform: Platform): string {
     "",
     probLine,
     "",
-    `Full breakdown, free → ${siteLink(platform, "premier_game")}`,
+    `Full breakdown, free → ${siteLink(platform, "premier_game", matchupContent(matchup))}`,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -114,7 +121,7 @@ export function recapCaption(season: number, week: number, matchups: Matchup[], 
     "",
     `${record.total} game${record.total === 1 ? "" : "s"}, ${season} season.`,
     "",
-    `See every pick → ${siteLink(platform, "weekly_recap")}`
+    `See every pick → ${siteLink(platform, "weekly_recap", `${season}-w${week}`)}`
   );
   return lines.join("\n");
 }
@@ -122,7 +129,7 @@ export function recapCaption(season: number, week: number, matchups: Matchup[], 
 export function insightCaption(insight: WeeklyInsight, platform: Platform): string {
   const { matchup } = insight;
   const matchupLine = `${teamDisplay(matchup.teamA.alias)} ${matchup.teamA.score} — ${matchup.teamB.score} ${teamDisplay(matchup.teamB.alias)}`;
-  const link = siteLink(platform, "weekly_insight");
+  const link = siteLink(platform, "weekly_insight", matchupContent(matchup));
 
   if (insight.kind === "bestPick") {
     return [
