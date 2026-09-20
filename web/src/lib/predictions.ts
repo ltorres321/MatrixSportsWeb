@@ -86,6 +86,100 @@ const PREDICTION_COLUMNS = `
   total_over_market, total_under_market
 `;
 
+// Every field the model actually "predicts," as opposed to
+// identity/outcome fields (id, teams, game_date, actual_*) that are
+// never frozen.
+type ProjectionFields = Pick<
+  PredictionRow,
+  | "market_spread_line_current"
+  | "market_total_line_current"
+  | "home_win_probability"
+  | "expected_home_score"
+  | "expected_away_score"
+  | "margin_p05"
+  | "margin_p25"
+  | "margin_p50"
+  | "margin_p75"
+  | "margin_p95"
+  | "margin_bucket_lost_or_tied"
+  | "margin_bucket_won_1_3"
+  | "margin_bucket_won_4_7"
+  | "margin_bucket_won_8_14"
+  | "margin_bucket_won_15_21"
+  | "margin_bucket_won_21_plus"
+  | "total_over_30"
+  | "total_over_40"
+  | "total_over_44"
+  | "total_over_48"
+  | "total_over_52"
+  | "total_under_30"
+  | "total_under_40"
+  | "total_under_44"
+  | "total_under_48"
+  | "total_under_52"
+  | "total_over_market"
+  | "total_under_market"
+>;
+
+const PROJECTION_COLUMNS = `
+  market_spread_line_current, market_total_line_current,
+  home_win_probability, expected_home_score, expected_away_score,
+  margin_p05, margin_p25, margin_p50, margin_p75, margin_p95,
+  margin_bucket_lost_or_tied, margin_bucket_won_1_3, margin_bucket_won_4_7,
+  margin_bucket_won_8_14, margin_bucket_won_15_21, margin_bucket_won_21_plus,
+  total_over_30, total_over_40, total_over_44, total_over_48, total_over_52,
+  total_under_30, total_under_40, total_under_44, total_under_48, total_under_52,
+  total_over_market, total_under_market
+`;
+
+// SportsAnalytics reruns its model HOURLY, including for games that
+// have already kicked off -- so latest_predictions' own projection
+// fields (win probability, expected score, market line, margin
+// buckets, totals) silently drift toward the real outcome after the
+// fact. Confirmed 2026-09-20: a blowout's "expected score" had been
+// overwritten to 6.5-37.0 (the real final was 3-34), and its "market
+// spread" to an impossible -30.5 -- neither is what the model
+// actually said before the game, yet latest_predictions has no
+// concept of "before" vs "after," just "most recent."
+//
+// Once a game's kickoff has passed, every projection field must
+// instead come from the LAST row the full (append-only) predictions
+// history has with generated_at at or before that game's own
+// game_date -- i.e. what the model genuinely said last, before it
+// could have known the outcome. actual_home_score/actual_away_score
+// are deliberately NOT part of this: the real result is supposed to
+// update after the fact (see resolveGameState).
+async function getFrozenProjectionsForWeek(
+  season: number,
+  week: number
+): Promise<Map<string, ProjectionFields>> {
+  const rows = await query<{ universal_game_id: string } & ProjectionFields>(
+    `SELECT DISTINCT ON (universal_game_id) universal_game_id, ${PROJECTION_COLUMNS}
+     FROM predictions
+     WHERE season = $1 AND week = $2 AND generated_at <= game_date
+     ORDER BY universal_game_id, generated_at DESC`,
+    [season, week]
+  );
+  return new Map(rows.map((r) => [r.universal_game_id, r]));
+}
+
+async function getFrozenProjection(universalGameId: string): Promise<ProjectionFields | undefined> {
+  const rows = await query<ProjectionFields>(
+    `SELECT ${PROJECTION_COLUMNS} FROM predictions
+     WHERE universal_game_id = $1 AND generated_at <= game_date
+     ORDER BY generated_at DESC LIMIT 1`,
+    [universalGameId]
+  );
+  return rows[0];
+}
+
+// Falls back to the row's own (possibly drifted) values when no
+// pre-kickoff row exists at all -- better to show something than to
+// blank out a game the model only ever predicted after it started.
+function withFrozenProjections(row: PredictionRow, frozen: ProjectionFields | undefined): PredictionRow {
+  return frozen ? { ...row, ...frozen } : row;
+}
+
 // NFL seasons span two calendar years -- "the current season" is this
 // year from Sept through Dec, then still-last-year's season Jan/Feb.
 //
@@ -541,6 +635,18 @@ export async function getMatchupsForSeasonWeek(
   );
   const records = await getTeamRecords(season, week);
   const priorProbabilities = await fetchPriorHomeWinProbabilities(season, week);
+  const frozenProjections = await getFrozenProjectionsForWeek(season, week);
+  const now = await getEffectiveNow();
+  // Once kickoff has passed, always show the frozen pre-kickoff
+  // prediction (see getFrozenProjectionsForWeek) instead of whatever
+  // the hourly rerun currently says, and drop the trending arrow --
+  // there's no more "the number is moving" story to tell once the
+  // number is frozen.
+  const hasKickedOff = (gameDate: Date) => gameDate.getTime() <= now.getTime();
+  const effectiveRow = (row: PredictionRow): PredictionRow =>
+    hasKickedOff(row.game_date) ? withFrozenProjections(row, frozenProjections.get(row.universal_game_id)) : row;
+  const effectivePriorProb = (row: PredictionRow): number | undefined =>
+    hasKickedOff(row.game_date) ? undefined : priorProbabilities.get(row.universal_game_id);
   const predicted = new Map(rows.map((row) => [row.universal_game_id, { row, date: row.game_date }]));
 
   // Only fetches for the current/future season -- live status is
@@ -579,10 +685,10 @@ export async function getMatchupsForSeasonWeek(
           ? {
               date: predictedEntry.date,
               matchup: rowToMatchup(
-                predictedEntry.row,
+                effectiveRow(predictedEntry.row),
                 records,
                 live,
-                priorProbabilities.get(g.universal_game_id),
+                effectivePriorProb(predictedEntry.row),
                 scheduleFinal
               ),
             }
@@ -595,7 +701,7 @@ export async function getMatchupsForSeasonWeek(
     if (seen.has(id)) continue;
     combined.push({
       date,
-      matchup: rowToMatchup(row, records, liveFor(row.away_team, row.home_team), priorProbabilities.get(id)),
+      matchup: rowToMatchup(effectiveRow(row), records, liveFor(row.away_team, row.home_team), effectivePriorProb(row)),
     });
   }
 
@@ -676,12 +782,26 @@ async function getPremierCandidates(season: number, week: number): Promise<Premi
      WHERE season = $1 AND week = $2`,
     [season, week]
   );
+
+  // Same freeze as getMatchupsForSeasonWeek/getGameDetail -- this
+  // picks and displays a confidence percentage too, so it's just as
+  // exposed to the hourly rerun drifting a past-kickoff game's
+  // probability toward the real outcome (this only actually bites
+  // when every game in the week has already ended and the fallback at
+  // the bottom of getPremierGame below has to pick one anyway).
+  const frozenProjections = await getFrozenProjectionsForWeek(season, week);
+  const now = await getEffectiveNow();
+  const effectiveProb = (r: { universal_game_id: string; game_date: Date; home_win_probability: number }): number =>
+    r.game_date.getTime() <= now.getTime()
+      ? (frozenProjections.get(r.universal_game_id)?.home_win_probability ?? r.home_win_probability)
+      : r.home_win_probability;
+
   const predictedById = new Map(predictionRows.map((r) => [r.universal_game_id, r]));
 
   if (!(await isScheduleEnabledSeason(season))) {
     // Fully historical season -- no external schedule call needed,
     // every game here is guaranteed to already have a real prediction.
-    return predictionRows;
+    return predictionRows.map((r) => ({ ...r, home_win_probability: effectiveProb(r) }));
   }
 
   const candidates: PremierCandidate[] = [];
@@ -694,7 +814,7 @@ async function getPremierCandidates(season: number, week: number): Promise<Premi
       game_date: g.game_date,
       home_team: g.home_team,
       away_team: g.away_team,
-      home_win_probability: pred?.home_win_probability,
+      home_win_probability: pred ? effectiveProb(pred) : undefined,
       actual_home_score: pred?.actual_home_score ?? g.actual_home_score,
       actual_away_score: pred?.actual_away_score ?? g.actual_away_score,
       scheduleFinal: g.final,
@@ -703,7 +823,7 @@ async function getPremierCandidates(season: number, week: number): Promise<Premi
   // A predicted game the schedule feed doesn't (yet) know about --
   // shouldn't normally happen, but keep it rather than silently drop it.
   for (const r of predictionRows) {
-    if (!seen.has(r.universal_game_id)) candidates.push(r);
+    if (!seen.has(r.universal_game_id)) candidates.push({ ...r, home_win_probability: effectiveProb(r) });
   }
   return candidates;
 }
@@ -948,7 +1068,15 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
      ORDER BY generated_at DESC OFFSET 1 LIMIT 1`,
     [universalGameId]
   );
-  const priorHomeWinProbability = priorRows[0]?.home_win_probability;
+
+  // Same freeze as getMatchupsForSeasonWeek -- once kickoff has
+  // passed, always show the last pre-kickoff prediction instead of
+  // whatever the hourly rerun currently says, and drop the trending
+  // arrow (see getFrozenProjectionsForWeek's comment for why).
+  const now = await getEffectiveNow();
+  const kickedOff = row.game_date.getTime() <= now.getTime();
+  const effectiveRow = kickedOff ? withFrozenProjections(row, await getFrozenProjection(universalGameId)) : row;
+  const priorHomeWinProbability = kickedOff ? undefined : priorRows[0]?.home_win_probability;
 
   // Same last-resort fallback as getMatchupsForSeasonWeek -- see
   // resolveGameState's comment for why this is needed at all (ESPN's
@@ -960,7 +1088,7 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
       ? { home: scheduled.actual_home_score, away: scheduled.actual_away_score }
       : undefined;
 
-  const game = rowToGameStat(row, records, live ?? undefined, priorHomeWinProbability, scheduleFinal);
+  const game = rowToGameStat(effectiveRow, records, live ?? undefined, priorHomeWinProbability, scheduleFinal);
   const premier = await getPremierGame(row.season, row.week);
   if (premier && premier.id === row.universal_game_id) {
     game.premier = true;
