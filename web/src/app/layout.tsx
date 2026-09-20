@@ -13,6 +13,17 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://matrixsports.net"),
   title: "Matrix Sports Analytics",
   description: "AI-simulated NFL win probabilities.",
+  openGraph: {
+    title: "Matrix Sports Analytics",
+    description: "AI-simulated NFL win probabilities.",
+    images: [{ url: "/assets/brand/og-image.png", width: 1200, height: 627 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Matrix Sports Analytics",
+    description: "AI-simulated NFL win probabilities.",
+    images: ["/assets/brand/og-image.png"],
+  },
 };
 
 // Appearance (theme, rain effect) is a per-account preference set on
