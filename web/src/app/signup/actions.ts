@@ -32,14 +32,8 @@ export async function signup(
   const email = str(formData, "email").toLowerCase();
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
-  const cell = str(formData, "cell") || null;
-  const address = str(formData, "address") || null;
-  const city = str(formData, "city") || null;
-  const state = str(formData, "state") || null;
-  const zip = str(formData, "zip") || null;
   const favoriteTeamRaw = str(formData, "favoriteTeam");
   const favoriteTeam = TEAM_ALIASES.has(favoriteTeamRaw) ? favoriteTeamRaw : null;
-  const notifyWinProb = formData.get("notify") === "on";
 
   const fieldErrors: Record<string, string> = {};
   if (!firstName) fieldErrors.firstName = "Required";
@@ -47,8 +41,6 @@ export async function signup(
   if (!email || !EMAIL_RE.test(email)) fieldErrors.email = "Enter a valid email";
   if (password.length < 8) fieldErrors.password = "At least 8 characters";
   if (password !== confirmPassword) fieldErrors.confirmPassword = "Passwords don't match";
-  if (notifyWinProb && !cell) fieldErrors.cell = "Cell number required for text notifications";
-  if (zip && !/^\d{5}(-\d{4})?$/.test(zip)) fieldErrors.zip = "Use ZIP or ZIP+4 format";
 
   if (Object.keys(fieldErrors).length > 0) {
     return { fieldErrors };
@@ -70,13 +62,7 @@ export async function signup(
         first_name: firstName,
         middle_name: middleName,
         last_name: lastName,
-        cell,
-        address,
-        city,
-        state,
-        zip,
         favorite_team: favoriteTeam,
-        notify_win_prob: notifyWinProb,
       },
     },
   });

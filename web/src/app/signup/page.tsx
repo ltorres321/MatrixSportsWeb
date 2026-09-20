@@ -10,7 +10,6 @@ const initialState: SignupState = {};
 
 export default function SignupPage() {
   const [state, formAction, pending] = useActionState(signup, initialState);
-  const [notifyChecked, setNotifyChecked] = useState(false);
 
   const errors = state.fieldErrors ?? {};
 
@@ -93,38 +92,6 @@ export default function SignupPage() {
               </div>
 
               <div className="field full">
-                <label htmlFor="cell">
-                  Cell Number{" "}
-                  {!notifyChecked && <span className="optional-tag">(optional)</span>}
-                </label>
-                <input id="cell" name="cell" type="tel" autoComplete="tel" placeholder="(555) 555-5555" className={errors.cell ? "invalid" : ""} />
-                <div className="error-msg">{errors.cell}</div>
-              </div>
-
-              <div className="field full">
-                <label htmlFor="address">
-                  Address <span className="optional-tag">(optional)</span>
-                </label>
-                <input id="address" name="address" autoComplete="street-address" placeholder="123 Main St" />
-              </div>
-
-              <div className="field">
-                <label htmlFor="city">City</label>
-                <input id="city" name="city" autoComplete="address-level2" />
-              </div>
-
-              <div className="field">
-                <label htmlFor="state">State</label>
-                <input id="state" name="state" autoComplete="address-level1" maxLength={2} placeholder="CA" />
-              </div>
-
-              <div className="field full">
-                <label htmlFor="zip">Zip Code</label>
-                <input id="zip" name="zip" autoComplete="postal-code" inputMode="numeric" maxLength={10} className={errors.zip ? "invalid" : ""} />
-                <div className="error-msg">{errors.zip}</div>
-              </div>
-
-              <div className="field full">
                 <label htmlFor="favoriteTeam">
                   Favorite Team <span className="optional-tag">(optional)</span>
                 </label>
@@ -138,26 +105,10 @@ export default function SignupPage() {
                 </select>
               </div>
 
-              <div className="checkbox-row">
-                <input
-                  type="checkbox"
-                  id="notify"
-                  name="notify"
-                  checked={notifyChecked}
-                  onChange={(e) => setNotifyChecked(e.target.checked)}
-                />
-                <label htmlFor="notify">
-                  Notify me when my favorite team&apos;s win probability changes
-                  <span className="sub">Requires a cell number above so we can text you.</span>
-                </label>
-              </div>
-
               <p className="form-footer-note">
                 By signing up you agree to receive account-related email and
                 to our <Link href="/terms">Terms of Service</Link> and{" "}
-                <Link href="/privacy">Privacy Policy</Link>. Text
-                notifications are opt-in only and sent solely for the alert
-                above.
+                <Link href="/privacy">Privacy Policy</Link>.
               </p>
 
               <div className="field full">
