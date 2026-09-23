@@ -24,6 +24,25 @@ export function performanceTierImagePath(accuracyPct: number): string {
   return TIER_IMAGE_PATH[performanceTier(accuracyPct)];
 }
 
+// 1080x1080 companion to each tier image above -- the source PNGs are
+// ~2:1 (designed for the article page/og-image), so a plain center
+// square crop clips the "WEEKLY PERFORMANCE" wordmark on both sides
+// (confirmed 2026-09-23: exactly what Instagram's own crop UI did to
+// it). These are pre-composited instead (full image letterboxed over
+// a blurred/darkened copy of itself, never cropped) -- same role the
+// spotlight/recap templates' own image_ig.png plays, just pre-baked
+// here since this source is a static designer asset, not something
+// rendered per-request.
+const TIER_IMAGE_SQUARE_PATH: Record<PerformanceTier, string> = {
+  rough: "/assets/icons/ModelPerformaceImage_MX_0-64_square.png",
+  solid: "/assets/icons/ModelPerformaceImage_MX_65-86_square.png",
+  gold: "/assets/icons/ModelPerformaceImage_MX_87-100_square.png",
+};
+
+export function performanceTierSquareImagePath(accuracyPct: number): string {
+  return TIER_IMAGE_SQUARE_PATH[performanceTier(accuracyPct)];
+}
+
 // Pulls straight_up_accuracy back out of a performance-review story's
 // source_facts (WeeklyPerformanceFacts, written by SportsLLM) -- that
 // column is untyped JSONB (Record<string, unknown>) from this repo's
