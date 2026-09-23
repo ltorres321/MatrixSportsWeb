@@ -44,6 +44,9 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
         <Link href="/home" onClick={close}>
           Predictions
         </Link>
+        <Link href="/stories" onClick={close}>
+          Recaps
+        </Link>
         <Link href="/about" onClick={close}>
           About
         </Link>

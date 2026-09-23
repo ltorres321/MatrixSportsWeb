@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedContentJob } from "@/lib/contentJobAuth";
-import { getCurrentSpotlightMatchup } from "@/lib/social/currentSpotlight";
+import { getCurrentSpotlightMatchup, getSpotlightMatchupById } from "@/lib/social/currentSpotlight";
 import { renderSpotlightCard, renderSpotlightCardSquare } from "@/lib/social/renderSpotlightCard";
 import { spotlightCaption, PLATFORMS } from "@/lib/social/captions";
 
@@ -28,9 +28,19 @@ export async function GET(request: Request) {
     return new NextResponse("Not authorized", { status: 403 });
   }
 
-  const matchup = await getCurrentSpotlightMatchup();
+  // ?game=<universal_game_id>: a specific game instead of whatever
+  // getPremierGame() currently has auto-selected -- see
+  // getSpotlightMatchupById's comment for why this exists. Omitted
+  // (the normal case), this is identical to before.
+  const gameIdOverride = new URL(request.url).searchParams.get("game");
+  const matchup = gameIdOverride
+    ? await getSpotlightMatchupById(gameIdOverride)
+    : await getCurrentSpotlightMatchup();
   if (!matchup) {
-    return NextResponse.json({ error: "No premier game found for the current week" }, { status: 404 });
+    return NextResponse.json(
+      { error: gameIdOverride ? `No matchup found for ${gameIdOverride}` : "No premier game found for the current week" },
+      { status: 404 }
+    );
   }
 
   const [imageResponse, imageSquareResponse] = await Promise.all([

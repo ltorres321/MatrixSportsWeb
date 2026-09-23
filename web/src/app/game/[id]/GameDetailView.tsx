@@ -329,26 +329,42 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
           </div>
 
           {locked ? (
-            <div className="locked-section is-locked">
-              <div className="matchup-grid">
-                <MarginSection game={game} />
-                <TotalsSection game={game} />
-              </div>
-              <div className="unlock-panel">
-                <div className="unlock-card">
-                  <span className="lock-icon">🔒</span>
-                  <h3>Unlock Full Game Stats</h3>
-                  <p>
-                    Margin-of-victory breakdowns and total-score probabilities for every game are a free-account
-                    feature. This one&apos;s part of the paid slate — the Game of the Week is always free to view in
-                    full.
-                  </p>
-                  <Link className="btn btn-primary btn-block" href="/signup">
-                    Sign Up Free
-                  </Link>
+            <>
+              {/* The written recap and the basic prediction-vs-result
+                  comparison are NOT part of what the paywall below
+                  claims to protect -- its own copy only names
+                  "margin-of-victory breakdowns and total-score
+                  probabilities" (MarginSection/TotalsSection). Gating
+                  the recap too meant every /game/[id] link from
+                  /stories or the home page (or a Google crawler,
+                  which is never signed in) landed on a paywall with
+                  no actual article behind it for any game except the
+                  one free premier pick each week -- real content that
+                  existed in the database but was unreachable by
+                  anyone who hadn't already signed up. */}
+              <ResultCompare game={game} />
+              <GameRecap story={story} />
+              <div className="locked-section is-locked">
+                <div className="matchup-grid">
+                  <MarginSection game={game} />
+                  <TotalsSection game={game} />
+                </div>
+                <div className="unlock-panel">
+                  <div className="unlock-card">
+                    <span className="lock-icon">🔒</span>
+                    <h3>Unlock Full Game Stats</h3>
+                    <p>
+                      Margin-of-victory breakdowns and total-score probabilities for every game are a free-account
+                      feature. This one&apos;s part of the paid slate — the Game of the Week is always free to view
+                      in full.
+                    </p>
+                    <Link className="btn btn-primary btn-block" href="/signup">
+                      Sign Up Free
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           ) : (
             <>
               <ResultCompare game={game} />
