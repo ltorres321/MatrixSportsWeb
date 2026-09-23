@@ -96,6 +96,17 @@ export async function getPublishedStories(limit = 6): Promise<Story[]> {
   );
 }
 
+// Every published weekly performance review, not just the latest --
+// what the /stories archive page reads (getLatestPerformanceReview
+// above stays as-is for the home page's single featured card).
+export async function getPublishedPerformanceReviews(limit = 30): Promise<Story[]> {
+  return query<Story>(
+    `SELECT id, season, week, universal_game_id, headline, body, source_facts, status, created_at, published_at, featured_from, featured_until
+     FROM stories WHERE status = 'published' AND universal_game_id IS NULL ORDER BY published_at DESC LIMIT $1`,
+    [limit]
+  );
+}
+
 // The published recap for one specific game, if one exists -- what
 // the game detail page shows under "Prediction vs. Result". A game
 // can have at most one story (stories.universal_game_id is UNIQUE),
