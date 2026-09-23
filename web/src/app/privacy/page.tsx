@@ -2,10 +2,13 @@ import Link from "next/link";
 
 // A working draft, not a substitute for a lawyer's review -- it's
 // written to genuinely describe what this site does today (Supabase
-// auth, optional phone verification) and what's about to be wired in
-// (Google Analytics, display ads, sportsbook affiliate links), since
-// both AdSense/Ezoic approval and Analytics' cookie consent need a
-// real policy in place before those go live, not after.
+// auth, optional phone verification, Google Analytics, Google AdSense)
+// and what's still to come (sportsbook affiliate links). Google
+// Analytics and AdSense went live 2026-09-23 -- the sections below
+// were updated from "once enabled" to present tense at the same time,
+// since an AdSense reviewer reading "may display ads" on a page that
+// already has ads running is exactly the kind of inaccurate
+// declaration the Program Policies ask publishers not to make.
 export const metadata = {
   title: "Privacy Policy — Matrix Sports Analytics",
 };
@@ -47,19 +50,17 @@ export default function PrivacyPage() {
             against your account so they persist across visits.
           </p>
           <p>
-            <strong>Usage data.</strong> Once analytics is enabled on this
-            site, we (via Google Analytics) collect information about how you
-            use the site — pages viewed, links clicked, approximate location
-            from IP address, device and browser type. This is used in
-            aggregate to understand what&apos;s working, not to identify you
-            personally.
+            <strong>Usage data.</strong> We use Google Analytics to collect
+            information about how you use the site — pages viewed, links
+            clicked, approximate location from IP address, device and browser
+            type. This is used in aggregate to understand what&apos;s
+            working, not to identify you personally.
           </p>
           <p>
             <strong>Cookies.</strong> We use cookies to keep you signed in
-            between visits. Once analytics and advertising are enabled,
-            Google and our advertising partners may also set cookies to
-            measure site usage and ad performance — see the Advertising
-            section below.
+            between visits. Google and our advertising partners (currently
+            Google AdSense) also set cookies to measure site usage and ad
+            performance — see the Advertising section below.
           </p>
         </section>
 
@@ -80,18 +81,17 @@ export default function PrivacyPage() {
             <span className="dot" /> ADVERTISING &amp; AFFILIATE LINKS
           </div>
           <p>
-            This site may display ads served by third-party advertising
-            networks (such as Google AdSense or Ezoic), and may include
-            affiliate links to sportsbooks and other partners. If you click
-            an ad or an affiliate link, you leave our site, and the
-            destination site&apos;s own privacy policy and terms apply — we
-            don&apos;t control what they collect. We may receive a referral
-            fee or commission for some of these links; that doesn&apos;t cost
-            you anything extra and doesn&apos;t affect what predictions or
-            content we show you.
+            This site displays ads served by Google AdSense, and may in the
+            future include affiliate links to sportsbooks and other partners
+            (none are live yet). If you click an ad or, once live, an
+            affiliate link, you leave our site, and the destination
+            site&apos;s own privacy policy and terms apply — we don&apos;t
+            control what they collect. Any referral fee or commission from
+            future affiliate links won&apos;t cost you anything extra and
+            won&apos;t affect what predictions or content we show you.
           </p>
           <p>
-            Advertising and analytics providers may use cookies or similar
+            Advertising and analytics providers use cookies or similar
             technology to serve relevant ads and measure their performance.
             You can control or disable cookies through your browser settings,
             though some parts of the site (like staying signed in) may not
@@ -113,10 +113,10 @@ export default function PrivacyPage() {
           <p>
             Supabase (accounts, authentication, database), Twilio (phone
             verification, if you choose to add a phone number), Resend
-            (transactional and prediction emails), and — once enabled —
-            Google Analytics and one or more advertising networks. Game and
-            score data comes from public sports data providers (including
-            ESPN and TheSportsDB); no personal information is shared with
+            (transactional and prediction emails), Google Analytics, and
+            Google AdSense. Game and score data comes from public sports
+            data providers (including ESPN and TheSportsDB); no personal
+            information is shared with
             them.
           </p>
         </section>
