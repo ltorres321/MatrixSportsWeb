@@ -527,7 +527,7 @@ function QbMatchupHeader({ game }: { game: GameStat }) {
       style={{ background: `linear-gradient(135deg, ${awayColor} 0%, ${awayColor} 45%, ${homeColor} 55%, ${homeColor} 100%)` }}
     >
       <div className="qb-matchup-header-side">
-        <PlayerHeadshot espnId={away.espnId} alias={game.teamA.alias} size={48} />
+        <PlayerHeadshot espnId={away.espnId} alias={game.teamA.alias} size={64} />
         <div className="qb-matchup-header-name">
           <span className="qb-matchup-header-team">{game.teamA.alias}</span>
           {away.name}
@@ -539,7 +539,7 @@ function QbMatchupHeader({ game }: { game: GameStat }) {
           <span className="qb-matchup-header-team">{game.teamB.alias}</span>
           {home.name}
         </div>
-        <PlayerHeadshot espnId={home.espnId} alias={game.teamB.alias} size={48} />
+        <PlayerHeadshot espnId={home.espnId} alias={game.teamB.alias} size={64} />
       </div>
     </div>
   );

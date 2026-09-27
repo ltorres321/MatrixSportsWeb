@@ -2940,14 +2940,14 @@ h1.glow span {
 
 .report-player-row {
   display: grid;
-  grid-template-columns: 32px 1fr auto;
+  grid-template-columns: 46px 1fr auto;
   align-items: center;
   gap: 0.7rem;
 }
 
 .player-headshot {
-  width: 32px;
-  height: 32px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   object-fit: cover;
   background: var(--panel-solid);
@@ -3020,8 +3020,6 @@ h1.glow span {
 }
 
 .qb-matchup-header-side .player-headshot {
-  width: 48px;
-  height: 48px;
   border: 2px solid rgba(255, 255, 255, 0.4);
 }
 
