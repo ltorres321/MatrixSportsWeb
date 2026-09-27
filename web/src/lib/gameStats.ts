@@ -3,6 +3,15 @@
 // only keeps the types and the percentile-track scaling helper, which
 // has nothing to do with where the data comes from.
 
+import type { TeamGradeRow } from "@/lib/pffGrades";
+import type { GameInjuryReport } from "@/lib/injuries";
+import type {
+  GameEfficiency,
+  GamePlayerGrades,
+  GameQbMatchup,
+  GameTeamPressure,
+} from "@/lib/pffGameReport";
+
 export interface GameStatSide {
   alias: string;
   record: string;
@@ -32,6 +41,18 @@ export interface GameStat {
   predictionCorrect?: boolean;
   // Same meaning as Matchup.lockOfWeek -- see there.
   lockOfWeek?: boolean;
+  // Undefined whenever neither team has any etl.injury_reports rows
+  // for this game's (season, week) yet.
+  injuryReport?: GameInjuryReport;
+  // PFF's own game-report page layout, replicated as five sections
+  // (see GameDetailView.tsx) -- each undefined independently (not one
+  // all-or-nothing flag) since the underlying tables are populated by
+  // separate poller calls and can land at different times.
+  playerGrades?: GamePlayerGrades;
+  qbMatchup?: GameQbMatchup;
+  efficiency?: GameEfficiency;
+  teamPressure?: GameTeamPressure;
+  teamGrades?: TeamGradeRow[];
 }
 
 export const PERCENTILE_MIN = -30;

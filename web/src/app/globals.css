@@ -1916,6 +1916,203 @@ h1.glow span {
   margin-top: 0.15rem;
 }
 
+/* Value-vs-value comparison row -- shared by every section built to
+   match PFF's own report rows (QB Matchup, Team Grades; "Who Has the
+   Edge?", the section this was originally built for, was removed).
+   Two-row grid per matchup: value / label / value on row 1, one
+   full-width bar spanning all three columns on row 2 -- matches PFF's
+   own team-grade rows exactly (a top line of grade boxes + ranks,
+   with the team-colored relative-share bar as a separate element
+   underneath, not embedded inside either box). */
+.edge-row-v2 {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 0.9rem;
+  row-gap: 0.5rem;
+}
+
+.edge-value {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 4.6rem;
+}
+
+.edge-value-left {
+  grid-column: 1;
+}
+
+.edge-value-right {
+  grid-column: 3;
+}
+
+.edge-value-team {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  color: var(--text);
+}
+
+.edge-value-box {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: var(--text-strong);
+  line-height: 1.1;
+  border: 1.5px solid;
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+}
+
+.edge-value-rank {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+/* A player/team with no recorded value for this specific stat yet
+   (e.g. a QB back from a season-opening injury, with real season
+   grades elsewhere on the page but no passing-pressure split
+   recorded) -- muted dash instead of a colored/plain value box, no
+   rank line since there is none. */
+.edge-value-box-empty {
+  color: var(--text-dim);
+  border-color: var(--panel-border) !important;
+  background-color: transparent !important;
+  text-align: center;
+}
+
+.edge-row-label {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.edge-track-v2 {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+/* No bar at all when one side has nothing to compare against (see
+   EdgeTrack's own comment) -- a faint flat line instead of a gap, so
+   the row still reads as "no comparison here" rather than a layout hole. */
+.edge-track-v2-empty {
+  background: rgba(var(--glow-rgb), 0.08);
+}
+
+.edge-fill-v2 {
+  height: 100%;
+}
+
+.edge-fill-behind {
+  opacity: 0.55;
+}
+
+/* Injury report -- two columns (away/home, matching every other
+   two-team layout on this page), sorted QB-first server-side (see
+   injuries.ts). Status colors mirror the standard Out/Doubtful/
+   Questionable tiering; a practice-status fallback (DNP/Limited/Full,
+   shown when no official designation exists yet this week) gets the
+   same dim neutral treatment as an ungraded stat elsewhere on this
+   page, since it's a much softer signal than an official tag. */
+.injury-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.injury-column {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+}
+
+.injury-column-title {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.injury-empty {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.injury-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.injury-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.injury-row-qb {
+  background: rgba(255, 214, 10, 0.08);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  margin: -0.3rem -0.5rem;
+}
+
+.injury-player {
+  color: var(--text);
+}
+
+.injury-position {
+  display: inline-block;
+  min-width: 1.8em;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.injury-status {
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.injury-out {
+  color: var(--red);
+}
+
+.injury-doubtful {
+  color: #ff9d3b;
+}
+
+.injury-questionable {
+  color: var(--gold);
+}
+
+.injury-status-mild {
+  color: var(--text-dim);
+}
+
 .percentile-block {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -2320,6 +2517,15 @@ h1.glow span {
   margin-right: auto;
 }
 
+/* "Who Has the Edge?" sits below the model-data footer, at .page's
+   full 1200px width (no ad rails, unlike .content-main above) --
+   see GameDetailView.tsx's comment for why it's placed past the
+   footer's "every number above" disclaimer instead of inside
+   .content-main with the rest of the model's own stats. */
+.page-edge-section {
+  margin-top: 3rem;
+}
+
 /* Sits below every page's own footer/content (rendered in the root
    layout, not per-page) so a Follow Us row + Privacy Policy link exist
    site-wide without every page needing its own copy of them. */
@@ -2646,5 +2852,405 @@ h1.glow span {
 
   .totals-grid {
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+}
+
+/* ------------------------------------------------------------------
+   PFF Game Report -- Highest Graded Players, QB Matchup, Efficiency
+   and Scoring, Pressure Matchup, Team Grades. Reuses the grade-tier
+   colors, relative-share bar math, and .edge-value-box/.edge-track-v2
+   styling already built for "Who Has the Edge?" (see gradeTierColor/
+   EdgeValue/EdgeTrack in GameDetailView.tsx) instead of re-deriving
+   them, so this reads as the same visual language, not a bolted-on
+   second system.
+   ------------------------------------------------------------------ */
+
+/* A plain (non grade-tier-colored) variant of .edge-value-box, for
+   rows that show a real-world figure -- a percentage, a time in
+   seconds -- rather than a 0-100 PFF grade. QB Matchup's non-grade
+   rows reuse .edge-value/.edge-value-box/.edge-track-v2 wholesale;
+   this is the one addition needed on top of them. */
+.edge-value-box-plain {
+  border-color: var(--panel-border);
+  background: var(--panel);
+  font-size: 1.1rem;
+}
+
+/* Highest Graded Players */
+.report-players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.report-players-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+}
+
+.report-players-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
+.report-players-team {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: 0.05em;
+}
+
+.report-toggle {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.report-toggle button {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  font-family: 'Chakra Petch', monospace;
+}
+
+.report-toggle button.active {
+  background: rgba(var(--glow-rgb), 0.15);
+  border-color: rgba(var(--glow-rgb), 0.5);
+  color: var(--text-strong);
+}
+
+.report-players-empty {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.report-players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.report-player-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.player-headshot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  flex-shrink: 0;
+}
+
+.player-headshot-fallback {
+  object-fit: contain;
+  padding: 3px;
+}
+
+.report-player-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.report-player-name {
+  color: var(--text);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.report-player-position {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+}
+
+.report-player-grade {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-strong);
+  border: 1.5px solid;
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  min-width: 2.6rem;
+  text-align: center;
+}
+
+/* QB Matchup */
+.qb-matchup-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.qb-matchup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem;
+  gap: 1rem;
+}
+
+.qb-matchup-header-side {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.qb-matchup-header-side-right {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.qb-matchup-header-side .player-headshot {
+  width: 48px;
+  height: 48px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.qb-matchup-header-name {
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  min-width: 0;
+}
+
+.qb-matchup-header-team {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.qb-matchup-header-vs {
+  color: rgba(255, 255, 255, 0.85);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+}
+
+.qb-matchup-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+}
+
+/* Efficiency and Scoring -- compact figure+rank list, no track, per
+   the reference page's own "data-compact" layout for this section. */
+.eff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.eff-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+}
+
+.eff-card-title {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.6rem;
+}
+
+.eff-card-teams {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--panel-border);
+  margin-bottom: 0.4rem;
+}
+
+.eff-card-teams span {
+  text-align: right;
+  min-width: 3.6rem;
+}
+
+.eff-card-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.eff-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(var(--glow-rgb), 0.08);
+}
+
+.eff-row:last-child {
+  border-bottom: none;
+}
+
+.eff-row-label {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.eff-row-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  min-width: 3.6rem;
+}
+
+.eff-figure {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text-strong);
+}
+
+.eff-figure-missing {
+  color: var(--text-dim);
+}
+
+.eff-rank {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Pressure Matchup */
+.pressure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.pressure-tile {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+}
+
+.pressure-tile-title {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--text-strong);
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.9rem;
+}
+
+.pressure-tile-figures {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pressure-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.pressure-figure-label {
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.pressure-figure-value {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--text-strong);
+}
+
+.pressure-figure-rank {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.pressure-tile-divider {
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* Team Grades -- both teams' own grades side by side, a flat list of
+   the same .edge-row-v2 rows "Who Has the Edge?" uses, just one card
+   instead of one-per-category (this is a single comparison, not four
+   separate unit matchups). */
+.team-grades-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.team-grades-card .edge-row-v2:not(:last-child) {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(var(--glow-rgb), 0.08);
+}
+
+@media (max-width: 768px) {
+  .qb-matchup-header {
+    flex-direction: column;
+  }
+
+  .qb-matchup-header-side-right {
+    flex-direction: row;
+    text-align: left;
+  }
+
+  .qb-matchup-header-vs {
+    order: 2;
+  }
+
+  .eff-card-teams span,
+  .eff-row-value {
+    min-width: 2.6rem;
+  }
+
+  .pressure-tile-figures {
+    flex-direction: column;
+  }
+
+  .pressure-tile-divider {
+    transform: rotate(90deg);
   }
 }
