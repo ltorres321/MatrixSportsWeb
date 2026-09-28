@@ -3181,6 +3181,21 @@ h1.glow span {
   white-space: nowrap;
 }
 
+/* Top-5-in-the-league callout -- same #ffd60a "Matrix machine-world"
+   yellow as .week-pill.active/.cell-verified-note, dark theme only
+   (light theme reverts to the theme's own accent color below), same
+   reasoning as every other use of this color on the site: it's a
+   fixed brand highlight, not something that should follow the
+   green<->blue light/dark re-theme the rest of the page uses. */
+.eff-rank-top5 {
+  color: #ffd60a;
+  font-weight: 700;
+}
+
+:root[data-theme="light"] .eff-rank-top5 {
+  color: var(--green);
+}
+
 /* Pressure Matchup */
 .pressure-grid {
   display: grid;

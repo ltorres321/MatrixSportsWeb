@@ -650,10 +650,15 @@ function EfficiencyFigure({ stat, format, align }: { stat: StatWithRank | null; 
       </div>
     );
   }
+  // Top-5-in-the-league callout -- safe to key off a plain "top 5"
+  // check here (unlike QB Matchup's rank) since every Efficiency stat
+  // ranks against the full, fixed 32-team league, never an ambiguous
+  // qualifying pool.
+  const isTop5 = stat.rank !== null && stat.rank <= 5;
   return (
     <div className={`eff-figure-block eff-figure-block-${align}`}>
       <span className="eff-figure">{format(stat.value)}</span>
-      <span className="eff-rank">{stat.rank ? `${ordinal(stat.rank)}/32` : ""}</span>
+      <span className={`eff-rank ${isTop5 ? "eff-rank-top5" : ""}`}>{stat.rank ? `${ordinal(stat.rank)}/32` : ""}</span>
     </div>
   );
 }
