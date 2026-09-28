@@ -293,7 +293,21 @@ function edgeAccentColor(alias: string): string {
 // though they're still the correct player to display -- matches the
 // reference PFF page, which renders a blank/dash box for that side
 // rather than hiding the whole row.
-function EdgeValue({ side, alias, align }: { side: EdgeSide | null; alias: string; align: "left" | "right" }) {
+function EdgeValue({
+  side,
+  alias,
+  align,
+  highlightTop5 = false,
+}: {
+  side: EdgeSide | null;
+  alias: string;
+  align: "left" | "right";
+  // Off by default -- only Team Grades passes this. QB Matchup's rank
+  // isn't against a fixed, reliable pool (see architecture.md's own
+  // note on that), so a "top 5" callout there would be misleading in
+  // a way it isn't for Team Grades' fixed 32-team league rank.
+  highlightTop5?: boolean;
+}) {
   if (!side) {
     return (
       <div className={`edge-value edge-value-${align}`}>
@@ -303,13 +317,14 @@ function EdgeValue({ side, alias, align }: { side: EdgeSide | null; alias: strin
     );
   }
   const tier = gradeTierColor(side.grade);
+  const isTop5 = highlightTop5 && side.rank !== null && side.rank <= 5;
   return (
     <div className={`edge-value edge-value-${align}`}>
       <span className="edge-value-team">{side.alias}</span>
       <div className="edge-value-box" style={{ borderColor: tier, backgroundColor: `${tier}20` }}>
         {side.grade.toFixed(1)}
       </div>
-      <span className="edge-value-rank">
+      <span className={`edge-value-rank ${isTop5 ? "edge-value-rank-top5" : ""}`}>
         {side.rankLabel.replace(" of ", " / ")}
       </span>
     </div>
@@ -397,7 +412,12 @@ function ordinal(n: number): string {
 
 function toEdgeSide(alias: string, stat: StatWithRank | null | undefined, total: number): EdgeSide | null {
   if (!stat) return null;
-  return { alias, grade: stat.value, rankLabel: stat.rank ? `${ordinal(stat.rank)} of ${total}` : `of ${total}` };
+  return {
+    alias,
+    grade: stat.value,
+    rankLabel: stat.rank ? `${ordinal(stat.rank)} of ${total}` : `of ${total}`,
+    rank: stat.rank,
+  };
 }
 
 function espnHeadshotUrl(espnId: string): string {
@@ -795,34 +815,53 @@ function EfficiencySection({ game }: { game: GameStat }) {
   );
 }
 
+// A "top 5" callout is safe here too -- pressure rate always ranks
+// against the full, fixed 32-team league, same as Efficiency and
+// Team Grades, never QB Matchup's ambiguous qualifying pool.
+function PressureFigure({ label, stat }: { label: string; stat: StatWithRank | null }) {
+  const isTop5 = stat?.rank !== null && stat?.rank !== undefined && stat.rank <= 5;
+  return (
+    <div className="pressure-figure">
+      <span className="pressure-figure-label">{label}</span>
+      <span className="pressure-figure-value">{stat ? fmtPct(stat.value) : "—"}</span>
+      <span className={`pressure-figure-rank ${isTop5 ? "pressure-figure-rank-top5" : ""}`}>
+        {stat?.rank ? `${ordinal(stat.rank)} of 32` : ""}
+      </span>
+    </div>
+  );
+}
+
+// Single-team color header + logo, matching the same treatment
+// EfficiencyCard uses -- each tile is a "when THIS team has the ball"
+// context, so one team's own color/logo (not a two-team blend) fits
+// better than Efficiency's away-vs-home gradient.
 function PressureTile({
+  ballTeamAlias,
   title,
   leftLabel,
   leftStat,
   rightLabel,
   rightStat,
 }: {
+  ballTeamAlias: string;
   title: string;
   leftLabel: string;
   leftStat: StatWithRank | null;
   rightLabel: string;
   rightStat: StatWithRank | null;
 }) {
+  const color = edgeAccentColor(ballTeamAlias);
   return (
     <div className="pressure-tile">
-      <div className="pressure-tile-title">{title}</div>
+      <div className="pressure-tile-header" style={{ background: `linear-gradient(100deg, ${color} 0%, ${color}cc 100%)` }}>
+        <span className="pressure-tile-title">{title}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="pressure-tile-logo" src={teamLogoPath(ballTeamAlias)} alt="" />
+      </div>
       <div className="pressure-tile-figures">
-        <div className="pressure-figure">
-          <span className="pressure-figure-label">{leftLabel}</span>
-          <span className="pressure-figure-value">{leftStat ? fmtPct(leftStat.value) : "—"}</span>
-          <span className="pressure-figure-rank">{leftStat?.rank ? `${ordinal(leftStat.rank)} of 32` : ""}</span>
-        </div>
+        <PressureFigure label={leftLabel} stat={leftStat} />
         <div className="pressure-tile-divider">→</div>
-        <div className="pressure-figure">
-          <span className="pressure-figure-label">{rightLabel}</span>
-          <span className="pressure-figure-value">{rightStat ? fmtPct(rightStat.value) : "—"}</span>
-          <span className="pressure-figure-rank">{rightStat?.rank ? `${ordinal(rightStat.rank)} of 32` : ""}</span>
-        </div>
+        <PressureFigure label={rightLabel} stat={rightStat} />
       </div>
     </div>
   );
@@ -839,6 +878,7 @@ function PressureMatchupSection({ game }: { game: GameStat }) {
       <p className="stat-sub">Each team&apos;s O-line pressure allowed against the other team&apos;s pass rush generated.</p>
       <div className="pressure-grid">
         <PressureTile
+          ballTeamAlias={game.teamA.alias}
           title={`When ${awayName} have the ball`}
           leftLabel={`${game.teamA.alias} pressure allowed`}
           leftStat={away.pressureRateAllowed}
@@ -846,6 +886,7 @@ function PressureMatchupSection({ game }: { game: GameStat }) {
           rightStat={home.pressureRateGenerated}
         />
         <PressureTile
+          ballTeamAlias={game.teamB.alias}
           title={`When ${homeName} have the ball`}
           leftLabel={`${game.teamB.alias} pressure allowed`}
           leftStat={home.pressureRateAllowed}
@@ -866,9 +907,9 @@ function TeamGradesSection({ game }: { game: GameStat }) {
       <div className="team-grades-card">
         {game.teamGrades.map((row) => (
           <div className="edge-row-v2" key={row.label}>
-            <EdgeValue side={row.away} alias={row.away.alias} align="left" />
+            <EdgeValue side={row.away} alias={row.away.alias} align="left" highlightTop5 />
             <div className="edge-row-label">{row.label}</div>
-            <EdgeValue side={row.home} alias={row.home.alias} align="right" />
+            <EdgeValue side={row.home} alias={row.home.alias} align="right" highlightTop5 />
             <EdgeTrack row={{ teamSide: row.away, oppositionSide: row.home }} />
           </div>
         ))}

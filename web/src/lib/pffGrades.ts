@@ -137,6 +137,13 @@ export interface EdgeSide {
   alias: string;
   grade: number;
   rankLabel: string; // e.g. "5th of 32"
+  // Raw ordinal, same one rankLabel is built from -- exposed
+  // separately so the UI can style a top-5 (or any other threshold)
+  // rank without parsing it back out of the formatted string. Safe to
+  // compare directly against a fixed threshold here specifically
+  // since Team Grades always ranks against the full, fixed 32-team
+  // league, never an ambiguous qualifying pool.
+  rank: number | null;
 }
 
 export interface TeamGradeRow {
@@ -178,7 +185,7 @@ export async function getGameTeamGrades(
   function side(team: TeamPositionGrades, field: GradeField, grade: number): EdgeSide {
     const { ranks, total } = rankLookupFor(field);
     const rank = ranks.get(team.team);
-    return { alias: team.team, grade, rankLabel: rank ? `${ordinal(rank)} of ${total}` : `of ${total}` };
+    return { alias: team.team, grade, rankLabel: rank ? `${ordinal(rank)} of ${total}` : `of ${total}`, rank: rank ?? null };
   }
 
   function row(label: string, field: GradeField): TeamGradeRow | null {
