@@ -321,7 +321,10 @@ function EdgeValue({
   return (
     <div className={`edge-value edge-value-${align}`}>
       <span className="edge-value-team">{side.alias}</span>
-      <div className="edge-value-box" style={{ borderColor: tier, backgroundColor: `${tier}20` }}>
+      <div
+        className={`edge-value-box ${isTop5 ? "edge-value-box-top5" : ""}`}
+        style={{ borderColor: tier, backgroundColor: `${tier}20` }}
+      >
         {side.grade.toFixed(1)}
       </div>
       <span className={`edge-value-rank ${isTop5 ? "edge-value-rank-top5" : ""}`}>
@@ -677,7 +680,7 @@ function EfficiencyFigure({ stat, format, align }: { stat: StatWithRank | null; 
   const isTop5 = stat.rank !== null && stat.rank <= 5;
   return (
     <div className={`eff-figure-block eff-figure-block-${align}`}>
-      <span className="eff-figure">{format(stat.value)}</span>
+      <span className={`eff-figure ${isTop5 ? "eff-figure-top5" : ""}`}>{format(stat.value)}</span>
       <span className={`eff-rank ${isTop5 ? "eff-rank-top5" : ""}`}>{stat.rank ? `${ordinal(stat.rank)}/32` : ""}</span>
     </div>
   );
@@ -823,7 +826,9 @@ function PressureFigure({ label, stat }: { label: string; stat: StatWithRank | n
   return (
     <div className="pressure-figure">
       <span className="pressure-figure-label">{label}</span>
-      <span className="pressure-figure-value">{stat ? fmtPct(stat.value) : "—"}</span>
+      <span className={`pressure-figure-value ${isTop5 ? "pressure-figure-value-top5" : ""}`}>
+        {stat ? fmtPct(stat.value) : "—"}
+      </span>
       <span className={`pressure-figure-rank ${isTop5 ? "pressure-figure-rank-top5" : ""}`}>
         {stat?.rank ? `${ordinal(stat.rank)} of 32` : ""}
       </span>
@@ -853,7 +858,15 @@ function PressureTile({
   const color = edgeAccentColor(ballTeamAlias);
   return (
     <div className="pressure-tile">
-      <div className="pressure-tile-header" style={{ background: `linear-gradient(100deg, ${color} 0%, ${color}cc 100%)` }}>
+      {/* Solid fill, not a gradient -- edgeAccentColor can return either
+          a "#rrggbb" hex or an "rgb(r, g, b)" string (for a lightened
+          color), and appending an alpha suffix like "cc" only works
+          for the hex form. That produced invalid CSS ("rgb(...)cc")
+          for any team whose color got lightened, which the browser
+          then dropped entirely, falling back to a default background
+          instead of that team's actual color (confirmed: LAR
+          rendered green instead of blue). */}
+      <div className="pressure-tile-header" style={{ background: color }}>
         <span className="pressure-tile-title">{title}</span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="pressure-tile-logo" src={teamLogoPath(ballTeamAlias)} alt="" />

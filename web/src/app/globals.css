@@ -1978,13 +1978,23 @@ h1.glow span {
 /* Top-5-in-the-league callout, Team Grades only (see EdgeValue's own
    comment on why QB Matchup never sets highlightTop5) -- same
    #ffd60a "Matrix machine-world" yellow and dark-theme-only rule as
-   .eff-rank-top5. */
+   .eff-rank-top5. Covers both the rank text AND the grade value
+   itself (the box's own tier-colored border/background is left
+   alone -- only the number inside turns yellow). */
 .edge-value-rank-top5 {
   color: #ffd60a;
   font-weight: 700;
 }
 
 :root[data-theme="light"] .edge-value-rank-top5 {
+  color: var(--green);
+}
+
+.edge-value-box-top5 {
+  color: #ffd60a;
+}
+
+:root[data-theme="light"] .edge-value-box-top5 {
   color: var(--green);
 }
 
@@ -3209,6 +3219,14 @@ h1.glow span {
   color: var(--green);
 }
 
+.eff-figure-top5 {
+  color: #ffd60a;
+}
+
+:root[data-theme="light"] .eff-figure-top5 {
+  color: var(--green);
+}
+
 /* Pressure Matchup */
 .pressure-grid {
   display: grid;
@@ -3294,6 +3312,14 @@ h1.glow span {
 }
 
 :root[data-theme="light"] .pressure-figure-rank-top5 {
+  color: var(--green);
+}
+
+.pressure-figure-value-top5 {
+  color: #ffd60a;
+}
+
+:root[data-theme="light"] .pressure-figure-value-top5 {
   color: var(--green);
 }
 
