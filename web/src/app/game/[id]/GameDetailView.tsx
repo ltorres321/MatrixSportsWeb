@@ -635,6 +635,29 @@ function QbMatchupSection({ game }: { game: GameStat }) {
   );
 }
 
+// Away figure+rank on the left, label centered, home figure+rank on
+// the right -- matches PFF's own Efficiency and Scoring rows exactly
+// (a plain figure/rank pair on each side, no grade-tier box, since
+// these are EPA/rate/points stats, not 0-100 PFF grades). The earlier
+// version stacked both teams' values in a narrow right-hand column,
+// cramped and hard to scan -- this spreads them across the full row
+// width like every other comparison section on this page.
+function EfficiencyFigure({ stat, format, align }: { stat: StatWithRank | null; format: (n: number) => string; align: "left" | "right" }) {
+  if (!stat) {
+    return (
+      <div className={`eff-figure-block eff-figure-block-${align}`}>
+        <span className="eff-figure eff-figure-missing">—</span>
+      </div>
+    );
+  }
+  return (
+    <div className={`eff-figure-block eff-figure-block-${align}`}>
+      <span className="eff-figure">{format(stat.value)}</span>
+      <span className="eff-rank">{stat.rank ? `${ordinal(stat.rank)}/32` : ""}</span>
+    </div>
+  );
+}
+
 function EfficiencyStatRow({
   label,
   away,
@@ -648,34 +671,19 @@ function EfficiencyStatRow({
 }) {
   if (!away && !home) return null;
   return (
-    <div className="eff-row">
+    <div className="eff-row-v2">
+      <EfficiencyFigure stat={away} format={format} align="left" />
       <span className="eff-row-label">{label}</span>
-      <div className="eff-row-value">
-        {away ? (
-          <>
-            <span className="eff-figure">{format(away.value)}</span>
-            <span className="eff-rank">{away.rank ? `${ordinal(away.rank)}/32` : ""}</span>
-          </>
-        ) : (
-          <span className="eff-figure eff-figure-missing">—</span>
-        )}
-      </div>
-      <div className="eff-row-value">
-        {home ? (
-          <>
-            <span className="eff-figure">{format(home.value)}</span>
-            <span className="eff-rank">{home.rank ? `${ordinal(home.rank)}/32` : ""}</span>
-          </>
-        ) : (
-          <span className="eff-figure eff-figure-missing">—</span>
-        )}
-      </div>
+      <EfficiencyFigure stat={home} format={format} align="right" />
     </div>
   );
 }
 
+// PFF always shows the sign on EPA figures (+0.05, not 0.05) so a
+// reader isn't left assuming every unsigned number is positive --
+// only the negatives stood out before this fix.
 function fmtEpa(n: number): string {
-  return n.toFixed(2);
+  return `${n >= 0 ? "+" : ""}${n.toFixed(2)}`;
 }
 
 function fmtPct(n: number): string {
@@ -699,11 +707,21 @@ function EfficiencyCard({
   awayStats: NonNullable<GameStat["efficiency"]>["awayOffense"];
   homeStats: NonNullable<GameStat["efficiency"]>["homeOffense"];
 }) {
+  const awayColor = edgeAccentColor(awayAlias);
+  const homeColor = edgeAccentColor(homeAlias);
   return (
     <div className="eff-card">
-      <div className="eff-card-title">{title}</div>
+      <div
+        className="eff-card-header"
+        style={{ background: `linear-gradient(135deg, ${awayColor} 0%, ${awayColor} 45%, ${homeColor} 55%, ${homeColor} 100%)` }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="eff-card-logo" src={teamLogoPath(awayAlias)} alt="" />
+        <span className="eff-card-title">{title}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="eff-card-logo" src={teamLogoPath(homeAlias)} alt="" />
+      </div>
       <div className="eff-card-teams">
-        <span />
         <span>{awayAlias}</span>
         <span>{homeAlias}</span>
       </div>
