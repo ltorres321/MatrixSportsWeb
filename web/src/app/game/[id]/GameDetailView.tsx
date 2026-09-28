@@ -913,19 +913,37 @@ function PressureMatchupSection({ game }: { game: GameStat }) {
 
 function TeamGradesSection({ game }: { game: GameStat }) {
   if (!game.teamGrades || game.teamGrades.length === 0) return null;
+  const awayColor = edgeAccentColor(game.teamA.alias);
+  const homeColor = edgeAccentColor(game.teamB.alias);
   return (
     <div className="stat-section">
       <h2>Team Grades</h2>
       <p className="stat-sub">Both teams&apos; own season-to-date PFF grades, side by side.</p>
       <div className="team-grades-card">
-        {game.teamGrades.map((row) => (
-          <div className="edge-row-v2" key={row.label}>
-            <EdgeValue side={row.away} alias={row.away.alias} align="left" highlightTop5 />
-            <div className="edge-row-label">{row.label}</div>
-            <EdgeValue side={row.home} alias={row.home.alias} align="right" highlightTop5 />
-            <EdgeTrack row={{ teamSide: row.away, oppositionSide: row.home }} />
-          </div>
-        ))}
+        {/* Same team-color gradient header as EfficiencyCard/PressureTile
+            -- matches the reference PFF page exactly (logos left/right,
+            "Grades ranked all 32 teams" centered), which this section
+            was missing while the other two already had it. */}
+        <div
+          className="team-grades-header"
+          style={{ background: `linear-gradient(135deg, ${awayColor} 0%, ${awayColor} 45%, ${homeColor} 55%, ${homeColor} 100%)` }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="team-grades-logo" src={teamLogoPath(game.teamA.alias)} alt="" />
+          <span className="team-grades-caption">Grades ranked all 32 teams</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="team-grades-logo" src={teamLogoPath(game.teamB.alias)} alt="" />
+        </div>
+        <div className="team-grades-rows">
+          {game.teamGrades.map((row) => (
+            <div className="edge-row-v2" key={row.label}>
+              <EdgeValue side={row.away} alias={row.away.alias} align="left" highlightTop5 />
+              <div className="edge-row-label">{row.label}</div>
+              <EdgeValue side={row.home} alias={row.home.alias} align="right" highlightTop5 />
+              <EdgeTrack row={{ teamSide: row.away, oppositionSide: row.home }} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
