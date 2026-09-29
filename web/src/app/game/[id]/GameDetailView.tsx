@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
@@ -14,6 +14,7 @@ import type { EdgeSide } from "@/lib/pffGrades";
 type EdgeTrackRow = { teamSide: EdgeSide | null; oppositionSide: EdgeSide | null };
 import type { InjuryEntry } from "@/lib/injuries";
 import type { StatWithRank, TeamPlayerGrades } from "@/lib/pffGameReport";
+import type { LineupPlayer } from "@/lib/lineup";
 import { teamPrimaryColor } from "@/lib/teamColors";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
@@ -949,6 +950,616 @@ function TeamGradesSection({ game }: { game: GameStat }) {
   );
 }
 
+// ----------------------------------------------------------------------
+// Matchups tab -- a formation-style depth chart for both teams' real
+// starters (etl.pff_lineup, via SportsPipelines/pff_api/poll_lineup.py).
+// PFF's own equivalent tab is called "Lineup" on their site; this page
+// calls it "Matchups" instead, consistent with this page's existing
+// "QB Matchup"/"Pressure Matchup" naming for a side-by-side comparison
+// section, rather than introducing PFF's own name for the first time
+// here. No personnel-package (11/21/12, Base/Nickel) picker -- out of
+// scope, this project has no snap-by-package data.
+// ----------------------------------------------------------------------
+
+// Which half of the formation an alignment code reads as, purely from
+// the code's own spelling -- confirmed against every real alignment
+// code seen on a live poll (2026-09-28): LT/LG/LWR/LCB/LOLB/LILB etc.
+// start with "L", RT/RG/RWR/RCB/ROLB/RILB etc. start with "R", "TE-L"/
+// "TE-R" carry the side after a hyphen instead, and the defensive-
+// line-specific codes (DLE/DLT/DRE/DRT) carry it as their SECOND
+// character behind a "D". Everything else (NT, C, MLB/WLB/SLB, FS/SS,
+// SWR, SCB, FB) has no side and reads as the formation's center/slot
+// group.
+function alignmentSide(alignment: string): "left" | "right" | "center" {
+  const suffix = alignment.includes("-") ? alignment.split("-").pop()! : alignment;
+  if (suffix.startsWith("L")) return "left";
+  if (suffix.startsWith("R")) return "right";
+  if (alignment.startsWith("D")) {
+    if (alignment[1] === "L") return "left";
+    if (alignment[1] === "R") return "right";
+  }
+  return "center";
+}
+
+function distanceForDefense(p: LineupPlayer): number {
+  if (p.position === "DI" || p.position === "ED") {
+    // A 3-4's stand-up OLB (position "ED", alignment LOLB/ROLB) is the
+    // OUTERMOST rusher on the line -- further out than a true down
+    // end, which is further out than the nose. Confirmed against PFF's
+    // own front-row order (CB, ROLB, RE, NT, LE, LOLB, CB): giving OLB
+    // the same distance as NT (this function's original bug) sorted it
+    // next to the nose instead of out by the corner.
+    if (p.alignment.includes("OLB")) return 3;
+    if (p.alignment.endsWith("E")) return 2;
+    if (p.alignment.endsWith("T")) return 1;
+    return 0; // NT or similar
+  }
+  if (p.position === "LB") {
+    if (p.alignment.includes("OLB")) return 2;
+    if (p.alignment.includes("ILB")) return 1;
+    return 0; // MLB/WLB/SLB
+  }
+  return 0;
+}
+
+// mirror=true for the front-seven groups (D-line/ED, LB) ONLY -- PFF
+// (and real coaching terminology) names THOSE alignments' L/R from the
+// DEFENSE's own point of view facing the offense, the mirror image of
+// how offensive alignments are named (from the QB's point of view
+// facing the same direction as the play). Confirmed directly against
+// PFF's own Lineup tab: their front row reads (left to right) CB,
+// ROLB, RE, NT, LE, LOLB, CB -- the "R"-named edge/tackle cluster on
+// screen-LEFT, "L"-named on screen-RIGHT, exactly backwards from a
+// literal reading of the letter -- and confirmed again for
+// linebackers (RILB left of LILB). Offense alignments (LWR/RWR, TE-L/
+// TE-R, LT/RT) are NOT mirrored, and neither are cornerbacks (see
+// buildDefensePositions' own comment on leftCb/rightCb) -- those
+// already render correctly screen-left/right as a literal reading.
+function orderRow(players: LineupPlayer[], distanceFn: (p: LineupPlayer) => number, mirror = false): LineupPlayer[] {
+  const signedKey = (p: LineupPlayer) => {
+    let side = alignmentSide(p.alignment);
+    if (mirror) side = side === "left" ? "right" : side === "right" ? "left" : "center";
+    const d = distanceFn(p);
+    return side === "left" ? -d : side === "right" ? d : 0;
+  };
+  return [...players].sort((a, b) => {
+    const diff = signedKey(a) - signedKey(b);
+    return diff !== 0 ? diff : a.alignment.localeCompare(b.alignment);
+  });
+}
+
+// A position on the field, in percent: xPct is left-right (0 = left
+// sideline, 100 = right), depthPct is distance from the line of
+// scrimmage (0 = right on it, 100 = as deep as this diagram gets). Real
+// field coordinates, not a flex-row guess -- this is what lines up a
+// slot receiver, a TE, or a running back somewhere OTHER than a plain
+// evenly-spaced row, matching PFF's own diagram instead of approximating
+// it.
+interface PositionedPlayer {
+  player: LineupPlayer;
+  xPct: number;
+  depthPct: number;
+}
+
+// A real offensive personnel grouping is a fixed, league-wide slot
+// template (same shape for every team -- only the players filling it
+// differ), not a generic "show every WR/TE this team has" dump. Every
+// code below is confirmed present, identically named, across every
+// team's etl.pff_lineup rows (LWR/SWR/RWR, TE-L/TE-R, LT/LG/C/RG/RT,
+// QB/HB/FB) -- verified directly against the DB for DEN/KC/MIA/BUF/LAR
+// before writing this. Coordinates are hand-placed to match PFF's own
+// diagram: outside receivers out at the sideline, the slot receiver
+// tucked in and slightly off the line, the TE inline next to a tackle,
+// and the backfield (QB, then HB/FB behind it) centered and deep. A
+// slot's code list is tried in order and the first real match wins, so
+// a team without a second alignment (e.g. BUF currently has no
+// depth_order=1 FB) just quietly loses that slot rather than crashing
+// or duplicating a player into two boxes.
+type PersonnelPackage = "11" | "21" | "12";
+
+const PERSONNEL_LABELS: Record<PersonnelPackage, string> = {
+  "11": "11 (3 WR)",
+  "21": "21 (2 RB)",
+  "12": "12 (2 TE)",
+};
+
+// Coordinates keep a real anti-collision margin, not just a plausible-
+// looking spot: any two slots whose x is within ~10 of each other also
+// keep their depth at least ~22 apart, and vice versa, so a ~100px-tall
+// card (see .lineup-box-card) never visually collides with its
+// neighbor regardless of which alignments a given team actually has
+// filled (confirmed by rendering real DEN/LAR/BUF rosters through
+// every package/front combination -- see chat history for the render
+// checks that caught the original QB/HB and LB/safety overlaps).
+// depth=18 is the closest anything ever gets to the LOS (depth 0). A
+// box is ~110px tall against this field's 500px-tall half (see
+// .lineup-field-half), so its own half-height alone is ~11% -- depth
+// 18 leaves a real ~7% gap instead of letting the box straddle the
+// yellow line the way depth 8 did (confirmed as the actual bug: at
+// depth 8 the box's near edge computed to a NEGATIVE offset, i.e. past
+// the divider). The O-line got noticeably more width (32-68 instead of
+// 35-65) since packed-together linemen were the single biggest
+// complaint after the divider bug itself.
+const OFFENSE_COORDS: Record<PersonnelPackage, { codes: string[]; x: number; depth: number }[]> = {
+  "11": [
+    { codes: ["LWR"], x: 6, depth: 22 },
+    { codes: ["SWR"], x: 16, depth: 27 },
+    { codes: ["LT"], x: 32, depth: 18 },
+    { codes: ["LG"], x: 41, depth: 18 },
+    { codes: ["C"], x: 50, depth: 18 },
+    { codes: ["RG"], x: 59, depth: 18 },
+    { codes: ["RT"], x: 68, depth: 18 },
+    { codes: ["TE-R", "TE-L"], x: 79, depth: 25 },
+    { codes: ["RWR"], x: 96, depth: 22 },
+    { codes: ["QB"], x: 50, depth: 52 },
+    { codes: ["HB"], x: 60, depth: 80 },
+  ],
+  "12": [
+    { codes: ["LWR"], x: 6, depth: 22 },
+    { codes: ["TE-L"], x: 21, depth: 25 },
+    { codes: ["LT"], x: 32, depth: 18 },
+    { codes: ["LG"], x: 41, depth: 18 },
+    { codes: ["C"], x: 50, depth: 18 },
+    { codes: ["RG"], x: 59, depth: 18 },
+    { codes: ["RT"], x: 68, depth: 18 },
+    { codes: ["TE-R"], x: 79, depth: 25 },
+    { codes: ["RWR"], x: 96, depth: 22 },
+    { codes: ["QB"], x: 50, depth: 52 },
+    { codes: ["HB"], x: 60, depth: 80 },
+  ],
+  "21": [
+    { codes: ["LWR"], x: 6, depth: 22 },
+    { codes: ["LT"], x: 32, depth: 18 },
+    { codes: ["LG"], x: 41, depth: 18 },
+    { codes: ["C"], x: 50, depth: 18 },
+    { codes: ["RG"], x: 59, depth: 18 },
+    { codes: ["RT"], x: 68, depth: 18 },
+    { codes: ["TE-R", "TE-L"], x: 79, depth: 25 },
+    { codes: ["RWR"], x: 96, depth: 22 },
+    { codes: ["QB"], x: 50, depth: 48 },
+    { codes: ["FB"], x: 38, depth: 64 },
+    { codes: ["HB"], x: 64, depth: 84 },
+  ],
+};
+
+// Fills a personnel template from one team's real depth chart. A
+// player is only ever placed in one slot -- if a fallback code (e.g.
+// 12 personnel's single-TE slot falling back from TE-R to TE-L) would
+// reuse a player another slot already claimed, that later slot is
+// left empty instead of duplicating a box.
+function buildOffensePositions(players: LineupPlayer[], pkg: PersonnelPackage): PositionedPlayer[] {
+  const byAlignment = new Map(players.map((p) => [p.alignment, p]));
+  const used = new Set<number>();
+  const positioned: PositionedPlayer[] = [];
+  for (const { codes, x, depth } of OFFENSE_COORDS[pkg]) {
+    const match = codes.map((code) => byAlignment.get(code)).find((p) => p !== undefined && !used.has(p.pffPlayerId));
+    if (match) {
+      used.add(match.pffPlayerId);
+      positioned.push({ player: match, xPct: x, depthPct: depth });
+    }
+  }
+  return positioned;
+}
+
+type DefensiveFront = "base" | "nickel";
+
+function evenX(index: number, count: number, left: number, right: number): number {
+  return count <= 1 ? (left + right) / 2 : left + ((right - left) * index) / (count - 1);
+}
+
+// Unlike offense, defensive alignment CODES genuinely differ by scheme
+// (a 3-4 team's D-line reads LE/NT/RE, a 4-3 team's reads DLT/DRT/
+// DLE/DRE; edge rushers are the "ED" position either way -- see
+// poll_lineup.py's own note on this), so the interior D-line/LB/safety
+// counts vary by team and can't be a fixed coordinate table like
+// offense. Instead each group gets a fixed DEPTH band (outside corners
+// and the D-line right on the line, linebackers behind them, safeties
+// deepest) and its real members are spread evenly left-to-right across
+// a fixed x-range for that band -- real field bands, not a guess at
+// exact per-alignment coordinates that don't exist league-wide. Base
+// has no slot corner and keeps every linebacker; Nickel swaps in the
+// slot corner and, to hold the total at 11, drops one linebacker
+// (approximated as whichever orderRow places last -- a real defensive
+// coordinator's actual sub-package rule varies by team and situation,
+// beyond "line up the positions" for now).
+function buildDefensePositions(players: LineupPlayer[], front: DefensiveFront): PositionedPlayer[] {
+  const known = new Set(["DI", "ED", "CB", "LB", "S"]);
+  const rawLine = players.filter((p) => p.position === "DI" || p.position === "ED");
+  const rawLb = players.filter((p) => p.position === "LB");
+
+  // Which real body sits for the slot corner in Nickel isn't fixed --
+  // confirmed against real DEN data (2026-09-28): DEN's Base front is
+  // 5-wide (ROLB/RE/NT/LE/LOLB), and their real Nickel drops the true
+  // nose tackle (D.J. Jones, the one with distanceForDefense's lowest
+  // magnitude -- i.e. the most interior lineman, not an edge piece)
+  // and keeps BOTH linebackers, unlike a standard 4-man front, which
+  // has no spare lineman to give up and drops a linebacker instead
+  // (still an approximation -- see that drop's own comment below).
+  let lineForFront = rawLine;
+  let lbForFront = rawLb;
+  if (front === "nickel") {
+    if (rawLine.length > 4) {
+      const minDist = Math.min(...rawLine.map(distanceForDefense));
+      const dropIdx = rawLine.findIndex((p) => distanceForDefense(p) === minDist);
+      lineForFront = rawLine.filter((_, i) => i !== dropIdx);
+    } else {
+      // Standard front, no spare lineman -- approximated as whichever
+      // orderRow places last (a real DC's actual sub-package rule
+      // varies by team and situation, beyond "line up the positions").
+      lbForFront = orderRow(rawLb, distanceForDefense, true).slice(0, -1);
+    }
+  }
+  const line = orderRow(lineForFront, distanceForDefense, true);
+  const lb = orderRow(lbForFront, distanceForDefense, true);
+
+  // The slot corner's ALIGNMENT code ("SCB") is trusted over its raw
+  // `position` field, which is real but inconsistent across teams --
+  // confirmed against the DB directly: DEN/KC/MIA/BUF all file SCB
+  // under position "CB", but LAR files the exact same SCB alignment
+  // under position "S". Trusting `position` alone meant LAR's slot
+  // corner landed in the safety group and rendered in EVERY front,
+  // including Base -- a real 12th-man-on-the-field bug (a slot corner
+  // is a Nickel-only body), not just a cosmetic misplacement.
+  const cb = players.filter((p) => p.position === "CB" || p.alignment === "SCB");
+  const safety = [...players.filter((p) => p.position === "S" && p.alignment !== "SCB")].sort((a, b) =>
+    a.alignment.localeCompare(b.alignment)
+  );
+  const other = players.filter((p) => !known.has(p.position) && p.alignment !== "SCB");
+
+  // NOT mirrored, unlike the D-line/ED/LB groups below -- confirmed
+  // against real DEN data (2026-09-28): Riley Moss (real alignment
+  // LCB) renders on screen-LEFT and Pat Surtain II (real alignment
+  // RCB) on screen-RIGHT on PFF's own Lineup tab, i.e. a literal
+  // reading, same convention as offense's LWR/RWR. Corners are named
+  // from the same fixed reference frame as the offense they're
+  // covering; only the front-seven groups are named from the
+  // defense's own point of view (see orderRow's mirror comment).
+  const leftCb = cb.filter((p) => alignmentSide(p.alignment) === "left");
+  const rightCb = cb.filter((p) => alignmentSide(p.alignment) === "right");
+  const slotCb = cb.filter((p) => alignmentSide(p.alignment) === "center");
+
+  // Same depth=18 minimum-from-LOS rule as offense (see OFFENSE_COORDS)
+  // -- and, per feedback, the defense clusters noticeably tighter than
+  // the O-line/WRs (narrower x-ranges throughout) rather than spread
+  // out toward the sidelines.
+  const positioned: PositionedPlayer[] = [];
+  leftCb.forEach((p) => positioned.push({ player: p, xPct: 6, depthPct: 24 }));
+  rightCb.forEach((p) => positioned.push({ player: p, xPct: 94, depthPct: 24 }));
+  line.forEach((p, i) => positioned.push({ player: p, xPct: evenX(i, line.length, 30, 70), depthPct: 18 }));
+  if (front === "nickel") {
+    // x=18 clears the line's leftmost possible box (x=30, 5-wide 3-4
+    // front) by more than a box-width on its own; depth (40) also
+    // clears it independently, so either margin alone is enough.
+    //
+    // KNOWN LIMITATION, confirmed 2026-09-28 against real LAR data:
+    // this picks the Nickel slot corner by alignment code ("SCB") --
+    // the only signal this project's PFF Developer API tier exposes
+    // for it (see the personnel-package research earlier the same day:
+    // no per-game/per-snap personnel participation endpoint exists at
+    // all, just this static depth-chart label). For LAR specifically,
+    // that alignment-coded SCB is Trent McDuffie (position=CB,
+    // depth_order=1, snap_pct=99.5%) -- but PFF's OWN Lineup tab's
+    // Nickel diagram instead shows Quentin Lake (position=S, alignment
+    // SS, snap_pct=100%) as the extra DB, i.e. a safety playing a
+    // hybrid slot-corner role on real snaps. There is no field in our
+    // data (position, alignment, or snap_pct) that distinguishes "this
+    // team's real Nickel DB is actually a safety" from a normal SCB
+    // team -- both McDuffie and Lake show ~full snap shares, so
+    // snap_pct isn't a usable tiebreaker either. Decision (per the
+    // project owner, same date): leave this on the real, data-backed
+    // SCB alignment rather than guess at a heuristic favoring safeties
+    // -- correct here just means "matches the depth chart," not
+    // "matches PFF's own Nickel diagram for every team."
+    slotCb.forEach((p) => positioned.push({ player: p, xPct: 18, depthPct: 40 }));
+  }
+  lb.forEach((p, i) => positioned.push({ player: p, xPct: evenX(i, lb.length, 45, 55), depthPct: 48 }));
+  // PFF's own reference isn't two safeties spread evenly -- one sits
+  // shallow, tucked in close beside the linebackers (matching their
+  // "#37 up and to the right of the LILB" look), the other sits deep
+  // and off to the opposite side. Only meaningful for the common
+  // 2-safety case; anything else falls back to an even spread.
+  if (safety.length === 2) {
+    positioned.push({ player: safety[0], xPct: 35, depthPct: 78 });
+    // x=68 (vs LILB's 55) clears a box-width on its own so it no
+    // longer overlaps the linebacker row it's tucked in beside.
+    positioned.push({ player: safety[1], xPct: 68, depthPct: 65 });
+  } else {
+    safety.forEach((p, i) => positioned.push({ player: p, xPct: evenX(i, safety.length, 38, 62), depthPct: 74 }));
+  }
+  other.forEach((p, i) => positioned.push({ player: p, xPct: evenX(i, other.length, 45, 55), depthPct: 88 }));
+  return positioned;
+}
+
+// Same convention as PFF's own boxes -- last name only, so it fits.
+// Strips a trailing suffix (Jr./Sr./II-V) before taking the last
+// whitespace-separated token, so "Warren McClendon Jr." reads
+// "McClendon" rather than "Jr." A hyphenated surname like
+// "Gardner-Johnson" is already one token, so it comes through whole.
+const NAME_SUFFIXES = new Set(["Jr.", "Sr.", "II", "III", "IV", "V"]);
+function lastName(fullName: string): string {
+  const tokens = fullName.trim().split(/\s+/);
+  while (tokens.length > 1 && NAME_SUFFIXES.has(tokens[tokens.length - 1])) {
+    tokens.pop();
+  }
+  return tokens[tokens.length - 1] ?? fullName;
+}
+
+// Matches PFF's own card anatomy: the alignment code as a plain black
+// pill OUTSIDE/above the card, the jersey+name on a team-colored bar
+// as the card's own header, then the grade badge, then the rank text
+// -- no headshot photo, which PFF's own Lineup-tab boxes don't carry
+// either (unlike this page's other report cards). A player with no
+// grade/rank yet (a real case -- a backup, or a defensive starter
+// below the leaders endpoint's own qualifying snap share, see
+// poll_lineup.py's module docstring) shows a dash, never a crash or a
+// literal "null". Absolutely positioned at (xPct, topPct) within its
+// half -- topPct is depthPct already converted for which half (top or
+// bottom of the LOS divider) this box is in, see LineupFieldHalf.
+function LineupPositionBox({
+  pos,
+  alias,
+  topPct,
+}: {
+  pos: PositionedPlayer;
+  alias: string;
+  topPct: number;
+}) {
+  const { player } = pos;
+  const tier = player.grade !== null ? gradeTierColor(player.grade) : null;
+  // Same "top 5 turns yellow" convention as the Overview page's report
+  // cards (.eff-rank-top5/.edge-value-rank-top5) -- same #ffd60a value,
+  // kept fixed regardless of site theme like the rest of this feature.
+  const isTop5 = player.gradeRank !== null && player.gradeRank <= 5;
+  return (
+    <div className="lineup-box" style={{ left: `${pos.xPct}%`, top: `${topPct}%` }}>
+      <span className="lineup-box-position">{player.alignment}</span>
+      <div className="lineup-box-card">
+        <div className="lineup-box-namebar" style={{ background: edgeAccentColor(alias) }}>
+          {player.jersey && <span className="lineup-box-jersey">#{player.jersey}</span>} {lastName(player.playerName)}
+        </div>
+        <PlayerHeadshot espnId={player.espnId} alias={alias} size={26} />
+        {player.grade !== null && tier !== null ? (
+          <div className="lineup-box-grade" style={{ borderColor: tier, backgroundColor: `${tier}20` }}>
+            {player.grade.toFixed(1)}
+          </div>
+        ) : (
+          <div className="lineup-box-grade lineup-box-grade-empty">—</div>
+        )}
+        <span className={`lineup-box-rank ${isTop5 ? "lineup-box-rank-top5" : ""}`}>
+          {player.gradeRank !== null && player.gradeRankOf !== null
+            ? `${ordinal(player.gradeRank)} / ${player.gradeRankOf} ${player.alignment}`
+            : "—"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// One half of the field (above or below the LOS divider). depthPct is
+// always "distance from the LOS" regardless of which half it's in --
+// this flips it into an actual top% for whichever half is on top
+// (farthest-from-LOS row ends up near that half's own top edge) versus
+// the bottom (nearest-to-LOS row ends up right under the divider).
+// Faint team-logo watermark centered in this half. A real pre-baked
+// duotone asset (public/assets/field-watermarks/{ALIAS}.png), not a
+// CSS mask -- a mask only sees the alpha channel, so every opaque
+// pixel gets painted the SAME flat tint and all the logo's internal
+// linework (feathers, shading, outlines) disappears into one flat
+// silhouette. This asset instead keeps the source badge's real
+// grayscale luminance (dark stays dark, light stays light) recolored
+// through a single green duotone (black->#1c5a2e, white->#a8e6b0, via
+// Pillow's ImageOps.colorize on the real transparent badge from
+// public/assets/thumb-team-logos/{ALIAS}.png), which is what actually
+// produces the embossed multi-tone look PFF's own site has -- verified
+// by rendering a preview and comparing side by side before generating
+// the full 32-team set. teamLogoPath's own /assets/team-logos set is
+// untouched, used elsewhere for the real (non-watermark) team logo.
+function LineupFieldWatermark({ alias }: { alias: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className="lineup-field-watermark" src={`/assets/field-watermarks/${alias}.png`} alt="" />
+  );
+}
+
+function LineupFieldHalf({
+  positions,
+  alias,
+  isTop,
+  emptyLabel,
+}: {
+  positions: PositionedPlayer[];
+  alias: string;
+  isTop: boolean;
+  emptyLabel: string;
+}) {
+  if (positions.length === 0) {
+    return (
+      <div className="lineup-field-half">
+        <LineupFieldWatermark alias={alias} />
+        <div className="lineup-field-empty">{emptyLabel}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="lineup-field-half">
+      <LineupFieldWatermark alias={alias} />
+      {positions.map((pos) => (
+        <LineupPositionBox
+          key={pos.player.pffPlayerId}
+          pos={pos}
+          alias={alias}
+          topPct={isTop ? 100 - pos.depthPct : pos.depthPct}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Generic pill-button group backing all three header switches below --
+// which team/unit, which offensive personnel package, which defensive
+// front. Kept as one component so the three groups share one visual
+// language instead of three near-duplicate button lists.
+// Active state is a flat #ffd60a yellow, not a per-team color (see
+// .lineup-toggle-group button.active) -- team colors here often
+// rendered as a muted, low-contrast brown/olive depending on the team.
+function LineupToggleGroup<T extends string>({
+  options,
+  active,
+  onChange,
+  label,
+}: {
+  options: readonly T[];
+  active: T;
+  onChange: (value: T) => void;
+  label: (value: T) => ReactNode;
+}) {
+  return (
+    <div className="lineup-toggle-group" role="tablist">
+      {options.map((opt) => {
+        const isActive = opt === active;
+        return (
+          <button
+            key={opt}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            className={isActive ? "active" : ""}
+            onClick={() => onChange(opt)}
+          >
+            {label(opt)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Mirrors PFF's own Lineup tab: ONE shared field, both teams on it at
+// once, lined up as they actually would be for a real snap -- whichever
+// unit the home team's toggle currently shows, the away team
+// automatically fills the opposite unit (home offense vs away defense,
+// or home defense vs away offense), never both teams' offenses or both
+// defenses at the same time. The personnel-package and front switches
+// apply to whichever team currently holds that unit, not to a fixed
+// team -- a package is something the offense calls, a front is
+// something the defense calls, regardless of home/away.
+function MatchupsView({ game }: { game: GameStat }) {
+  const [homeUnit, setHomeUnit] = useState<"offense" | "defense">("offense");
+  const [offensePackage, setOffensePackage] = useState<PersonnelPackage>("11");
+  const [defenseFront, setDefenseFront] = useState<DefensiveFront>("base");
+  if (!game.lineup) {
+    return (
+      <div className="stat-section">
+        <h2>Matchups</h2>
+        <div className="lineup-unavailable">Lineup data isn&apos;t available for this game yet.</div>
+      </div>
+    );
+  }
+
+  const homeAlias = game.teamB.alias;
+  const awayAlias = game.teamA.alias;
+  const awayUnit = homeUnit === "offense" ? "defense" : "offense";
+
+  // Matches PFF's own convention: the HOME team always renders on top,
+  // in whichever unit its own toggle currently shows -- the away team
+  // fills the complementary unit on the bottom. It's the team that's
+  // fixed to a side, not the unit (an earlier version of this had
+  // defense fixed to the top regardless of home/away, which is wrong).
+  const topPositions =
+    homeUnit === "offense"
+      ? buildOffensePositions(game.lineup.home.offense, offensePackage)
+      : buildDefensePositions(game.lineup.home.defense, defenseFront);
+  const bottomPositions =
+    awayUnit === "offense"
+      ? buildOffensePositions(game.lineup.away.offense, offensePackage)
+      : buildDefensePositions(game.lineup.away.defense, defenseFront);
+
+  return (
+    <div className="stat-section">
+      <h2>Matchups</h2>
+      <p className="stat-sub">
+        {teamByAlias(homeAlias)?.name ?? homeAlias}&apos;s toggle picks the matchup — the other team automatically
+        lines up as the opposing unit, same as a real snap. The personnel and front buttons are the same generic
+        slot template for every team; only the real players filling each slot differ. Season-to-date PFF grade and
+        its league-wide rank for that specific alignment slot (e.g. &ldquo;8th / 69 LT&rdquo;).
+      </p>
+      <div className="lineup-card">
+        <div className="lineup-card-header">
+          <LineupToggleGroup
+            options={["offense", "defense"] as const}
+            active={homeUnit}
+            onChange={setHomeUnit}
+            label={(u) => (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="lineup-switch-logo" src={teamLogoPath(homeAlias)} alt="" />
+                {teamByAlias(homeAlias)?.name ?? homeAlias} {u === "offense" ? "Offense" : "Defense"}
+              </>
+            )}
+          />
+          <LineupToggleGroup
+            options={["11", "21", "12"] as const}
+            active={offensePackage}
+            onChange={setOffensePackage}
+            label={(pkg) => PERSONNEL_LABELS[pkg]}
+          />
+          <LineupToggleGroup
+            options={["base", "nickel"] as const}
+            active={defenseFront}
+            onChange={setDefenseFront}
+            label={(f) => (f === "base" ? "Base" : "Nickel")}
+          />
+        </div>
+        {/* Deliberately just a CSS gradient "field" backdrop, not real
+            yard-line/hash-mark SVG art -- out of scope for this feature.
+            Each half is a real (x%, depth%) coordinate system, not flex
+            rows -- see PositionedPlayer/LineupFieldHalf above. */}
+        <div className="lineup-field">
+          <LineupFieldHalf positions={topPositions} alias={homeAlias} isTop emptyLabel={`No ${homeUnit} lineup data yet.`} />
+          <div className="lineup-los" />
+          <LineupFieldHalf
+            positions={bottomPositions}
+            alias={awayAlias}
+            isTop={false}
+            emptyLabel={`No ${awayUnit} lineup data yet.`}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PageTabStrip({
+  active,
+  onChange,
+}: {
+  active: "overview" | "matchups";
+  onChange: (tab: "overview" | "matchups") => void;
+}) {
+  return (
+    <div className="page-tab-strip" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active === "overview"}
+        className={active === "overview" ? "active" : ""}
+        onClick={() => onChange("overview")}
+      >
+        Overview
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active === "matchups"}
+        className={active === "matchups" ? "active" : ""}
+        onClick={() => onChange("matchups")}
+      >
+        Matchups
+      </button>
+    </div>
+  );
+}
+
 const INJURY_STATUS_CLASS: Record<string, string> = {
   Out: "injury-out",
   Doubtful: "injury-doubtful",
@@ -1063,6 +1674,7 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
   const { isMember, toggle } = useMemberPreview();
   const router = useRouter();
   const locked = !game.premier && !isMember;
+  const [activeTab, setActiveTab] = useState<"overview" | "matchups">("overview");
 
   useEffect(() => {
     if (game.status !== "live") return;
@@ -1180,21 +1792,33 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
         </p>
       </footer>
 
-      {/* Below the model-data disclaimer on purpose -- these grades
-          come from PFF, a separate data source from the Monte Carlo
-          simulation the footer above is describing, not "every number
-          above." These five sections replicate PFF's own game-report
-          page, in PFF's own order, as one cohesive block. ("Who Has
-          the Edge?", the original cross-unit-matchup section, was
-          removed -- Team Grades below covers the same ground with
-          PFF's own real report shape instead.) */}
-      <div className="page-edge-section">
-        <HighestGradedPlayersSection game={game} />
-        <QbMatchupSection game={game} />
-        <EfficiencySection game={game} />
-        <PressureMatchupSection game={game} />
-        <TeamGradesSection game={game} />
-      </div>
+      {/* Tab strip sits here, right above the PFF report block, rather
+          than under the Hero -- everything above this point (margin/
+          totals/percentile, the model-data disclaimer) is shared
+          context for both tabs, not Overview-only content. */}
+      <PageTabStrip active={activeTab} onChange={setActiveTab} />
+
+      {activeTab === "overview" ? (
+        // Below the model-data disclaimer on purpose -- these grades
+        // come from PFF, a separate data source from the Monte Carlo
+        // simulation the footer above is describing, not "every number
+        // above." These five sections replicate PFF's own game-report
+        // page, in PFF's own order, as one cohesive block. ("Who Has
+        // the Edge?", the original cross-unit-matchup section, was
+        // removed -- Team Grades below covers the same ground with
+        // PFF's own real report shape instead.
+        <div className="page-edge-section">
+          <HighestGradedPlayersSection game={game} />
+          <QbMatchupSection game={game} />
+          <EfficiencySection game={game} />
+          <PressureMatchupSection game={game} />
+          <TeamGradesSection game={game} />
+        </div>
+      ) : (
+        <div className="page-edge-section">
+          <MatchupsView game={game} />
+        </div>
+      )}
     </>
   );
 }

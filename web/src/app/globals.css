@@ -3400,3 +3400,263 @@ h1.glow span {
     transform: rotate(90deg);
   }
 }
+
+/* ----------------------------------------------------------------------
+   Overview / Matchups tab strip + the Matchups tab's formation-style
+   lineup view (etl.pff_lineup, via SportsPipelines/pff_api/poll_lineup.py).
+   ---------------------------------------------------------------------- */
+.page-tab-strip {
+  display: flex;
+  margin: 1.5rem 0 2rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.page-tab-strip button {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  padding: 0.6rem 0.25rem;
+  margin-right: 1.5rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.page-tab-strip button:hover {
+  color: var(--text);
+}
+
+.page-tab-strip button.active {
+  color: var(--text-strong);
+  border-bottom-color: var(--green);
+}
+
+.lineup-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Fixed dark green regardless of site theme, same convention as the
+   field backdrop below it -- this bar holds three independent
+   switches (home team unit, offensive personnel, defensive front),
+   not a per-team color (both teams appear on the field at once, so no
+   single team owns this header). Wraps on narrow screens since three
+   button groups won't fit one line on mobile. */
+.lineup-card-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  padding: 0.7rem 1rem;
+  background: #123a20;
+}
+
+.lineup-toggle-group {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.lineup-toggle-group button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Flat #ffd60a yellow (same accent as this feature's own top-5 rank
+   highlight) instead of a per-team color -- team colors here often
+   rendered as a muted, low-contrast brown/olive against the dark
+   header bar depending on the team, which read as "boring" regardless
+   of which team's game this is. Dark text for contrast against the
+   bright fill instead of the inactive buttons' white. */
+.lineup-toggle-group button.active {
+  background: #ffd60a;
+  color: #1a1a00;
+  border-color: #ffd60a;
+  text-shadow: none;
+}
+
+.lineup-switch-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+/* Real field texture (public/assets/field/field-tile.png), not a
+   CSS-drawn approximation -- a 129px-tall seamless vertical crop of
+   /home/neo/SportsWeb/static/assets/team-logos/Field.png (its own
+   yard-line row to the next one), tiled vertically. The source image
+   also has a baked-in yellow LOS stripe partway down that does NOT
+   repeat on this tile's period -- it was cropped out on purpose so it
+   can't collide with this feature's own separately-positioned
+   .lineup-los divider between the two halves. Holds both teams at
+   once: the home team's half, the divider, then the away team's half. */
+.lineup-field {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-image: url("/assets/field/field-tile.png");
+  background-repeat: repeat-y;
+  background-size: 100% 129px;
+  background-position: top center;
+}
+
+/* A real (x%, y%) coordinate plane, not a flex row -- every box inside
+   is absolutely positioned by PositionedPlayer's xPct/depthPct (see
+   GameDetailView.tsx). Fixed height so percentage offsets are stable
+   regardless of how many boxes a given half has. */
+.lineup-field-half {
+  position: relative;
+  z-index: 1;
+  height: 500px;
+}
+
+/* Pre-baked green-duotone team logo (see LineupFieldWatermark's own
+   comment for how the asset itself preserves real shading/linework,
+   not a flat silhouette). Low opacity so it reads as an embossed field
+   watermark, not a sticker sitting on top of the turf. Sits behind the
+   player boxes (rendered first in DOM, both z-index:auto within the
+   half's own stacking context) without needing an explicit z-index. */
+.lineup-field-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 69%;
+  height: 69%;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.lineup-los {
+  position: relative;
+  z-index: 1;
+  height: 3px;
+  margin: 0 1rem;
+  background: #d4af37;
+}
+
+.lineup-field-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+}
+
+/* Matches PFF's own card anatomy: the alignment code as a plain black
+   pill OUTSIDE the card, then the card itself (team-colored name bar,
+   grade badge, rank text) -- no headshot photo, PFF's own Lineup-tab
+   boxes don't carry one either. Centered on its (xPct, topPct) point. */
+.lineup-box {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 92px;
+}
+
+.lineup-box-position {
+  background: #000;
+  color: #fff;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  padding: 0.05rem 0.4rem;
+  border-radius: 3px;
+  margin-bottom: 0.2rem;
+}
+
+.lineup-box-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  background: rgba(4, 20, 8, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  overflow: hidden;
+  padding-bottom: 0.3rem;
+  text-align: center;
+}
+
+.lineup-box-card .player-headshot {
+  margin-top: 0.3rem;
+  margin-bottom: 0.2rem;
+}
+
+.lineup-box-namebar {
+  width: 100%;
+  color: #fff;
+  font-size: 0.64rem;
+  font-weight: 700;
+  padding: 0.25rem 0.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineup-box-jersey {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.lineup-box-grade {
+  margin-top: 0.3rem;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-strong);
+  border: 1.5px solid;
+  border-radius: 6px;
+  padding: 0.1rem 0.4rem;
+  min-width: 2.2rem;
+}
+
+.lineup-box-grade-empty {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.lineup-box-rank {
+  margin-top: 0.2rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.58rem;
+}
+
+/* Same #ffd60a "top 5" convention as .eff-rank-top5/
+   .edge-value-rank-top5 on the Overview page. */
+.lineup-box-rank-top5 {
+  color: #ffd60a;
+  font-weight: 700;
+}
+
+.lineup-unavailable {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+@media (max-width: 480px) {
+  .lineup-box {
+    width: 78px;
+  }
+}

@@ -11,6 +11,7 @@ import type {
   GameQbMatchup,
   GameTeamPressure,
 } from "@/lib/pffGameReport";
+import type { GameLineup } from "@/lib/lineup";
 
 export interface GameStatSide {
   alias: string;
@@ -53,6 +54,12 @@ export interface GameStat {
   efficiency?: GameEfficiency;
   teamPressure?: GameTeamPressure;
   teamGrades?: TeamGradeRow[];
+  // Backs the "Matchups" tab (etl.pff_lineup, via
+  // SportsPipelines/pff_api/poll_lineup.py) -- undefined whenever
+  // neither team has any lineup rows yet (poller hasn't run for that
+  // team, or its code isn't resolvable), same independently-nullable
+  // convention as every other report field above.
+  lineup?: GameLineup;
 }
 
 export const PERCENTILE_MIN = -30;
