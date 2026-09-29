@@ -1252,7 +1252,17 @@ function buildDefensePositions(players: LineupPlayer[], front: DefensiveFront): 
     // "matches PFF's own Nickel diagram for every team."
     slotCb.forEach((p) => positioned.push({ player: p, xPct: 18, depthPct: 40 }));
   }
-  lb.forEach((p, i) => positioned.push({ player: p, xPct: evenX(i, lb.length, 45, 55), depthPct: 48 }));
+  // Spread scales with how many linebackers this team actually has --
+  // a fixed 45-70 range was sized for the common 2-linebacker (3-4)
+  // case and left only ~5% between adjacent boxes for a true 3-backer
+  // 4-3 team (MLB/SLB/WLB), well under the ~10% a box needs to clear
+  // its neighbor (confirmed as the real cause of NYG's overlapping
+  // MLB/SLB/WLB boxes). 10% per player keeps that same safe spacing
+  // regardless of count.
+  const lbSpread = Math.max(10, (lb.length - 1) * 10);
+  const lbLeft = 50 - lbSpread / 2;
+  const lbRight = 50 + lbSpread / 2;
+  lb.forEach((p, i) => positioned.push({ player: p, xPct: evenX(i, lb.length, lbLeft, lbRight), depthPct: 48 }));
   // PFF's own reference isn't two safeties spread evenly -- one sits
   // shallow, tucked in close beside the linebackers (matching their
   // "#37 up and to the right of the LILB" look), the other sits deep
