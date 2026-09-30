@@ -1325,7 +1325,8 @@ function LineupPositionBox({
       <span className="lineup-box-position">{player.alignment}</span>
       <div className="lineup-box-card">
         <div className="lineup-box-namebar" style={{ background: edgeAccentColor(alias) }}>
-          {player.jersey && <span className="lineup-box-jersey">#{player.jersey}</span>} {lastName(player.playerName)}
+          {player.jersey && <span className="lineup-box-jersey">#{player.jersey}</span>}
+          <span className="lineup-box-lastname">{lastName(player.playerName)}</span>
         </div>
         <PlayerHeadshot espnId={player.espnId} alias={alias} size={26} />
         {player.grade !== null && tier !== null ? (
