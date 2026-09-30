@@ -3615,6 +3615,7 @@ h1.glow span {
 
 .lineup-box-jersey {
   color: rgba(255, 255, 255, 0.85);
+  margin-right: 0.3em;
 }
 
 .lineup-box-grade {
@@ -3667,7 +3668,7 @@ h1.glow span {
    the O-line row mashed together). */
 @media (max-width: 480px) {
   .lineup-box {
-    width: 50px;
+    width: 42px;
   }
 
   .lineup-box-position {
@@ -3680,9 +3681,26 @@ h1.glow span {
     display: none;
   }
 
+  /* Jersey number and last name stack on their own lines instead of
+     sharing one ("#XX LASTNAME") -- taller, but noticeably narrower,
+     which is the actual constraint on a phone-width field. */
   .lineup-box-namebar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     font-size: 0.42rem;
     padding: 0.15rem 0.15rem;
+  }
+
+  .lineup-box-jersey {
+    margin-right: 0;
+  }
+
+  .lineup-box-lastname {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .lineup-box-grade {
