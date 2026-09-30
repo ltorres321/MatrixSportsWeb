@@ -3655,8 +3655,46 @@ h1.glow span {
   padding: 2rem 0;
 }
 
+/* Narrow viewports: the coordinate math (x%/depth% gaps) is the same
+   math as desktop, but a phone-width field container (~380px) gives
+   every one of those percentage gaps far fewer real pixels to work
+   with than the ~975px desktop container they were tuned against --
+   the fixed-pixel box width doesn't shrink to match, so boxes that
+   were comfortably apart on desktop start overlapping on a phone.
+   Headshot dropped and every dimension shrunk hard (not just a modest
+   scale-down) so the box's real pixel footprint clears the tightest
+   gaps again (confirmed against a real on-device screenshot showing
+   the O-line row mashed together). */
 @media (max-width: 480px) {
   .lineup-box {
-    width: 78px;
+    width: 50px;
+  }
+
+  .lineup-box-position {
+    font-size: 0.42rem;
+    padding: 0.02rem 0.25rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .lineup-box-card .player-headshot {
+    display: none;
+  }
+
+  .lineup-box-namebar {
+    font-size: 0.42rem;
+    padding: 0.15rem 0.15rem;
+  }
+
+  .lineup-box-grade {
+    margin-top: 0.15rem;
+    font-size: 0.56rem;
+    padding: 0.04rem 0.2rem;
+    min-width: 1.5rem;
+    border-width: 1px;
+  }
+
+  .lineup-box-rank {
+    margin-top: 0.1rem;
+    font-size: 0.36rem;
   }
 }
