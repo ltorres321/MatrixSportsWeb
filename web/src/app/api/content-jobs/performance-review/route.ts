@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { isAuthorizedContentJob } from "@/lib/contentJobAuth";
 import { getLatestPerformanceReview } from "@/lib/stories";
 import { performanceReviewCaption, PLATFORMS } from "@/lib/social/captions";
-import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
+import { accuracyPctFromStory, performanceTierImagePath, performanceTierSquareImagePath } from "@/lib/performanceTier";
 
 // Machine-to-machine endpoint for the standalone content-generation
 // jobs in /home/neo/SportsContentCreation -- see contentJobAuth.ts.
@@ -32,12 +32,21 @@ export async function GET(request: Request) {
   // base64-encoded, same shape spotlight/recap already return
   // (imageBase64), so SportsContentCreation's job can use the same
   // writePostFolder() as those instead of a text-only variant.
+  // imageSquareBase64 is that same tier's pre-composited 1080x1080
+  // companion (performanceTier.ts) -- the source PNGs are wide, so
+  // Instagram's own crop otherwise clips the headline text.
   const accuracyPct = accuracyPctFromStory(story);
   let imageBase64: string | null = null;
+  let imageSquareBase64: string | null = null;
   if (accuracyPct !== null) {
     const imagePath = performanceTierImagePath(accuracyPct);
-    const fileBuffer = await readFile(path.join(process.cwd(), "public", imagePath));
+    const imageSquarePath = performanceTierSquareImagePath(accuracyPct);
+    const [fileBuffer, squareFileBuffer] = await Promise.all([
+      readFile(path.join(process.cwd(), "public", imagePath)),
+      readFile(path.join(process.cwd(), "public", imageSquarePath)),
+    ]);
     imageBase64 = fileBuffer.toString("base64");
+    imageSquareBase64 = squareFileBuffer.toString("base64");
   }
 
   return NextResponse.json({
@@ -47,5 +56,6 @@ export async function GET(request: Request) {
     headline: story.headline,
     captions,
     imageBase64,
+    imageSquareBase64,
   });
 }

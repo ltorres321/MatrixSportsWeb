@@ -123,6 +123,16 @@ export default function MatchupCard({
       <TeamRow side={matchup.teamA} status={matchup.status} predictionCorrect={matchup.predictionCorrect} />
       <div className="vs-divider">VS</div>
       <TeamRow side={matchup.teamB} status={matchup.status} predictionCorrect={matchup.predictionCorrect} />
+      {/* Every final game gets a written recap within a few hours (see
+          weekly-stories.mts's 3-hourly cron) -- surfacing that here,
+          not just on the game page itself, is what makes "there's
+          real analysis behind every finished game" visible from a
+          list of tiles, not just discoverable one click deep. */}
+      {matchup.status === "final" && (
+        <div style={{ marginTop: "0.75rem", textAlign: "center", color: "var(--green)", fontSize: "0.82rem" }}>
+          📰 Read Game Analysis →
+        </div>
+      )}
     </div>
   );
 

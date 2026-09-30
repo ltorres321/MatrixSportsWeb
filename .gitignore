@@ -16,3 +16,5 @@ __pycache__/
 # OS junk
 .DS_Store
 Thumbs.db
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md

@@ -55,6 +55,13 @@ export default async function HomePage() {
     }
   }
 
+  // Signed-out visitors previously had zero links to any of the
+  // site's actual written content (every recap lived one login away,
+  // behind SignedInDashboard) -- this is the one page an anonymous
+  // crawler (including Google's own AdSense reviewer) ever sees, so a
+  // real sample of it has to be reachable from here directly.
+  const recentStories = await getPublishedStories(3);
+
   return (
     <>
       {/* Signed-out visitors -- including Google's own AdSense crawler,
@@ -132,6 +139,36 @@ export default async function HomePage() {
               <p>Free accounts created now lock in preferential pricing when paid tiers launch later.</p>
             </div>
           </div>
+
+          {recentStories.length > 0 && (
+            <div className="news-section">
+              <div className="section-label">
+                <span className="dot" /> LATEST GAME RECAPS
+              </div>
+              <div className="news-grid">
+                {recentStories.map((story) => (
+                  <Link key={story.id} className="news-card" href={`/game/${story.universal_game_id}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- generated route, not a static asset next/image can optimize */}
+                    <img
+                      className="news-card-image"
+                      src={`/game/${story.universal_game_id}/opengraph-image`}
+                      alt=""
+                    />
+                    <div className="news-card-body">
+                      <h3>{story.headline}</h3>
+                      <p>{truncateTeaser(story.body)}</p>
+                      <span className="read-more">View Game →</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                <Link className="btn btn-ghost" href="/stories">
+                  Browse All Recaps →
+                </Link>
+              </div>
+            </div>
+          )}
 
           <div className="mobile-ad-wrap" aria-label="Promotional space">
             <MobileAdFrame>
@@ -366,36 +403,16 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
               <span className="read-more">Read More →</span>
             </Link>
 
-            {/* The real Weekly Model Performance article shows in the
-                LATEST NFL COVERAGE grid above (first slot) once
-                featured -- not duplicated here too. This card stays a
-                placeholder until there's a second insights-style piece
-                to fill it with. */}
-            <div className="article-card disabled">
-              <div className="thumb">📊</div>
-              <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
-                COMING SOON
-              </span>
-              <h3>Weekly Model Performance</h3>
+            <Link className="article-card" href="/stories">
+              <div className="thumb">📰</div>
+              <h3>Every Game Recap We&apos;ve Published</h3>
               <p>
-                A running look at how the model&apos;s calls have tracked against
-                real results across the season so far -- not just one game, the
-                whole body of work.
+                A real, written recap for every final game this season, plus
+                our weekly model performance reviews -- not just the handful
+                featured above.
               </p>
-            </div>
-
-            <div className="article-card disabled">
-              <div className="thumb">🏈</div>
-              <span className="soon-tag" style={{ position: "absolute", top: "1rem", right: "1rem" }}>
-                COMING SOON
-              </span>
-              <h3>Team Deep Dives</h3>
-              <p>
-                Season-long trend pieces on individual teams — how their actual
-                results have tracked against our simulated projections week
-                over week.
-              </p>
-            </div>
+              <span className="read-more">Browse All Recaps →</span>
+            </Link>
           </div>
 
           {/* One ad slot per 3 articles -- currently a single group of
@@ -424,10 +441,8 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
 
       <footer className="site-footer">
         <p>
-          Article content is being built out — the piece linked above is real,
-          the two marked &quot;Coming Soon&quot; will be written from actual
-          weekly model output once a full season cycle has run, not filled in
-          with placeholder numbers.
+          Every final game gets a real, written recap -- browse the{" "}
+          <Link href="/stories">full archive</Link>.
         </p>
       </footer>
     </>
