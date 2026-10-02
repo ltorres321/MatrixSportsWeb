@@ -1743,6 +1743,12 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
               <InjuryReportSection game={game} />
               <ResultCompare game={game} />
               <GameRecap story={story} />
+              <div className="mobile-ad-wrap" aria-label="Promotional space">
+                <MobileAdFrame>
+                  <AdUnit kind="mobile" />
+                  <span className="slot-label">Ad space</span>
+                </MobileAdFrame>
+              </div>
               <div className="locked-section is-locked">
                 <div className="matchup-grid">
                   <MarginSection game={game} />
@@ -1769,6 +1775,12 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
               <InjuryReportSection game={game} />
               <ResultCompare game={game} />
               <GameRecap story={story} />
+              <div className="mobile-ad-wrap" aria-label="Promotional space">
+                <MobileAdFrame>
+                  <AdUnit kind="mobile" />
+                  <span className="slot-label">Ad space</span>
+                </MobileAdFrame>
+              </div>
               <MarginSection game={game} />
               <TotalsSection game={game} />
               <PercentileSection game={game} />
@@ -1807,6 +1819,13 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
           than under the Hero -- everything above this point (margin/
           totals/percentile, the model-data disclaimer) is shared
           context for both tabs, not Overview-only content. */}
+      <div className="mobile-ad-wrap" aria-label="Promotional space">
+        <MobileAdFrame>
+          <AdUnit kind="mobile" />
+          <span className="slot-label">Ad space</span>
+        </MobileAdFrame>
+      </div>
+
       <PageTabStrip active={activeTab} onChange={setActiveTab} />
 
       {activeTab === "overview" ? (
