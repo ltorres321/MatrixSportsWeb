@@ -1692,6 +1692,47 @@ function displayPosition(entry: PlayerPropEntry): string | null {
   return entry.lineupPosition;
 }
 
+// null pre-game (PFF hasn't graded it yet -- most props on this site,
+// since most games haven't been played). Yellow check (this site's own
+// accent color, not PFF's green) for a hit, red X for a miss -- same
+// semantic PFF's own page uses, different color for the positive case
+// to match the rest of the site's theme.
+function PickResultIcon({ result }: { result: string | null }) {
+  if (result === "correct") {
+    return (
+      <span className="pick-result-icon pick-result-correct" title="Hit" aria-label="Correct pick">
+        ✓
+      </span>
+    );
+  }
+  if (result === "incorrect") {
+    return (
+      <span className="pick-result-icon pick-result-incorrect" title="Miss" aria-label="Incorrect pick">
+        ✕
+      </span>
+    );
+  }
+  return null;
+}
+
+// Yellow check ONLY, never a red X here -- unlike Player Props (every
+// prop has a clean correct/incorrect grade), First Touchdown and Game
+// Lines are both single-winner markets: everyone/everything that
+// didn't win isn't "wrong," they're just the other side of the same
+// coin. A red X on every non-winner would be noise, not a real
+// signal, so this only ever marks the one actual winner, once the
+// game's final. Shared by First Touchdown's scorer flag and Game
+// Lines' spread/moneyline/total results -- same visual, same
+// single-winner reasoning, different source of "did this hit."
+function HitCheckmark({ hit, title }: { hit: boolean; title: string }) {
+  if (!hit) return null;
+  return (
+    <span className="pick-result-icon pick-result-correct" title={title} aria-label={title}>
+      ✓
+    </span>
+  );
+}
+
 function sideLabel(sideType: string, game: GameStat): string {
   if (sideType === "away") return teamDisplay(game.teamA.alias).split(" ").pop() ?? sideType;
   if (sideType === "home") return teamDisplay(game.teamB.alias).split(" ").pop() ?? sideType;
@@ -1714,6 +1755,47 @@ function formatSideLine(propType: string, line: number | null, sideType: string)
   if (propType === "game_point_total") return line.toFixed(1);
   const signed = sideType === "home" ? line : -line;
   return signed > 0 ? `+${signed}` : `${signed}`;
+}
+
+// Only ever returns true for the side that actually won -- never
+// marks the losing side, same single-winner philosophy as First
+// Touchdown's checkmark (every market here has exactly one real
+// outcome, so there's nothing a red X would add beyond what the
+// missing checkmark on the other side already says). A push
+// (spread/total landing exactly on the line) correctly returns false
+// for both sides -- neither "hit."
+//
+// `line` here is stored "home's quoted spread" (positive = home
+// underdog) -- NOT SportsAnalytics's own "positive = good for home"
+// internal convention used elsewhere in this project (File 46 etc.),
+// so this is its own derivation, not a copy of that logic. Home
+// covers when actual_margin > -line; away covers when
+// actual_margin < -line -- verified against a real IND@WAS result
+// before trusting this in the UI.
+function didSideHit(
+  propType: string,
+  sideType: string,
+  line: number | null,
+  actualHomeScore: number | null,
+  actualAwayScore: number | null
+): boolean {
+  if (line == null || actualHomeScore == null || actualAwayScore == null) return false;
+  const margin = actualHomeScore - actualAwayScore;
+  const total = actualHomeScore + actualAwayScore;
+
+  if (propType === "game_point_total") {
+    if (sideType === "over") return total > line;
+    if (sideType === "under") return total < line;
+    return false;
+  }
+  if (propType === "game_away_home_win") {
+    if (sideType === "home") return actualHomeScore > actualAwayScore;
+    if (sideType === "away") return actualAwayScore > actualHomeScore;
+    return false;
+  }
+  if (sideType === "home") return margin > -line;
+  if (sideType === "away") return margin < -line;
+  return false;
 }
 
 // No info icon on the badge itself -- it renders once per row (every
@@ -1823,6 +1905,10 @@ function GameLinesSection({ game }: { game: GameStat }) {
                   <span className="betting-line-pick-text">
                     <span className="betting-line-side">
                       {sideLabel(side.type, game)} {formatSideLine(m.propType, m.line, side.type)}
+                      <HitCheckmark
+                        hit={didSideHit(m.propType, side.type, m.line, m.actualHomeScore, m.actualAwayScore)}
+                        title="This side hit"
+                      />
                     </span>
                     <span className="betting-line-odds">{formatOdds(side.odds)}</span>
                   </span>
@@ -1884,6 +1970,10 @@ function GameLinesSection({ game }: { game: GameStat }) {
                 <div className="gl-card-side-pick">
                   <span className="betting-line-side">
                     {sideLabel(side.type, game)} {formatSideLine(m.propType, m.line, side.type)}
+                    <HitCheckmark
+                      hit={didSideHit(m.propType, side.type, m.line, m.actualHomeScore, m.actualAwayScore)}
+                      title="This side hit"
+                    />
                   </span>
                   <span className="betting-line-odds">{formatOdds(side.odds)}</span>
                 </div>
@@ -2043,6 +2133,7 @@ function FirstTouchdownSection({ game }: { game: GameStat }) {
                 <td className="betting-table-sticky-col">
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
                   {e.position && <span className="betting-player-position">({e.position})</span>}
+                  <HitCheckmark hit={e.isActualFirstScorer} title="First TD scorer" />
                 </td>
                 <td>{formatOdds(e.firstTdOdds)}</td>
                 <td style={epaCellStyle(e.epaPerPlay, "high", 0.5)}>
@@ -2096,6 +2187,7 @@ function TdCard({ entry: e, game }: { entry: FirstTouchdownEntry; game: GameStat
           <div className="td-card-name">
             {e.playerName}
             {e.position && <span className="betting-player-position">({e.position})</span>}
+            <HitCheckmark hit={e.isActualFirstScorer} title="First TD scorer" />
           </div>
           <div className="td-card-matchup">
             <span className="betting-player-team">{e.playerTeam}</span>
@@ -2209,6 +2301,13 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
   const entries = game.bettingEdge?.playerProps ?? [];
   if (entries.length === 0) return null;
 
+  // Graded entries only -- most props on this site are for games that
+  // haven't been played yet, where pickResult is still null. Nothing
+  // to summarize until at least one prop has an actual result.
+  const graded = entries.filter((e) => e.pickResult === "correct" || e.pickResult === "incorrect");
+  const correctCount = graded.filter((e) => e.pickResult === "correct").length;
+  const correctPct = graded.length > 0 ? Math.round((correctCount / graded.length) * 100) : null;
+
   return (
     <div className="stat-section">
       <h2>Player Props</h2>
@@ -2216,6 +2315,14 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
         Prop picks for this game, sorted by Edge — the consensus line, the recommended side, its projection,
         matchup context, and recent hit-rate form for each player prop.
       </p>
+      {graded.length > 0 && (
+        <p className="betting-props-summary">
+          <span className="betting-props-summary-correct">{correctCount}</span>
+          <span className="betting-props-summary-sep">/</span>
+          <span className="betting-props-summary-total">{graded.length}</span>
+          <span className="betting-props-summary-pct">{correctPct}% correct</span>
+        </p>
+      )}
       <div className="betting-table-outer betting-desktop-only">
       <div className="betting-table-wrap">
         <table className="betting-table betting-table-grouped">
@@ -2279,6 +2386,7 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
                 <td className="betting-table-sticky-col">
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
                   {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
+                  <PickResultIcon result={e.pickResult} />
                 </td>
                 <td>
                   {e.consensusLine ?? "—"} {e.consensusStat}
@@ -2362,6 +2470,7 @@ function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }
             <div className="prop-card-name">
               {e.playerName}
               {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
+              <PickResultIcon result={e.pickResult} />
             </div>
             <div className="prop-card-matchup">
               <span className="betting-player-team">{e.playerTeam}</span>
@@ -2579,9 +2688,18 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
 
   return (
     <>
-      <StickyBar game={game} />
+      {/* Wrapped so .game-sticky-bar's `position: sticky` range is
+          scoped to this above-the-tabs block instead of the whole
+          rest of the page (its own containing block, absent this
+          wrapper, would be the page layout's root element) -- it
+          unsticks once this block scrolls past, right before the tab
+          strip, instead of staying pinned at z-index 20 over the tabs
+          (and whichever tab content sits at the top of the viewport)
+          for the rest of the scroll and silently eating their taps. */}
+      <div>
+        <StickyBar game={game} />
 
-      <div className="content-split">
+        <div className="content-split">
         <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
           <AdFrame>
             <AdUnit kind="rail" />
@@ -2698,12 +2816,32 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
           grounded in the market line at generation time.
         </p>
       </footer>
+      </div>
 
       {/* Tab strip sits here, right above the PFF report block, rather
           than under the Hero -- everything above this point (margin/
           totals/percentile, the model-data disclaimer) is shared
           context for both tabs, not Overview-only content. */}
-      <div className="mobile-ad-wrap" aria-label="Promotional space">
+      {/* mobile-ad-wrap--pre-tabs: this specific placement needs extra
+          reserved clearance below it that the other mobile-ad-wrap
+          instances don't -- .mobile-ad-panel is absolutely positioned
+          inside .mobile-ad-frame's fixed 7:2-aspect-ratio box (sized
+          for the decorative frame, not for ad content), and AdSense's
+          "auto" format + full-width-responsive can fill that panel
+          with a creative taller than the frame (observed: a ~250px
+          rectangle inside an ~87px frame, confirmed live on the
+          ltorres-1 deploy -- doesn't reproduce locally since no real
+          ad serves there). With no overflow clipping (AdSense policy
+          prohibits cropping ads), the overflow spilled ~80px past the
+          frame's own box and landed on the tab strip right below it,
+          eating every tap -- "Matchups"/"Betting Edge" looked dead on
+          mobile. The other two mobile-ad-wrap placements on this page
+          have the same underlying overflow quirk but nothing critical
+          sits close enough below them for it to matter, so this fix
+          is scoped to just this one spot instead of changing the
+          shared ad frame's sizing (tuned deliberately, affects every
+          ad placement site-wide) for a problem only this spot has. */}
+      <div className="mobile-ad-wrap mobile-ad-wrap--pre-tabs" aria-label="Promotional space">
         <MobileAdFrame>
           <AdUnit kind="mobile" />
           <span className="slot-label">Ad space</span>
