@@ -2712,7 +2712,53 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
 
       <PageTabStrip active={activeTab} onChange={setActiveTab} />
 
-      {activeTab === "overview" ? (
+      {/* Same free-premier-game-only pattern as MarginSection/TotalsSection
+          above -- these three tabs are PFF-backed stats/tools (grades,
+          lineup diagrams, betting lines), not editorial content, so
+          gating them doesn't reintroduce the AdSense "low value content"
+          problem the recap/injury-report unlock above was specifically
+          for: the written article stays free on every game regardless of
+          this. The tab strip itself stays visible and clickable when
+          locked -- blurring the content (not hiding the tabs) is what
+          shows a visitor every game has this depth, not just the one
+          free pick, same as Margin/Totals' own blur-preview. */}
+      {locked ? (
+        <div className="locked-section is-locked">
+          <div className="matchup-grid">
+            {activeTab === "overview" ? (
+              <div className="page-edge-section">
+                <HighestGradedPlayersSection game={game} />
+                <QbMatchupSection game={game} />
+                <EfficiencySection game={game} />
+                <PressureMatchupSection game={game} />
+                <TeamGradesSection game={game} />
+              </div>
+            ) : activeTab === "matchups" ? (
+              <div className="page-edge-section">
+                <MatchupsView game={game} />
+              </div>
+            ) : (
+              <div className="page-edge-section">
+                <BettingEdgeView game={game} />
+              </div>
+            )}
+          </div>
+          <div className="unlock-panel">
+            <div className="unlock-card">
+              <span className="lock-icon">🔒</span>
+              <h3>Unlock Matchups &amp; Betting Edge</h3>
+              <p>
+                PFF player grades, lineup matchups, and betting-line insights for every game are a free-account
+                feature. This one&apos;s part of the paid slate — the Game of the Week is always free to view in
+                full.
+              </p>
+              <Link className="btn btn-primary btn-block" href="/signup">
+                Sign Up Free
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === "overview" ? (
         // Below the model-data disclaimer on purpose -- these grades
         // come from PFF, a separate data source from the Monte Carlo
         // simulation the footer above is describing, not "every number
