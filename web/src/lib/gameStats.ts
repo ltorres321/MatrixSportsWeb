@@ -12,6 +12,7 @@ import type {
   GameTeamPressure,
 } from "@/lib/pffGameReport";
 import type { GameLineup } from "@/lib/lineup";
+import type { GameBettingEdge } from "@/lib/pffBettingEdge";
 
 export interface GameStatSide {
   alias: string;
@@ -60,6 +61,11 @@ export interface GameStat {
   // team, or its code isn't resolvable), same independently-nullable
   // convention as every other report field above.
   lineup?: GameLineup;
+  // Backs the "Betting Edge" tab (etl.pff_best_bets/pff_first_touchdown/
+  // pff_player_props/pff_key_insights, via SportsPipelines's four
+  // poll_*.py scripts under pff_api/) -- undefined whenever none of
+  // the four source tables has any rows for this game yet.
+  bettingEdge?: GameBettingEdge;
 }
 
 export const PERCENTILE_MIN = -30;

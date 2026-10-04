@@ -14,6 +14,7 @@ import {
   getGameTeamPressure,
 } from "@/lib/pffGameReport";
 import { getGameLineup } from "@/lib/lineup";
+import { getGameBettingEdge } from "@/lib/pffBettingEdge";
 
 // Real data layer over the predictions/latest_predictions table that
 // SportsAnalytics (a separate repo/pipeline) writes into. This file
@@ -1104,15 +1105,17 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
     game.lockOfWeek = premier.probability !== undefined && premier.probability >= LOCK_OF_WEEK_THRESHOLD;
   }
 
-  const [injuryReport, playerGrades, qbMatchup, efficiency, teamPressure, teamGrades, lineup] = await Promise.all([
-    getGameInjuryReport(row.season, row.week, row.home_team, row.away_team),
-    getGamePlayerGrades(row.season, row.home_team, row.away_team),
-    getGameQbMatchup(row.season, row.home_team, row.away_team),
-    getGameEfficiency(row.season, row.home_team, row.away_team),
-    getGameTeamPressure(row.season, row.home_team, row.away_team),
-    getGameTeamGrades(row.season, row.home_team, row.away_team),
-    getGameLineup(row.season, row.home_team, row.away_team),
-  ]);
+  const [injuryReport, playerGrades, qbMatchup, efficiency, teamPressure, teamGrades, lineup, bettingEdge] =
+    await Promise.all([
+      getGameInjuryReport(row.season, row.week, row.home_team, row.away_team),
+      getGamePlayerGrades(row.season, row.home_team, row.away_team),
+      getGameQbMatchup(row.season, row.home_team, row.away_team),
+      getGameEfficiency(row.season, row.home_team, row.away_team),
+      getGameTeamPressure(row.season, row.home_team, row.away_team),
+      getGameTeamGrades(row.season, row.home_team, row.away_team),
+      getGameLineup(row.season, row.home_team, row.away_team),
+      getGameBettingEdge(row.universal_game_id),
+    ]);
   if (injuryReport) game.injuryReport = injuryReport;
   if (playerGrades) game.playerGrades = playerGrades;
   if (qbMatchup) game.qbMatchup = qbMatchup;
@@ -1120,6 +1123,7 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
   if (teamPressure) game.teamPressure = teamPressure;
   if (teamGrades) game.teamGrades = teamGrades;
   if (lineup) game.lineup = lineup;
+  if (bettingEdge) game.bettingEdge = bettingEdge;
 
   return game;
 }

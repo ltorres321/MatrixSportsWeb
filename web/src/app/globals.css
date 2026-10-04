@@ -3716,3 +3716,850 @@ h1.glow span {
     font-size: 0.36rem;
   }
 }
+
+/* ------------------------------------------------------------------
+   Betting Edge tab -- Game Lines, First Touchdown, Key Insights,
+   Player Props. Reuses .stat-section/.stat-sub for section chrome
+   (same as every other report section on this page); everything
+   below is specific to this tab's own card/table/badge shapes.
+   ------------------------------------------------------------------ */
+
+.betting-edge-badge-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.betting-edge-badge {
+  display: inline-block;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  margin-left: 0.5rem;
+}
+
+.betting-edge-positive {
+  color: #39d98a;
+  background: rgba(57, 217, 138, 0.12);
+}
+
+.betting-edge-negative {
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.betting-edge-neutral {
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.betting-player-team {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-right: 0.3rem;
+}
+
+.betting-player-position {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-left: 0.3rem;
+}
+
+/* Game Lines -- one full-width row per side (not grouped per market
+   into a card), matching PFF's own "Best Game Bets" table layout:
+   pick+logo on the left, Cash/Tickets split in the middle, Edge bar +
+   value on the right, all in one line so every data point PFF shows
+   is visible without expanding anything. */
+
+.betting-lines-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Same 3-column grid as .betting-line-full-row below it, so labels
+   line up with the data they describe. Only exists to carry the Cash/
+   Tickets and Edge info icons ONCE, at the top -- see GameLinesSection's
+   own comment. */
+.betting-line-header-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) minmax(140px, 1.2fr) minmax(140px, 1fr);
+  gap: 1rem;
+  padding: 0.5rem 1.1rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.betting-line-header-row span {
+  display: flex;
+  align-items: center;
+}
+
+.betting-line-header-row span:last-child {
+  justify-content: flex-end;
+}
+
+.betting-line-full-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) minmax(140px, 1.2fr) minmax(140px, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.1rem;
+  background: var(--panel-solid);
+  border-top: 1px solid var(--panel-border);
+}
+
+.betting-line-full-row:first-child {
+  border-top: none;
+}
+
+.betting-line-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.betting-line-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.betting-line-logo-blank {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.betting-line-pick-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.betting-line-side {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.betting-line-odds {
+  color: var(--text-dim);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.75rem;
+}
+
+.betting-line-market {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  margin-left: auto;
+  padding-left: 0.5rem;
+}
+
+.betting-line-split {
+  display: flex;
+  gap: 1rem;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  border-left: 1px solid var(--panel-border);
+  border-right: 1px solid var(--panel-border);
+  padding: 0 1rem;
+  white-space: nowrap;
+}
+
+.betting-line-split strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.betting-line-split-empty {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.betting-line-edge {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.betting-line-edge-label {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.betting-edge-bar {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.betting-edge-bar-seg {
+  width: 10px;
+  height: 5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.betting-edge-bar-seg.filled {
+  background: #39d98a;
+}
+
+/* First Touchdown */
+
+/* --panel-solid specifically (not transparent) -- same reasoning as
+   .story-recap: the Matrix rain canvas sits behind this whole page,
+   and a dense table of small text with no opaque backing is
+   genuinely unreadable with the rain showing straight through every
+   cell. Every other Betting Edge card already had this; this table
+   was the one section that didn't. */
+/* .betting-table-outer is the non-scrolling parent; .betting-table-wrap
+   inside it is the actual overflow-x:auto scroller. .betting-table-fade
+   is a sibling of .betting-table-wrap, positioned against the OUTER
+   box -- that's what keeps it pinned at the visible right edge as the
+   inner table scrolls underneath it, rather than scrolling away with
+   the content itself. Exists because these tables (11-13 data columns)
+   don't fit most screens, and a scrolled-off column with no visible
+   cue reads as missing data instead of "scroll right for more." */
+.betting-table-outer {
+  position: relative;
+}
+
+/* Breaks these two tables out wider than the normal ~1152px content
+   column so more columns (L10, H2H) are visible without scrolling --
+   safe to do because .page's ad rails are position:absolute at a
+   FIXED offset from .content-split's own edges (see that rule's own
+   comment), computed independently of anything a descendant does
+   lower in the page. Widening a table here can't move or overlap them.
+
+   The widening itself is symmetric negative margins relative to this
+   element's own parent (.content-main), not a viewport-relative 100vw
+   trick -- simpler to reason about, and it stays naturally centered
+   as a side effect of .content-main already being centered. max-width
+   is the safety net: it's always calc(100vw - 32px), so on a narrower
+   viewport where +360px would overflow, the cap wins (max-width beats
+   width in the cascade) and this silently becomes a no-op rather than
+   ever forcing a page-wide horizontal scrollbar. Guarded to tablet
+   width and up -- below that .content-main is already close to
+   viewport width, so there's nothing meaningful to break out into,
+   and the sticky column + scroll-fade already carry mobile. */
+@media (min-width: 768px) {
+  .betting-table-outer {
+    width: calc(100% + 360px);
+    max-width: calc(100vw - 32px);
+    margin-left: -180px;
+    margin-right: -180px;
+  }
+}
+
+.betting-table-fade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  background: linear-gradient(to right, transparent, var(--panel-solid) 75%);
+  border-radius: 0 10px 10px 0;
+  pointer-events: none;
+}
+
+.betting-table-wrap {
+  overflow-x: auto;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.betting-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.betting-table th {
+  text-align: left;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--panel-border);
+  white-space: nowrap;
+}
+
+/* Grouped-header tables (First Touchdown's EPA/Touches/Red Zone/Def
+   Redzone clusters) -- the category row gets a slightly raised
+   background and a vertical rule between groups so a reader can tell
+   at a glance which numbers belong together, same as PFF's own table.
+   Non-grouped tables (none currently) are unaffected since this class
+   only applies where it's added. */
+.betting-table-grouped thead tr:first-child th.betting-table-group {
+  background: rgba(255, 255, 255, 0.04);
+  text-align: center;
+  font-style: italic;
+  font-size: 0.64rem;
+  border-left: 1px solid var(--panel-border);
+}
+
+.betting-table-grouped thead tr:first-child th[rowspan] {
+  vertical-align: bottom;
+}
+
+.betting-table-grouped thead tr:last-child th {
+  font-size: 0.64rem;
+}
+
+.betting-table td {
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--panel-border);
+  white-space: nowrap;
+}
+
+/* Player name column stays pinned on the left while the rest of the
+   row scrolls underneath it -- the actual fix for "scroll right, lose
+   track of which player a row belongs to," not just a scrollbar
+   tweak. An explicit background is required (not inherited) because a
+   sticky cell paints OVER whatever scrolls past beneath it; without
+   one the columns behind it would show through. The right-edge shadow
+   is the usual visual cue that content is sliding under a pinned
+   column. */
+.betting-table-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--panel-solid);
+  box-shadow: 4px 0 6px -4px rgba(0, 0, 0, 0.4);
+}
+
+.betting-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.betting-sportsbook-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  opacity: 0.85;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.betting-sportsbook-link:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.betting-sportsbook-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+}
+
+.betting-sportsbook-unknown {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  text-transform: capitalize;
+}
+
+/* Info icon + popover (First Touchdown's grouped-header glossary).
+   The popover itself is portaled to document.body with `position:
+   fixed` coordinates (see InfoTooltip's own comment for why) -- the
+   two rules below only style the icon button that stays in place and
+   the backdrop/popover that render at the body level. */
+
+.betting-info-wrap {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 0.15rem;
+}
+
+.betting-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--text-dim);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.betting-info-icon:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.betting-info-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.betting-info-popover {
+  position: fixed;
+  z-index: 61;
+  width: 260px;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Key Insights */
+
+.betting-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.betting-insight-card {
+  display: flex;
+  gap: 0.75rem;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+}
+
+.betting-insight-headshot {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.betting-insight-player {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 0.85rem;
+  margin-bottom: 0.2rem;
+}
+
+.betting-insight-headline {
+  color: #ffd60a;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.betting-insight-detail {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* Player Props -- a grouped table like First Touchdown's, not cards
+   (see .betting-table-grouped above). Badge styles below are still
+   used by MatchupGradeBadge; the card-layout classes that used to
+   live here (.betting-props-grid/.betting-prop-card/etc.) are gone,
+   replaced by the shared .betting-table machinery. */
+
+.betting-pick-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.betting-hit-type {
+  color: var(--text-dim);
+  font-size: 0.64rem;
+  text-transform: none;
+  font-weight: 400;
+  margin-top: 0.1rem;
+}
+
+.betting-proj-under {
+  color: #ff8787;
+}
+
+.betting-proj-over {
+  color: #39d98a;
+}
+
+.betting-grade-badge {
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.08rem 0.4rem;
+  border-radius: 5px;
+}
+
+.betting-grade-good {
+  color: #39d98a;
+  background: rgba(57, 217, 138, 0.12);
+}
+
+.betting-grade-poor {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.betting-grade-fair {
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 480px) {
+  .betting-insights-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .betting-table {
+    font-size: 0.74rem;
+  }
+
+  .betting-table th,
+  .betting-table td {
+    padding: 0.4rem 0.5rem;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Player Props mobile cards -- a genuinely different layout from the
+   desktop table (13 columns shrunk into a table never reads well on a
+   phone), not a reflow of the same markup. Both render in the DOM;
+   which one is visible is a pure CSS min-width toggle, matching PFF's
+   own mobile Player Prop Tool card design. Breakpoint matches the
+   table breakout's own 768px (see .betting-table-outer).
+   ------------------------------------------------------------------ */
+
+.betting-mobile-only {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .betting-desktop-only {
+    display: none;
+  }
+
+  .betting-mobile-only {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+}
+
+.prop-card {
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.prop-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.prop-card-stat {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.prop-card-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.prop-card-line {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.prop-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem;
+}
+
+.prop-card-player {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.prop-card-player .player-headshot {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.prop-card-name {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.prop-card-matchup {
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  margin-top: 0.1rem;
+}
+
+.prop-card-proj {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.prop-card-proj-value {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.prop-card-proj-label {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.prop-card-avg {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  margin-top: 0.15rem;
+}
+
+.prop-card-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--panel-border);
+}
+
+.prop-card-stat-box {
+  padding: 0.6rem 0.5rem;
+  text-align: center;
+  border-left: 1px solid var(--panel-border);
+}
+
+.prop-card-stat-box:first-child {
+  border-left: none;
+}
+
+.prop-card-stat-label {
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  white-space: nowrap;
+}
+
+.prop-card-stat-value {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+/* First Touchdown mobile cards -- same .betting-mobile-only toggle as
+   Player Props above; reuses .prop-card-stat-label/-value for the
+   stat-box text (identical shape, no reason to duplicate), own
+   classes only for the parts that differ (header layout, the extra
+   EPA row with its heatmap coloring from epaCellStyle). */
+
+.td-card {
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.td-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+}
+
+.td-card-top .player-headshot {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.td-card-name-wrap {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.td-card-name {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.td-card-matchup {
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  margin-top: 0.1rem;
+}
+
+.td-card-odds-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.td-card-odds {
+  color: var(--text);
+  font-weight: 700;
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.95rem;
+}
+
+.td-card-stats-row,
+.td-card-epa-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--panel-border);
+}
+
+.td-card-stat-box,
+.td-card-epa-box {
+  padding: 0.55rem 0.4rem;
+  text-align: center;
+  border-left: 1px solid var(--panel-border);
+}
+
+.td-card-stat-box:first-child,
+.td-card-epa-box:first-child {
+  border-left: none;
+}
+
+/* Game Lines mobile cards -- one card per MARKET (not per side, unlike
+   PFF's own mobile view which only shows one side at all), grouping
+   both of this site's sides together under one team-branded header
+   instead of repeating the matchup on every row. Same .betting-mobile-
+   only toggle as the other two sections' mobile cards. */
+
+.gl-card {
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.gl-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.gl-card-teams {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.gl-card-teams .betting-line-logo {
+  width: 18px;
+  height: 18px;
+}
+
+.gl-card-teams span:not(:last-child) {
+  margin-right: 0.3rem;
+}
+
+.gl-card-market-label {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gl-card-side-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.6rem 0.85rem;
+  border-top: 1px solid var(--panel-border);
+}
+
+.gl-card-side-row:first-of-type {
+  border-top: none;
+}
+
+.gl-card-side-pick {
+  display: flex;
+  flex-direction: column;
+}
+
+.gl-card-side-edge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gl-card-side-split {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
