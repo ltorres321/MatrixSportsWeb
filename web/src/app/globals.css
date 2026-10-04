@@ -395,6 +395,16 @@ a {
   }
 }
 
+/* Extra clearance below the one mobile-ad-wrap placement that sits
+   right above .page-tab-strip -- see the long comment at its JSX
+   usage in GameDetailView.tsx for why: a responsive AdSense creative
+   here can render taller than .mobile-ad-frame's fixed-aspect-ratio
+   box and spill out underneath it (observed ~80px), which otherwise
+   lands directly on the tab buttons and silently blocks every tap. */
+.mobile-ad-wrap--pre-tabs {
+  margin-bottom: 9.5rem;
+}
+
 .mobile-ad-frame {
   position: relative;
   width: 85%;

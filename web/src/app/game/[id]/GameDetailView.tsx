@@ -2822,7 +2822,26 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
           than under the Hero -- everything above this point (margin/
           totals/percentile, the model-data disclaimer) is shared
           context for both tabs, not Overview-only content. */}
-      <div className="mobile-ad-wrap" aria-label="Promotional space">
+      {/* mobile-ad-wrap--pre-tabs: this specific placement needs extra
+          reserved clearance below it that the other mobile-ad-wrap
+          instances don't -- .mobile-ad-panel is absolutely positioned
+          inside .mobile-ad-frame's fixed 7:2-aspect-ratio box (sized
+          for the decorative frame, not for ad content), and AdSense's
+          "auto" format + full-width-responsive can fill that panel
+          with a creative taller than the frame (observed: a ~250px
+          rectangle inside an ~87px frame, confirmed live on the
+          ltorres-1 deploy -- doesn't reproduce locally since no real
+          ad serves there). With no overflow clipping (AdSense policy
+          prohibits cropping ads), the overflow spilled ~80px past the
+          frame's own box and landed on the tab strip right below it,
+          eating every tap -- "Matchups"/"Betting Edge" looked dead on
+          mobile. The other two mobile-ad-wrap placements on this page
+          have the same underlying overflow quirk but nothing critical
+          sits close enough below them for it to matter, so this fix
+          is scoped to just this one spot instead of changing the
+          shared ad frame's sizing (tuned deliberately, affects every
+          ad placement site-wide) for a problem only this spot has. */}
+      <div className="mobile-ad-wrap mobile-ad-wrap--pre-tabs" aria-label="Promotional space">
         <MobileAdFrame>
           <AdUnit kind="mobile" />
           <span className="slot-label">Ad space</span>
