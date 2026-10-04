@@ -2688,9 +2688,18 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
 
   return (
     <>
-      <StickyBar game={game} />
+      {/* Wrapped so .game-sticky-bar's `position: sticky` range is
+          scoped to this above-the-tabs block instead of the whole
+          rest of the page (its own containing block, absent this
+          wrapper, would be the page layout's root element) -- it
+          unsticks once this block scrolls past, right before the tab
+          strip, instead of staying pinned at z-index 20 over the tabs
+          (and whichever tab content sits at the top of the viewport)
+          for the rest of the scroll and silently eating their taps. */}
+      <div>
+        <StickyBar game={game} />
 
-      <div className="content-split">
+        <div className="content-split">
         <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
           <AdFrame>
             <AdUnit kind="rail" />
@@ -2807,6 +2816,7 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
           grounded in the market line at generation time.
         </p>
       </footer>
+      </div>
 
       {/* Tab strip sits here, right above the PFF report block, rather
           than under the Hero -- everything above this point (margin/
