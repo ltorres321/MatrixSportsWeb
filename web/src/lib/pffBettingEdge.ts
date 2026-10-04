@@ -69,6 +69,7 @@ export interface FirstTouchdownEntry {
   playerTeam: string;
   opponentTeam: string;
   espnId: string | null;
+  position: string | null;
   sportsbook: string;
   firstTdOdds: number;
   epaPerPlay: number | null;
@@ -87,6 +88,7 @@ interface FirstTouchdownRow {
   player_team: string;
   opponent_team: string;
   espn_id: string | null;
+  position: string | null;
   sportsbook: string;
   first_td_odds: number;
   epa_per_play: number | null;
@@ -109,6 +111,15 @@ export interface PlayerPropEntry {
   playerTeam: string;
   opponentTeam: string;
   espnId: string | null;
+  // Independent of matchupPosition below -- "what position this player
+  // plays" vs. "did PFF compute a matchup grade for them," two
+  // different questions the CSV's own matchup_position field conflates
+  // (it's literally the string "No Matchup" for backups PFF didn't run
+  // an analysis on, even though they obviously still play a position).
+  // Sourced the same way First Touchdown's position is, from
+  // etl.pff_lineup -- used as the display fallback when
+  // matchupPosition says "No Matchup" (see GameDetailView.tsx).
+  lineupPosition: string | null;
   consensusStat: string;
   consensusLine: number | null;
   pickSportsbook: string | null;
@@ -138,6 +149,7 @@ interface PlayerPropRow {
   player_team: string;
   opponent_team: string;
   espn_id: string | null;
+  lineup_position: string | null;
   consensus_stat: string;
   consensus_line: number | null;
   pick_sportsbook: string | null;
@@ -205,25 +217,35 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
       [universalGameId]
     ),
     query<FirstTouchdownRow>(
-      `SELECT ft.player_name, ft.player_team, ft.opponent_team, lu.espn_id, ft.sportsbook,
-              ft.first_td_odds, ft.epa_per_play, ft.opp_off_epa_per_play, ft.epa_difference,
-              ft.touches, ft.touch_rate_pct, ft.adj_target_rate_pct, ft.red_zone_carries,
-              ft.red_zone_targets, ft.td_rate_allowed_pct
+      `SELECT ft.player_name, ft.player_team, ft.opponent_team,
+              COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
+              COALESCE(lu.position, ec.position) AS position,
+              ft.sportsbook, ft.first_td_odds, ft.epa_per_play, ft.opp_off_epa_per_play,
+              ft.epa_difference, ft.touches, ft.touch_rate_pct, ft.adj_target_rate_pct,
+              ft.red_zone_carries, ft.red_zone_targets, ft.td_rate_allowed_pct
        FROM etl.pff_first_touchdown ft
        -- Same LATERAL + LIMIT 1 pattern as the player-props query below
-       -- -- see that one's own comment for why.
+       -- -- see that one's own comment for why. position comes along
+       -- for free from the same join already needed for espn_id --
+       -- this table's own CSV source never had a position column.
        LEFT JOIN LATERAL (
-         SELECT espn_id FROM etl.pff_lineup
+         SELECT espn_id, position FROM etl.pff_lineup
          WHERE player_name = ft.player_name AND season = ft.season
          LIMIT 1
        ) lu ON true
+       -- Fallback for a player not in etl.pff_lineup at all (confirmed
+       -- case: Austin Ekeler, not yet on any team's PFF depth chart --
+       -- see sql/014_espn_player_crosswalk.sql's own docstring).
+       LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = ft.player_name
        WHERE ft.universal_game_id = $1 ORDER BY ft.first_td_odds ASC`,
       [universalGameId]
     ),
     query<PlayerPropRow>(
-      `SELECT pp.player_name, pp.player_team, pp.opponent_team, lu.espn_id, pp.consensus_stat,
-              pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line, pp.pick_odds,
-              pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
+      `SELECT pp.player_name, pp.player_team, pp.opponent_team,
+              COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
+              COALESCE(lu.position, ec.position) AS lineup_position,
+              pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
+              pp.pick_odds, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
               pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
               pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
               pp.h2h_record, pp.h2h_hit_type
@@ -235,11 +257,17 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
        -- say) -- this guarantees at most one espn_id per prop row
        -- regardless, same safety property poll_key_insights.py's own
        -- name-based lookup relies on, just enforced in SQL here.
+       -- position comes along for free here too -- see PlayerPropEntry.
+       -- lineupPosition's own comment for why it's a second field, not
+       -- a replacement for matchup_position.
        LEFT JOIN LATERAL (
-         SELECT espn_id FROM etl.pff_lineup
+         SELECT espn_id, position FROM etl.pff_lineup
          WHERE player_name = pp.player_name AND season = pp.season
          LIMIT 1
        ) lu ON true
+       -- Same fallback as First Touchdown's query -- see
+       -- sql/014_espn_player_crosswalk.sql's own docstring.
+       LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = pp.player_name
        WHERE pp.universal_game_id = $1
        ORDER BY pp.edge_pct DESC NULLS LAST`,
       [universalGameId]
@@ -283,6 +311,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     playerTeam: r.player_team,
     opponentTeam: r.opponent_team,
     espnId: r.espn_id,
+    position: r.position,
     sportsbook: r.sportsbook,
     firstTdOdds: r.first_td_odds,
     epaPerPlay: r.epa_per_play,
@@ -301,6 +330,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     playerTeam: r.player_team,
     opponentTeam: r.opponent_team,
     espnId: r.espn_id,
+    lineupPosition: r.lineup_position,
     consensusStat: r.consensus_stat,
     consensusLine: r.consensus_line,
     pickSportsbook: r.pick_sportsbook,

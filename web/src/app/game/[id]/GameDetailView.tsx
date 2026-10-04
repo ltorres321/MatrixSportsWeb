@@ -1680,6 +1680,18 @@ function formatOdds(odds: number): string {
   return odds > 0 ? `+${odds}` : `${odds}`;
 }
 
+// matchupPosition is "No Matchup" for backups PFF didn't run a
+// matchup analysis on -- that's a real, honest signal about matchup
+// *grade* availability (left alone everywhere else this entry is
+// used), but it isn't the right answer to "what position do they
+// play," which lineupPosition (sourced independently, from the same
+// roster data First Touchdown's position column uses) still usually
+// knows even when PFF's own matchup field doesn't.
+function displayPosition(entry: PlayerPropEntry): string | null {
+  if (entry.matchupPosition && entry.matchupPosition !== "No Matchup") return entry.matchupPosition;
+  return entry.lineupPosition;
+}
+
 function sideLabel(sideType: string, game: GameStat): string {
   if (sideType === "away") return teamDisplay(game.teamA.alias).split(" ").pop() ?? sideType;
   if (sideType === "home") return teamDisplay(game.teamB.alias).split(" ").pop() ?? sideType;
@@ -2030,6 +2042,7 @@ function FirstTouchdownSection({ game }: { game: GameStat }) {
               <tr key={e.playerName}>
                 <td className="betting-table-sticky-col">
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
+                  {e.position && <span className="betting-player-position">({e.position})</span>}
                 </td>
                 <td>{formatOdds(e.firstTdOdds)}</td>
                 <td style={epaCellStyle(e.epaPerPlay, "high", 0.5)}>
@@ -2080,7 +2093,10 @@ function TdCard({ entry: e, game }: { entry: FirstTouchdownEntry; game: GameStat
       <div className="td-card-top">
         <PlayerHeadshot espnId={e.espnId} alias={e.playerTeam} size={44} />
         <div className="td-card-name-wrap">
-          <div className="td-card-name">{e.playerName}</div>
+          <div className="td-card-name">
+            {e.playerName}
+            {e.position && <span className="betting-player-position">({e.position})</span>}
+          </div>
           <div className="td-card-matchup">
             <span className="betting-player-team">{e.playerTeam}</span>
             {isHome ? "vs" : "@"} {e.opponentTeam}
@@ -2262,6 +2278,7 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
               <tr key={`${e.playerName}-${e.consensusStat}`}>
                 <td className="betting-table-sticky-col">
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
+                  {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
                 </td>
                 <td>
                   {e.consensusLine ?? "—"} {e.consensusStat}
@@ -2342,7 +2359,10 @@ function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }
         <div className="prop-card-player">
           <PlayerHeadshot espnId={e.espnId} alias={e.playerTeam} size={48} />
           <div>
-            <div className="prop-card-name">{e.playerName}</div>
+            <div className="prop-card-name">
+              {e.playerName}
+              {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
+            </div>
             <div className="prop-card-matchup">
               <span className="betting-player-team">{e.playerTeam}</span>
               {isHome ? "vs" : "@"} {e.opponentTeam}
