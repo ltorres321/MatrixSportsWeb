@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -18,6 +19,19 @@ import ExternalWindowLink from "@/components/ExternalWindowLink";
 import { getPublishedStories, isStoryFeatured, getLatestPerformanceReview, isPerformanceReviewFeatured } from "@/lib/stories";
 import { getEffectiveNow } from "@/lib/admin";
 import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
+
+// The only page a signed-out visitor or crawler (including Google's
+// AdSense reviewer, which never logs in) ever lands on -- see the
+// comment on recentStories below. Previously had no metadata of its
+// own and silently inherited the generic layout-wide title/description,
+// which undersold the actual free-picks pitch on the one page search
+// engines can actually see.
+export const metadata: Metadata = {
+  title: "Free NFL Win Probabilities — 100,000 Simulations Per Game | Matrix Sports Analytics",
+  description:
+    "Matrix Sports Analytics simulates every NFL matchup 100,000 times, grounded in the real betting line. See this week's free model picks and game recaps.",
+  alternates: { canonical: "https://matrixsports.net/" },
+};
 
 // Home-page article cards are teasers, not the full recap -- the
 // 250-300 word body belongs on the game's own page (linked via "View

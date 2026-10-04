@@ -23,6 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: `${story.headline} | Matrix Sports Analytics`,
     description: story.body.slice(0, 200),
+    alternates: { canonical: `https://matrixsports.net/stories/${id}` },
     openGraph: image ? { images: [{ url: image, width: 1774, height: 887 }] } : undefined,
     twitter: { card: "summary_large_image", images: image ? [image] : undefined },
   };
@@ -37,8 +38,21 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   const accuracyPct = accuracyPctFromStory(story);
   const heroImage = accuracyPct !== null ? performanceTierImagePath(accuracyPct) : null;
 
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: story.headline,
+    articleBody: story.body,
+    datePublished: story.published_at ?? undefined,
+    url: `https://matrixsports.net/stories/${id}`,
+    author: { "@type": "Organization", name: "Matrix Sports Analytics" },
+    publisher: { "@type": "Organization", name: "Matrix Sports Analytics" },
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+
       <header className="site-header">
         <h1 className="glow">{story.headline}</h1>
         <p className="subtitle">
