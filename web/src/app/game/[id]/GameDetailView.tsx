@@ -2333,10 +2333,10 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
           <thead>
             <tr>
               <th rowSpan={2} className="betting-table-sticky-col">
-                Player <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.player} />
+                pRank <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.pRank} />
               </th>
               <th rowSpan={2}>
-                pRank <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.pRank} />
+                Player <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.player} />
               </th>
               <th rowSpan={2}>
                 Consensus <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.consensus} />
@@ -2390,12 +2390,14 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
           <tbody>
             {entries.map((e) => (
               <tr key={`${e.playerName}-${e.consensusStat}`}>
-                <td className="betting-table-sticky-col">
+                <td className="betting-table-sticky-col betting-prank-cell">
+                  {e.pRank != null ? `#${e.pRank}` : "—"}
+                </td>
+                <td>
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
                   {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
                   <PickResultIcon result={e.pickResult} />
                 </td>
-                <td className="betting-prank-cell">{e.pRank != null ? `#${e.pRank}` : "—"}</td>
                 <td>
                   {e.consensusLine ?? "—"} {e.consensusStat}
                 </td>

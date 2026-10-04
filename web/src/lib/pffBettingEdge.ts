@@ -165,10 +165,11 @@ export interface PlayerPropEntry {
   // This model's rank of how likely this pick is to be correct,
   // across ALL of this week's props league-wide (1 = most likely) --
   // not scoped to just this game. Sourced from SportsAnalytics's own
-  // player_prop_predictions table (see that table's header for why
-  // there's no per-game id there), not from PFF's export. Null for a
-  // prop that table hasn't scored yet (e.g. already graded, or a
-  // pick_side spelling mismatch) -- sorts last, not an error.
+  // player_prop_predictions table, joined on universal_game_id (added
+  // 2026-10 once that table started sourcing from etl.pff_player_props
+  // instead of the raw PFF CSV -- see sql/006's header in
+  // SportsAnalytics). Null for a prop that table hasn't scored yet
+  // (e.g. already graded) -- sorts last, not an error.
   pRank: number | null;
 }
 
@@ -307,17 +308,17 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
        LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = pp.player_name
        -- pRank comes from a DIFFERENT repo's table (SportsAnalytics's
        -- player_prop_predictions, public schema of this SAME shared
-       -- database) -- not from PFF's export at all, so it's a LATERAL
-       -- join on the key that table actually has (week + player +
-       -- stat + side), not universal_game_id. See PlayerPropEntry.
-       -- pRank's own comment for why no per-game id exists there yet.
+       -- database) -- not from PFF's export at all. Joined directly
+       -- on universal_game_id + player_name + consensus_stat, the
+       -- same key etl.pff_player_props itself uses, now that both
+       -- tables carry a real universal_game_id (see PlayerPropEntry.
+       -- pRank's own comment).
        LEFT JOIN LATERAL (
          SELECT model_rank
          FROM public.latest_player_prop_predictions pred
-         WHERE pred.source_week = pp.week
+         WHERE pred.universal_game_id = pp.universal_game_id
            AND pred.player_name = pp.player_name
            AND pred.consensus_stat = pp.consensus_stat
-           AND (pred.pick_side = pp.pick_side OR (pred.pick_side IS NULL AND pp.pick_side IS NULL))
          LIMIT 1
        ) pred ON true
        WHERE pp.universal_game_id = $1
