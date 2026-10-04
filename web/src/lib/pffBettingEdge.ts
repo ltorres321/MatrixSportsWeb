@@ -162,6 +162,26 @@ export interface PlayerPropEntry {
   l10HitType: string | null;
   h2hRecord: string | null;
   h2hHitType: string | null;
+  // This model's rank of how likely this pick is to be correct,
+  // scoped to just THIS GAME's own props (1 = most likely, no gaps --
+  // see pffBettingEdge.ts's own query comment for why ROW_NUMBER, not
+  // the underlying model_rank directly). The model itself is still
+  // fit and scored across the WHOLE WEEK's population on purpose --
+  // see overallRank below -- this is a presentation-layer re-rank of
+  // that same probability, not a different model. Sourced from
+  // SportsAnalytics's player_prop_predictions table, joined on
+  // universal_game_id (added 2026-10 once that table started sourcing
+  // from etl.pff_player_props instead of the raw PFF CSV -- see
+  // sql/006's header in SportsAnalytics). Null for a prop that table
+  // hasn't scored yet (e.g. already graded) -- sorts last, not an
+  // error.
+  pRank: number | null;
+  // The SAME model's rank across every prop it scored that week,
+  // league-wide -- not scoped to this game. Shown alongside pRank in
+  // smaller type: a #2 in-game pick that's only #80 of 1,000+
+  // league-wide is a real signal worth keeping visible, not noise to
+  // hide.
+  overallRank: number | null;
 }
 
 interface PlayerPropRow {
@@ -193,6 +213,8 @@ interface PlayerPropRow {
   l10_hit_type: string | null;
   h2h_record: string | null;
   h2h_hit_type: string | null;
+  p_rank: number | null;
+  overall_rank: number | null;
 }
 
 // ----------------------------------------------------------------------
@@ -269,35 +291,70 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
       [universalGameId]
     ),
     query<PlayerPropRow>(
-      `SELECT pp.player_name, pp.player_team, pp.opponent_team,
-              COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
-              COALESCE(lu.position, ec.position) AS lineup_position,
-              pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
-              pp.pick_odds, pp.pick_result, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
-              pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
-              pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
-              pp.h2h_record, pp.h2h_hit_type
-       FROM etl.pff_player_props pp
-       -- LATERAL + LIMIT 1, not a plain JOIN: etl.pff_player_props has
-       -- no player id of its own to join on, only a name, and a plain
-       -- join could duplicate a prop row if pff_lineup ever had more
-       -- than one match for that name/season (a Jr./Sr. collision,
-       -- say) -- this guarantees at most one espn_id per prop row
-       -- regardless, same safety property poll_key_insights.py's own
-       -- name-based lookup relies on, just enforced in SQL here.
-       -- position comes along for free here too -- see PlayerPropEntry.
-       -- lineupPosition's own comment for why it's a second field, not
-       -- a replacement for matchup_position.
-       LEFT JOIN LATERAL (
-         SELECT espn_id, position FROM etl.pff_lineup
-         WHERE player_name = pp.player_name AND season = pp.season
-         LIMIT 1
-       ) lu ON true
-       -- Same fallback as First Touchdown's query -- see
-       -- sql/014_espn_player_crosswalk.sql's own docstring.
-       LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = pp.player_name
-       WHERE pp.universal_game_id = $1
-       ORDER BY pp.edge_pct DESC NULLS LAST`,
+      `WITH props AS (
+         SELECT pp.player_name, pp.player_team, pp.opponent_team,
+                COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
+                COALESCE(lu.position, ec.position) AS lineup_position,
+                pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
+                pp.pick_odds, pp.pick_result, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
+                pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
+                pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
+                pp.h2h_record, pp.h2h_hit_type,
+                pred.predicted_correct_probability, pred.model_rank AS overall_rank
+         FROM etl.pff_player_props pp
+         -- LATERAL + LIMIT 1, not a plain JOIN: etl.pff_player_props has
+         -- no player id of its own to join on, only a name, and a plain
+         -- join could duplicate a prop row if pff_lineup ever had more
+         -- than one match for that name/season (a Jr./Sr. collision,
+         -- say) -- this guarantees at most one espn_id per prop row
+         -- regardless, same safety property poll_key_insights.py's own
+         -- name-based lookup relies on, just enforced in SQL here.
+         -- position comes along for free here too -- see PlayerPropEntry.
+         -- lineupPosition's own comment for why it's a second field, not
+         -- a replacement for matchup_position.
+         LEFT JOIN LATERAL (
+           SELECT espn_id, position FROM etl.pff_lineup
+           WHERE player_name = pp.player_name AND season = pp.season
+           LIMIT 1
+         ) lu ON true
+         -- Same fallback as First Touchdown's query -- see
+         -- sql/014_espn_player_crosswalk.sql's own docstring.
+         LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = pp.player_name
+         -- predicted_correct_probability/overall_rank come from a
+         -- DIFFERENT repo's table (SportsAnalytics's
+         -- player_prop_predictions, public schema of this SAME shared
+         -- database) -- not from PFF's export at all. Joined directly
+         -- on universal_game_id + player_name + consensus_stat, the
+         -- same key etl.pff_player_props itself uses, now that both
+         -- tables carry a real universal_game_id.
+         LEFT JOIN LATERAL (
+           SELECT predicted_correct_probability, model_rank
+           FROM public.latest_player_prop_predictions pred
+           WHERE pred.universal_game_id = pp.universal_game_id
+             AND pred.player_name = pp.player_name
+             AND pred.consensus_stat = pp.consensus_stat
+           LIMIT 1
+         ) pred ON true
+         WHERE pp.universal_game_id = $1
+       )
+       -- overall_rank (pred.model_rank, above) ranks across EVERY prop
+       -- the model scored that week, league-wide -- the population the
+       -- model actually needs to be worth anything. p_rank here is a
+       -- SEPARATE, presentation-only re-rank of that same probability,
+       -- scoped to just this game's own props (1..N, no gaps) -- what
+       -- a reader looking at one game's table actually wants to sort
+       -- by. ROW_NUMBER, not RANK: a tie in probability still gets a
+       -- clean 1..N sequence instead of a gap. Wrapped in CASE so a
+       -- prop with no prediction at all (predicted_correct_probability
+       -- IS NULL) shows no rank rather than a meaningless number --
+       -- NULLS LAST means those rows sort after every real ranked row,
+       -- so the ones that DO get numbered are still a contiguous 1..N.
+       SELECT *,
+              CASE WHEN predicted_correct_probability IS NOT NULL
+                   THEN ROW_NUMBER() OVER (ORDER BY predicted_correct_probability DESC NULLS LAST)
+              END AS p_rank
+       FROM props
+       ORDER BY p_rank ASC NULLS LAST`,
       [universalGameId]
     ),
     query<KeyInsightRow>(
@@ -385,6 +442,8 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     l10HitType: r.l10_hit_type,
     h2hRecord: r.h2h_record,
     h2hHitType: r.h2h_hit_type,
+    pRank: r.p_rank,
+    overallRank: r.overall_rank,
   }));
 
   const keyInsights: KeyInsightEntry[] = keyInsightRows.map((r) => ({

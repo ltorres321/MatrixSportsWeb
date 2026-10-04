@@ -1589,6 +1589,10 @@ const EDGE_INFO_PLAYER_PROPS =
 // Edge, not just a wording choice.
 const PLAYER_PROP_COLUMN_INFO = {
   player: "The player this prop is for.",
+  pRank:
+    "Our model's rank of how likely this pick is to hit, among this game's own player props " +
+    "-- 1 is the most likely to be correct. The smaller number in parentheses is that same " +
+    "pick's rank across every player prop this week, league-wide.",
   consensus: "The standard line most sportsbooks are offering for this prop.",
   pick: "PFF's own recommended side for this prop.",
   proj: "PFF's own projected value for this stat.",
@@ -2312,8 +2316,9 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
     <div className="stat-section">
       <h2>Player Props</h2>
       <p className="stat-sub">
-        Prop picks for this game, sorted by Edge — the consensus line, the recommended side, its projection,
-        matchup context, and recent hit-rate form for each player prop.
+        Prop picks for this game, sorted by pRank (our model&apos;s rank of how likely each pick is to hit) —
+        the consensus line, the recommended side, its projection, matchup context, and recent hit-rate form for
+        each player prop.
       </p>
       {graded.length > 0 && (
         <p className="betting-props-summary">
@@ -2329,6 +2334,9 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
           <thead>
             <tr>
               <th rowSpan={2} className="betting-table-sticky-col">
+                pRank <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.pRank} />
+              </th>
+              <th rowSpan={2}>
                 Player <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.player} />
               </th>
               <th rowSpan={2}>
@@ -2383,7 +2391,13 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
           <tbody>
             {entries.map((e) => (
               <tr key={`${e.playerName}-${e.consensusStat}`}>
-                <td className="betting-table-sticky-col">
+                <td className="betting-table-sticky-col betting-prank-cell">
+                  {e.pRank != null ? e.pRank : "—"}
+                  {e.overallRank != null && (
+                    <span className="betting-prank-overall">({e.overallRank})</span>
+                  )}
+                </td>
+                <td>
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
                   {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
                   <PickResultIcon result={e.pickResult} />
@@ -2456,6 +2470,14 @@ function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }
       <div className="prop-card-top">
         <span className="prop-card-stat">{e.consensusStat}</span>
         <div className="prop-card-pick">
+          {e.pRank != null && (
+            <span className="prop-card-prank">
+              {e.pRank}
+              {e.overallRank != null && (
+                <span className="betting-prank-overall">({e.overallRank})</span>
+              )}
+            </span>
+          )}
           {e.edgePct != null && <EdgeBadge pct={e.edgePct} />}
           <span className="prop-card-line">
             {e.pickSide ?? ""} {e.pickLine ?? ""}
