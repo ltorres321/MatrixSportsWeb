@@ -3768,6 +3768,64 @@ h1.glow span {
   margin-left: 0.3rem;
 }
 
+/* Yellow (this site's own #ffd60a accent, same as .week-pill.active/
+   .story-recap-body) for a hit -- PFF's own page uses green here, but
+   this site uses yellow as its "good/accent" color throughout, so the
+   miss color (red) carries over unchanged while the hit color doesn't. */
+.pick-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  margin-left: 0.3rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pick-result-correct {
+  background: #ffd60a;
+  color: #1a1a1a;
+}
+
+.pick-result-incorrect {
+  background: #ff6b6b;
+  color: #1a1a1a;
+}
+
+/* Player Props' graded-results summary line -- only rendered once at
+   least one prop in this game has a pickResult, sitting right under
+   the section's intro paragraph. */
+.betting-props-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  margin: 0 0 1.1rem;
+}
+
+.betting-props-summary-correct {
+  color: #ffd60a;
+}
+
+.betting-props-summary-sep {
+  color: var(--text-dim);
+}
+
+.betting-props-summary-total {
+  color: #ff6b6b;
+}
+
+.betting-props-summary-pct {
+  color: #ffd60a;
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+}
+
 /* Game Lines -- one full-width row per side (not grouped per market
    into a card), matching PFF's own "Best Game Bets" table layout:
    pick+logo on the left, Cash/Tickets split in the middle, Edge bar +

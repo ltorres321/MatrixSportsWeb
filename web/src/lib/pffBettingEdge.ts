@@ -1,5 +1,6 @@
 import "server-only";
 import { query } from "@/lib/db";
+import { getScheduledGame } from "@/lib/schedule";
 
 // Read layer over the four tables SportsPipelines/sql/010-013 added
 // (etl.pff_best_bets, pff_first_touchdown, pff_player_props,
@@ -34,6 +35,15 @@ export interface BestGameBetMarket {
   sideTwoEdgePct: number;
   sideTwoCashPct: number | null;
   sideTwoTicketsPct: number | null;
+  // Final score, for determining which side actually hit once the
+  // game's over -- sourced from SportsAnalytics's own predictions
+  // table (same deliberate reverse-read exception as
+  // pff_betting_common.resolve_game()'s historical-week fallback on
+  // the ingestion side; etl.pff_best_bets has no result field of its
+  // own, same situation as First Touchdown). Null until the game is
+  // final.
+  actualHomeScore: number | null;
+  actualAwayScore: number | null;
 }
 
 interface BestGameBetRow {
@@ -81,6 +91,10 @@ export interface FirstTouchdownEntry {
   redZoneCarries: number | null;
   redZoneTargets: number | null;
   tdRateAllowedPct: number | null;
+  // Computed by this project from play-by-play data, not read from
+  // PFF -- their own export has no result field at all for this
+  // market. See SportsPipelines/pff_api/poll_first_td_scorers.py.
+  isActualFirstScorer: boolean;
 }
 
 interface FirstTouchdownRow {
@@ -100,6 +114,7 @@ interface FirstTouchdownRow {
   red_zone_carries: number | null;
   red_zone_targets: number | null;
   td_rate_allowed_pct: number | null;
+  is_actual_first_scorer: boolean;
 }
 
 // ----------------------------------------------------------------------
@@ -126,6 +141,11 @@ export interface PlayerPropEntry {
   pickSide: string | null;
   pickLine: number | null;
   pickOdds: number | null;
+  // "correct" | "incorrect" | null (null pre-game, before PFF grades
+  // it). Backs the result icon shown next to a player's name once
+  // their game is final -- see sql/012's own note on why this column
+  // was already captured but, until now, never read.
+  pickResult: string | null;
   projValue: number | null;
   projDirection: string | null;
   l10Avg: number | null;
@@ -156,6 +176,7 @@ interface PlayerPropRow {
   pick_side: string | null;
   pick_line: number | null;
   pick_odds: number | null;
+  pick_result: string | null;
   proj_value: number | null;
   proj_direction: string | null;
   l10_avg: number | null;
@@ -208,7 +229,7 @@ export interface GameBettingEdge {
 }
 
 export async function getGameBettingEdge(universalGameId: string): Promise<GameBettingEdge | null> {
-  const [bestGameBetRows, firstTouchdownRows, playerPropRows, keyInsightRows] = await Promise.all([
+  const [bestGameBetRows, scheduledGame, firstTouchdownRows, playerPropRows, keyInsightRows] = await Promise.all([
     query<BestGameBetRow>(
       `SELECT prop_type, line, side_one_type, side_one_odds, side_one_edge_pct,
               side_one_cash_pct, side_one_tickets_pct, side_two_type, side_two_odds,
@@ -216,13 +237,20 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
        FROM etl.pff_best_bets WHERE universal_game_id = $1`,
       [universalGameId]
     ),
+    // NOT SportsAnalytics's predictions/latest_predictions -- confirmed
+    // (2026-10) actual_home_score/actual_away_score sit NULL there even
+    // days after a game finished (that sync job isn't current). This
+    // page already uses getScheduledGame for the live score shown in
+    // the Hero -- same TheSportsDB-backed source, independently
+    // reliable, reused here to decide which Game Lines side hit.
+    getScheduledGame(universalGameId),
     query<FirstTouchdownRow>(
       `SELECT ft.player_name, ft.player_team, ft.opponent_team,
               COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
               COALESCE(lu.position, ec.position) AS position,
               ft.sportsbook, ft.first_td_odds, ft.epa_per_play, ft.opp_off_epa_per_play,
               ft.epa_difference, ft.touches, ft.touch_rate_pct, ft.adj_target_rate_pct,
-              ft.red_zone_carries, ft.red_zone_targets, ft.td_rate_allowed_pct
+              ft.red_zone_carries, ft.red_zone_targets, ft.td_rate_allowed_pct, ft.is_actual_first_scorer
        FROM etl.pff_first_touchdown ft
        -- Same LATERAL + LIMIT 1 pattern as the player-props query below
        -- -- see that one's own comment for why. position comes along
@@ -245,7 +273,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
               COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
               COALESCE(lu.position, ec.position) AS lineup_position,
               pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
-              pp.pick_odds, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
+              pp.pick_odds, pp.pick_result, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
               pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
               pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
               pp.h2h_record, pp.h2h_hit_type
@@ -303,6 +331,8 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
       sideTwoEdgePct: r.side_two_edge_pct,
       sideTwoCashPct: r.side_two_cash_pct,
       sideTwoTicketsPct: r.side_two_tickets_pct,
+      actualHomeScore: scheduledGame?.final ? scheduledGame.actual_home_score : null,
+      actualAwayScore: scheduledGame?.final ? scheduledGame.actual_away_score : null,
     }))
     .sort((a, b) => (PROP_TYPE_ORDER[a.propType] ?? 99) - (PROP_TYPE_ORDER[b.propType] ?? 99));
 
@@ -323,6 +353,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     redZoneCarries: r.red_zone_carries,
     redZoneTargets: r.red_zone_targets,
     tdRateAllowedPct: r.td_rate_allowed_pct,
+    isActualFirstScorer: r.is_actual_first_scorer,
   }));
 
   const playerProps: PlayerPropEntry[] = playerPropRows.map((r) => ({
@@ -337,6 +368,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     pickSide: r.pick_side,
     pickLine: r.pick_line,
     pickOdds: r.pick_odds,
+    pickResult: r.pick_result,
     projValue: r.proj_value,
     projDirection: r.proj_direction,
     l10Avg: r.l10_avg,
