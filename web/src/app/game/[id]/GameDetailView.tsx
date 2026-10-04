@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
@@ -14,6 +15,7 @@ import type { EdgeSide } from "@/lib/pffGrades";
 type EdgeTrackRow = { teamSide: EdgeSide | null; oppositionSide: EdgeSide | null };
 import type { InjuryEntry } from "@/lib/injuries";
 import type { StatWithRank, TeamPlayerGrades } from "@/lib/pffGameReport";
+import type { FirstTouchdownEntry, PlayerPropEntry } from "@/lib/pffBettingEdge";
 import type { LineupPlayer } from "@/lib/lineup";
 import { teamPrimaryColor } from "@/lib/teamColors";
 import AdFrame from "@/components/AdFrame";
@@ -1540,12 +1542,865 @@ function MatchupsView({ game }: { game: GameStat }) {
   );
 }
 
+// ----------------------------------------------------------------------
+// Betting Edge tab -- four independently-nullable sections (Game
+// Lines, First Touchdown, Key Insights, Player Props), same "each
+// section renders or doesn't based on its own data" convention as the
+// Overview tab's five PFF report sections. All four source tables are
+// manually fed by a separate pipeline -- see
+// src/lib/pffBettingEdge.ts's module docstring.
+// ----------------------------------------------------------------------
+
+const PROP_TYPE_LABELS: Record<string, string> = {
+  game_away_home_spread: "Spread",
+  game_away_home_win: "Moneyline",
+  game_point_total: "Total",
+};
+
+const CASH_TICKETS_INFO =
+  "Cash = the share of all the money bet on this side. Tickets = the share of individual bets placed on it. " +
+  "When they're far apart, it usually means a few big bettors are betting one way while most casual bettors " +
+  "are betting the other.";
+
+const EDGE_INFO =
+  "Estimate of how good this bet is. It compares their model's true win probability for this side to what " +
+  "the odds require just to break even. A positive Edge (green) means their model sees extra value here — " +
+  "the bigger the number, the stronger the play. A negative Edge means there's no advantage; the price " +
+  "already looks fair or worse, so most bettors would skip it.";
+
+// Player Props computes Edge differently from Game Lines -- confirmed
+// against real data (Malik Nabers: 92.8% Cov Prob at -111 odds gives
+// exactly +76.4% through THIS formula; Game Lines' simpler "Cover% -
+// Break-even%" gives a visibly different, wrong number on the same
+// row). Both tools call the result "Edge" and both still mean "bigger
+// positive number = PFF likes this more," but the actual math isn't
+// the same, so this gets the formula appended rather than silently
+// reusing EDGE_INFO as-is.
+const EDGE_INFO_PLAYER_PROPS =
+  EDGE_INFO + " Formula here: (Cover Probability × Sportsbook Payout) − 100%.";
+
+// Source: data/raw/pff/player-props/PlayerProp_info.txt -- PFF's own
+// column-by-column glossary for this table, lightly expanded into full
+// sentences (the file itself is terse label fragments, e.g. "COV PROB:
+// Coverage probability") to match the newbie-readable tone set by
+// CASH_TICKETS_INFO/EDGE_INFO above, not reworded for substance. Edge
+// isn't here -- its formula is handled separately below (EDGE_INFO_
+// PLAYER_PROPS), since it's genuinely different math from Game Lines'
+// Edge, not just a wording choice.
+const PLAYER_PROP_COLUMN_INFO = {
+  player: "The player this prop is for.",
+  consensus: "The standard line most sportsbooks are offering for this prop.",
+  pick: "PFF's own recommended side for this prop.",
+  proj: "PFF's own projected value for this stat.",
+  l10Avg: "This player's average for this stat over their last 10 games.",
+  covProb: "How often PFF's model expects this side of the line to actually hit.",
+  defVsProp: "How the opponent's defense has performed against this specific prop recently.",
+  matchup: "A grade for how favorable this matchup is for the player against the opposing defense.",
+  simDef: "This player's hit rate in past games against defenses similar to this week's opponent.",
+  l5: "This player's hit rate on this prop over their last 5 games.",
+  l10: "This player's hit rate on this prop over their last 10 games.",
+  h2h: "This player's hit rate on this prop in past meetings against this exact opponent.",
+};
+
+// PFF's own export names the book but never shows it on the page --
+// a reader sees the price but not who's offering it. name/url back a
+// small clickable favicon at the end of each First Touchdown row
+// instead of a text column, so it reads as "which book" at a glance
+// without widening the table. Favicon comes from Google's public
+// favicon service (no logo asset of our own to license/host) rather
+// than an unrecognized key appearing as plain text.
+// Links to each book's general NFL section, not a specific bet/event
+// id -- this data doesn't carry PFF's own per-bet deep-link id, and a
+// hardcoded one would go stale (or point at the wrong game entirely)
+// the moment it's reused for any game other than the one it was
+// copied from. caesars.com itself silently redirects to williamhill.us
+// (confirmed 2026-10 -- a real rebrand/redirect quirk, not a typo) --
+// sportsbook.caesars.com is the actual working subdomain.
+//
+// EXCEPTION: Caesars's own /bet/americanfootball with no query string
+// lands on COLLEGE football, not NFL (confirmed 2026-10 by actually
+// clicking it) -- the `?id=` here isn't a specific bet/event after
+// all, it's what tells Caesars's own router "NFL," so unlike the
+// per-bet-id concern above, this one IS the stable, correct link to
+// keep.
+const SPORTSBOOK_INFO: Record<string, { name: string; url: string; domain: string }> = {
+  caesars: {
+    name: "Caesars Sportsbook",
+    url: "https://sportsbook.caesars.com/us/nj/bet/americanfootball?id=007d7c61-07a7-4e18-bb40-15104b6eac92",
+    domain: "sportsbook.caesars.com",
+  },
+  draftKings: {
+    name: "DraftKings",
+    url: "https://sportsbook.draftkings.com/leagues/football/nfl",
+    domain: "sportsbook.draftkings.com",
+  },
+  betmgm: {
+    name: "BetMGM",
+    url: "https://www.nj.betmgm.com/en/engage/lan/geolocator?orh=sports.betmgm.com",
+    domain: "www.nj.betmgm.com",
+  },
+  fanduel: {
+    name: "FanDuel",
+    url: "https://sportsbook.fanduel.com/navigation/nfl",
+    domain: "sportsbook.fanduel.com",
+  },
+  // Not yet confirmed by click-through like the other four (seen in
+  // Player Props' pick_sportsbook, not First Touchdown's set) -- same
+  // "general section, not a specific bet" reasoning, but this URL is
+  // a best guess, not a verified one.
+  fanatics: {
+    name: "Fanatics Sportsbook",
+    url: "https://sportsbook.fanatics.com/",
+    domain: "sportsbook.fanatics.com",
+  },
+};
+
+function SportsbookLink({ sportsbook }: { sportsbook: string }) {
+  const info = SPORTSBOOK_INFO[sportsbook];
+  if (!info) return <span className="betting-sportsbook-unknown">{sportsbook}</span>;
+  return (
+    <a
+      className="betting-sportsbook-link"
+      href={info.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Odds via ${info.name}`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`https://www.google.com/s2/favicons?sz=32&domain=${info.domain}`}
+        alt={info.name}
+        className="betting-sportsbook-icon"
+      />
+    </a>
+  );
+}
+
+function formatOdds(odds: number): string {
+  return odds > 0 ? `+${odds}` : `${odds}`;
+}
+
+function sideLabel(sideType: string, game: GameStat): string {
+  if (sideType === "away") return teamDisplay(game.teamA.alias).split(" ").pop() ?? sideType;
+  if (sideType === "home") return teamDisplay(game.teamB.alias).split(" ").pop() ?? sideType;
+  return sideType === "over" ? "Over" : sideType === "under" ? "Under" : sideType;
+}
+
+// null (not a dash) for over/under -- those sides have no team to show
+// a logo for, and the row layout skips the logo slot entirely for them.
+function sideAlias(sideType: string, game: GameStat): string | null {
+  if (sideType === "away") return game.teamA.alias;
+  if (sideType === "home") return game.teamB.alias;
+  return null;
+}
+
+// `line` is stored once, signed from the HOME side (spread) -- the
+// away side's number is the same magnitude, opposite sign. A total's
+// line is shared as-is by both sides (Over 47.5 / Under 47.5).
+function formatSideLine(propType: string, line: number | null, sideType: string): string {
+  if (line == null) return "";
+  if (propType === "game_point_total") return line.toFixed(1);
+  const signed = sideType === "home" ? line : -line;
+  return signed > 0 ? `+${signed}` : `${signed}`;
+}
+
+// No info icon on the badge itself -- it renders once per row (every
+// row in both Game Lines and Player Props use this), which made the
+// same explanation repeat endlessly. The icon lives once at the top
+// of each section instead (the header row above Game Lines' list, the
+// "Edge" <th> in Player Props) -- see EDGE_INFO's usages.
+function EdgeBadge({ pct }: { pct: number }) {
+  const cls = pct > 2 ? "betting-edge-positive" : pct < -2 ? "betting-edge-negative" : "betting-edge-neutral";
+  return (
+    <span className={`betting-edge-badge ${cls}`}>
+      {pct > 0 ? "+" : ""}
+      {pct.toFixed(1)}%
+    </span>
+  );
+}
+
+// Same 3-segment bar as PFF's own "Best Game Bets" table -- a quick
+// visual read of edge strength alongside the exact number, not a
+// replacement for it. Segments filled only for positive edge (a
+// negative/flat edge shows all three segments empty, same as PFF's
+// own display).
+function EdgeBar({ pct }: { pct: number }) {
+  const filled = pct > 6 ? 3 : pct > 3 ? 2 : pct > 0 ? 1 : 0;
+  return (
+    <span className="betting-edge-bar" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <span key={i} className={i < filled ? "betting-edge-bar-seg filled" : "betting-edge-bar-seg"} />
+      ))}
+    </span>
+  );
+}
+
+// Own conditional-formatting heatmap for First Touchdown's EPA
+// columns -- PFF's page has this too (their "Color Cells" toggle),
+// but the color itself isn't a field in the export; it's computed
+// from the number. Fixed bounds, not scaled against the live week's
+// data range, so a given EPA value always reads as the same shade
+// regardless of what else happens to be in that week's slate -- a
+// deliberate choice over matching PFF's own (unknown) exact
+// thresholds, which would need scraping their page to reverse-engineer
+// and would drift the moment their own formula changes anyway.
+//
+// direction="low" inverts the scale (used for Opp Off EPA Per Play
+// only) -- confirmed against a real PFF screenshot that a LOW value
+// there colors green, not high, since it's the subtracted term in
+// Difference (EPA Per Play minus Opp Off EPA Per Play): a struggling
+// opponent offense is favorable context for this player's own
+// first-TD odds, not unfavorable.
+function epaCellStyle(
+  value: number | null,
+  direction: "high" | "low",
+  maxAbs: number
+): CSSProperties {
+  if (value == null) return {};
+  const clamped = Math.max(-maxAbs, Math.min(maxAbs, value));
+  const signed = direction === "high" ? clamped : -clamped;
+  const intensity = Math.abs(signed) / maxAbs; // 0..1
+  const alpha = 0.1 + intensity * 0.35;
+  return {
+    backgroundColor: signed > 0 ? `rgba(57, 217, 138, ${alpha})` : `rgba(255, 107, 107, ${alpha})`,
+  };
+}
+
+function GameLinesSection({ game }: { game: GameStat }) {
+  const markets = game.bettingEdge?.bestGameBets ?? [];
+  if (markets.length === 0) return null;
+
+  return (
+    <div className="stat-section">
+      <h2>Game Lines</h2>
+      <p className="stat-sub">
+        The gap between their model&apos;s fair win probability and the price the market is actually offering,
+        shown as expected value. Cash/Tickets is the public betting split (% of dollars wagered vs. % of
+        individual bets) on each side. Not something this site calculates independently.
+      </p>
+      <div className="betting-lines-list betting-desktop-only">
+        {/* Labels + info icons live here ONCE, not per row -- same
+            explanation repeating on every one of the 6 rows below was
+            the actual complaint being fixed. */}
+        <div className="betting-line-header-row">
+          <span>Pick</span>
+          <span>
+            Cash / Tickets
+            <InfoTooltip text={CASH_TICKETS_INFO} />
+          </span>
+          <span>
+            Edge
+            <InfoTooltip text={EDGE_INFO} />
+          </span>
+        </div>
+        {markets.map((m) =>
+          [
+            { type: m.sideOneType, odds: m.sideOneOdds, edge: m.sideOneEdgePct, cash: m.sideOneCashPct, tickets: m.sideOneTicketsPct },
+            { type: m.sideTwoType, odds: m.sideTwoOdds, edge: m.sideTwoEdgePct, cash: m.sideTwoCashPct, tickets: m.sideTwoTicketsPct },
+          ].map((side) => {
+            const alias = sideAlias(side.type, game);
+            return (
+              <div className="betting-line-full-row" key={`${m.propType}-${side.type}`}>
+                <div className="betting-line-pick">
+                  {alias ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="betting-line-logo" src={teamLogoPath(alias)} alt="" />
+                  ) : (
+                    <span className="betting-line-logo betting-line-logo-blank" aria-hidden="true" />
+                  )}
+                  <span className="betting-line-pick-text">
+                    <span className="betting-line-side">
+                      {sideLabel(side.type, game)} {formatSideLine(m.propType, m.line, side.type)}
+                    </span>
+                    <span className="betting-line-odds">{formatOdds(side.odds)}</span>
+                  </span>
+                  <span className="betting-line-market">{PROP_TYPE_LABELS[m.propType] ?? m.propType}</span>
+                </div>
+                <div className="betting-line-split">
+                  {side.cash != null && side.tickets != null ? (
+                    <>
+                      <span>
+                        {side.cash}% <strong>Cash</strong>
+                      </span>
+                      <span>
+                        {side.tickets}% <strong>Tickets</strong>
+                      </span>
+                    </>
+                  ) : (
+                    <span className="betting-line-split-empty">Cash/Tickets not reported</span>
+                  )}
+                </div>
+                <div className="betting-line-edge">
+                  <EdgeBar pct={side.edge} />
+                  <span className="betting-line-edge-label">Edge</span>
+                  <EdgeBadge pct={side.edge} />
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Mobile-only: same per-side full-width rows read as one long
+          undifferentiated list on a phone with no visual separation
+          between markets -- this groups both sides of each market into
+          its own bordered card instead (team logos once per card, not
+          repeated per side), closer to PFF's own mobile card layout.
+          Still shows BOTH sides per market, unlike PFF's mobile view
+          (which only shows one side) -- that was a deliberate earlier
+          decision for this site, not something this reshuffle should
+          quietly drop. */}
+      <div className="betting-mobile-only">
+        {markets.map((m) => (
+          <div className="gl-card" key={m.propType}>
+            <div className="gl-card-header">
+              <div className="gl-card-teams">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="betting-line-logo" src={teamLogoPath(game.teamA.alias)} alt="" />
+                <span>{game.teamA.alias}</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="betting-line-logo" src={teamLogoPath(game.teamB.alias)} alt="" />
+                <span>{game.teamB.alias}</span>
+              </div>
+              <span className="gl-card-market-label">{PROP_TYPE_LABELS[m.propType] ?? m.propType}</span>
+            </div>
+            {[
+              { type: m.sideOneType, odds: m.sideOneOdds, edge: m.sideOneEdgePct, cash: m.sideOneCashPct, tickets: m.sideOneTicketsPct },
+              { type: m.sideTwoType, odds: m.sideTwoOdds, edge: m.sideTwoEdgePct, cash: m.sideTwoCashPct, tickets: m.sideTwoTicketsPct },
+            ].map((side) => (
+              <div className="gl-card-side-row" key={side.type}>
+                <div className="gl-card-side-pick">
+                  <span className="betting-line-side">
+                    {sideLabel(side.type, game)} {formatSideLine(m.propType, m.line, side.type)}
+                  </span>
+                  <span className="betting-line-odds">{formatOdds(side.odds)}</span>
+                </div>
+                <div className="gl-card-side-edge">
+                  <EdgeBar pct={side.edge} />
+                  <EdgeBadge pct={side.edge} />
+                </div>
+                <div className="gl-card-side-split">
+                  {side.cash != null && side.tickets != null ? (
+                    <>
+                      {side.cash}% Cash · {side.tickets}% Tickets
+                    </>
+                  ) : (
+                    <span className="betting-line-split-empty">Cash/Tickets not reported</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Verbatim from PFF's own glossary for this page
+// (data/raw/pff/first-touchdown/FirstTDFinder_info.txt, manually
+// copied alongside the CSV exports -- same "not in the CSV itself"
+// situation as the group headers, this is just explanatory text PFF
+// shows, not a data field). Keyed by group, not by individual column,
+// matching how PFF's own info icons are placed one per group header.
+const FIRST_TD_GROUP_INFO: Record<string, string> = {
+  epa: "EPA per play in the first 15 plays measures how efficient offenses are early in games. Can be valuable to compare when deciding what team is more likely to score first.",
+  targets:
+    "Targets and touches in the first 15 plays indicate how involved an offensive player is early in games, where first touchdowns typically occur.",
+  redZone:
+    "First half red zone carries and targets represent more valuable scoring opportunities early in games, where a first TD typically occurs.",
+  defRedZone:
+    "The percentage of drives where a defense allows a TD when the opposing offense gets to the red zone. Higher percentage is better for the offensive player.",
+};
+
+// Rendered via a portal to document.body, positioned with fixed
+// coordinates from the icon's own bounding rect -- NOT a plain
+// absolute-positioned tooltip, because the table it lives in sits
+// inside a horizontally-scrolling wrapper (.betting-table-wrap,
+// overflow-x: auto). Per the CSS overflow spec, setting overflow-x to
+// anything but visible forces the computed overflow-y to auto too, so
+// a tooltip positioned relative to an ancestor inside that wrapper
+// would get clipped at the wrapper's own edge instead of floating
+// above the page -- confirmed this is exactly the kind of bug that
+// class of implementation hits.
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  function toggle() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const popoverWidth = 260;
+      setPos({
+        top: rect.bottom + 6,
+        left: Math.max(12, Math.min(rect.left, window.innerWidth - popoverWidth - 12)),
+      });
+    }
+    setOpen((o) => !o);
+  }
+
+  return (
+    <span className="betting-info-wrap">
+      <button
+        type="button"
+        ref={buttonRef}
+        className="betting-info-icon"
+        aria-label="More info"
+        onClick={toggle}
+      >
+        i
+      </button>
+      {open &&
+        pos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div className="betting-info-backdrop" onClick={() => setOpen(false)} />
+            <div className="betting-info-popover" style={{ top: pos.top, left: pos.left }}>
+              {text}
+            </div>
+          </>,
+          document.body
+        )}
+    </span>
+  );
+}
+
+function FirstTouchdownSection({ game }: { game: GameStat }) {
+  const entries = game.bettingEdge?.firstTouchdown ?? [];
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="stat-section">
+      <h2>First Touchdown</h2>
+      <p className="stat-sub">
+        Anytime-first-scorer odds alongside the usage signals behind them — touch share, red-zone looks, and how
+        often the opponent&apos;s defense has allowed a touchdown at that position.
+      </p>
+      {/* Outer wrapper + fade div: the table genuinely doesn't fit most
+          screens (11 data columns) and needs to scroll horizontally --
+          without a visible cue for that, a scrolled-off column reads as
+          missing data rather than "scroll right." The fade is pinned to
+          the OUTER (non-scrolling) container, not the inner scrolling
+          one, so it stays visible at the true right edge regardless of
+          scroll position, rather than scrolling away with the content. */}
+      <div className="betting-table-outer betting-desktop-only">
+      <div className="betting-table-wrap">
+        <table className="betting-table betting-table-grouped">
+          <thead>
+            {/* Same two-row grouped-header shape as PFF's own "First TD
+                Finder" -- 11 numeric columns is too many to read as one
+                flat header row, so they're clustered under the same 4
+                category labels PFF uses. Player/Odds/Book span both
+                header rows since they don't belong to any group. */}
+            <tr>
+              <th rowSpan={2} className="betting-table-sticky-col">
+                Player
+              </th>
+              <th rowSpan={2}>First TD Odds</th>
+              <th colSpan={3} className="betting-table-group">
+                EPA First 15 Plays <InfoTooltip text={FIRST_TD_GROUP_INFO.epa} />
+              </th>
+              <th colSpan={3} className="betting-table-group">
+                First 15 — Targets, Touches <InfoTooltip text={FIRST_TD_GROUP_INFO.targets} />
+              </th>
+              <th colSpan={2} className="betting-table-group">
+                Red Zone <InfoTooltip text={FIRST_TD_GROUP_INFO.redZone} />
+              </th>
+              <th colSpan={1} className="betting-table-group">
+                Def Redzone <InfoTooltip text={FIRST_TD_GROUP_INFO.defRedZone} />
+              </th>
+              <th rowSpan={2}>Book</th>
+            </tr>
+            <tr>
+              <th>EPA/Play</th>
+              <th>Opp Off EPA/Play</th>
+              <th>Diff</th>
+              <th>Touches</th>
+              <th>Touch Rate</th>
+              <th>Adj Target Rate</th>
+              <th>Carries</th>
+              <th>Tgts</th>
+              <th>TD Rate Allowed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((e) => (
+              <tr key={e.playerName}>
+                <td className="betting-table-sticky-col">
+                  <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
+                </td>
+                <td>{formatOdds(e.firstTdOdds)}</td>
+                <td style={epaCellStyle(e.epaPerPlay, "high", 0.5)}>
+                  {e.epaPerPlay != null ? e.epaPerPlay.toFixed(3) : "—"}
+                </td>
+                <td style={epaCellStyle(e.oppOffEpaPerPlay, "low", 0.5)}>
+                  {e.oppOffEpaPerPlay != null ? e.oppOffEpaPerPlay.toFixed(3) : "—"}
+                </td>
+                <td style={epaCellStyle(e.epaDifference, "high", 0.8)}>
+                  {e.epaDifference != null ? e.epaDifference.toFixed(3) : "—"}
+                </td>
+                <td>{e.touches ?? "—"}</td>
+                <td>{e.touchRatePct != null ? `${e.touchRatePct}%` : "—"}</td>
+                <td>{e.adjTargetRatePct != null ? `${e.adjTargetRatePct}%` : "—"}</td>
+                <td>{e.redZoneCarries ?? 0}</td>
+                <td>{e.redZoneTargets ?? 0}</td>
+                <td>{e.tdRateAllowedPct != null ? `${e.tdRateAllowedPct}%` : "—"}</td>
+                <td>
+                  <SportsbookLink sportsbook={e.sportsbook} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="betting-table-fade" aria-hidden="true" />
+      </div>
+
+      {/* Mobile-only: same reasoning as Player Props' mobile cards --
+          this table's 11 columns don't shrink into something usable on
+          a phone, so this is a second, independent rendering of the
+          same `entries` as cards, toggled purely by CSS against the
+          table above. */}
+      <div className="betting-mobile-only">
+        {entries.map((e) => (
+          <TdCard key={e.playerName} entry={e} game={game} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TdCard({ entry: e, game }: { entry: FirstTouchdownEntry; game: GameStat }) {
+  const isHome = e.playerTeam === game.teamB.alias;
+
+  return (
+    <div className="td-card">
+      <div className="td-card-top">
+        <PlayerHeadshot espnId={e.espnId} alias={e.playerTeam} size={44} />
+        <div className="td-card-name-wrap">
+          <div className="td-card-name">{e.playerName}</div>
+          <div className="td-card-matchup">
+            <span className="betting-player-team">{e.playerTeam}</span>
+            {isHome ? "vs" : "@"} {e.opponentTeam}
+          </div>
+        </div>
+        <div className="td-card-odds-wrap">
+          <span className="td-card-odds">{formatOdds(e.firstTdOdds)}</span>
+          <SportsbookLink sportsbook={e.sportsbook} />
+        </div>
+      </div>
+      <div className="td-card-stats-row">
+        <div className="td-card-stat-box">
+          <div className="prop-card-stat-label">Touch Rate</div>
+          <div className="prop-card-stat-value">{e.touchRatePct != null ? `${e.touchRatePct}%` : "—"}</div>
+        </div>
+        <div className="td-card-stat-box">
+          <div className="prop-card-stat-label">Red Zone</div>
+          <div className="prop-card-stat-value">
+            {e.redZoneCarries ?? 0}c / {e.redZoneTargets ?? 0}t
+          </div>
+        </div>
+        <div className="td-card-stat-box">
+          <div className="prop-card-stat-label">Opp TD Rate</div>
+          <div className="prop-card-stat-value">{e.tdRateAllowedPct != null ? `${e.tdRateAllowedPct}%` : "—"}</div>
+        </div>
+      </div>
+      <div className="td-card-epa-row">
+        <div className="td-card-epa-box" style={epaCellStyle(e.epaPerPlay, "high", 0.5)}>
+          <div className="prop-card-stat-label">EPA/Play</div>
+          <div className="prop-card-stat-value">{e.epaPerPlay != null ? e.epaPerPlay.toFixed(3) : "—"}</div>
+        </div>
+        <div className="td-card-epa-box" style={epaCellStyle(e.oppOffEpaPerPlay, "low", 0.5)}>
+          <div className="prop-card-stat-label">Opp Off EPA</div>
+          <div className="prop-card-stat-value">
+            {e.oppOffEpaPerPlay != null ? e.oppOffEpaPerPlay.toFixed(3) : "—"}
+          </div>
+        </div>
+        <div className="td-card-epa-box" style={epaCellStyle(e.epaDifference, "high", 0.8)}>
+          <div className="prop-card-stat-label">Diff</div>
+          <div className="prop-card-stat-value">{e.epaDifference != null ? e.epaDifference.toFixed(3) : "—"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KeyInsightsSection({ game }: { game: GameStat }) {
+  const entries = game.bettingEdge?.keyInsights ?? [];
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="stat-section">
+      <h2>Key Insights</h2>
+      <p className="stat-sub">Matchup-specific notes for players in this game.</p>
+      <div className="betting-insights-grid">
+        {entries.map((e, i) => (
+          <div className="betting-insight-card" key={`${e.playerName}-${i}`}>
+            {e.headshotUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="betting-insight-headshot" src={e.headshotUrl} alt="" />
+            )}
+            <div className="betting-insight-body">
+              <div className="betting-insight-player">
+                {e.playerName} <span className="betting-player-team">{e.playerTeam}</span>
+              </div>
+              <div className="betting-insight-headline">{e.insightHeadline}</div>
+              <div className="betting-insight-detail">{e.insightDetail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MatchupGradeBadge({ grade }: { grade: string | null }) {
+  if (!grade) return null;
+  const cls =
+    grade === "GOOD" ? "betting-grade-good" : grade === "POOR" ? "betting-grade-poor" : "betting-grade-fair";
+  return <span className={`betting-grade-badge ${cls}`}>{grade}</span>;
+}
+
+// Same idea as epaCellStyle (fixed bounds, not scraped) applied to a
+// "X/Y" hit-rate record instead of a raw number. "0/0" (no sample
+// yet) is deliberately left uncolored -- there's nothing to grade.
+function hitRateCellStyle(record: string | null): CSSProperties {
+  if (!record) return {};
+  const match = record.match(/^(\d+)\/(\d+)$/);
+  if (!match) return {};
+  const hits = Number(match[1]);
+  const total = Number(match[2]);
+  if (total === 0) return {};
+  const rate = hits / total;
+  const alpha = 0.16;
+  if (rate >= 0.6) return { backgroundColor: `rgba(57, 217, 138, ${alpha})` };
+  if (rate >= 0.4) return { backgroundColor: `rgba(255, 214, 10, ${alpha})` };
+  return { backgroundColor: `rgba(255, 107, 107, ${alpha})` };
+}
+
+function HitRateCell({ record, hitType }: { record: string | null; hitType: string | null }) {
+  return (
+    <td style={hitRateCellStyle(record)}>
+      {record ?? "—"}
+      {hitType && <div className="betting-hit-type">{hitType}</div>}
+    </td>
+  );
+}
+
+function PlayerPropsSection({ game }: { game: GameStat }) {
+  const entries = game.bettingEdge?.playerProps ?? [];
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="stat-section">
+      <h2>Player Props</h2>
+      <p className="stat-sub">
+        Prop picks for this game, sorted by Edge — the consensus line, the recommended side, its projection,
+        matchup context, and recent hit-rate form for each player prop.
+      </p>
+      <div className="betting-table-outer betting-desktop-only">
+      <div className="betting-table-wrap">
+        <table className="betting-table betting-table-grouped">
+          <thead>
+            <tr>
+              <th rowSpan={2} className="betting-table-sticky-col">
+                Player <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.player} />
+              </th>
+              <th rowSpan={2}>
+                Consensus <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.consensus} />
+              </th>
+              <th rowSpan={2}>
+                Pick <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.pick} />
+              </th>
+              <th colSpan={4} className="betting-table-group">
+                Projections + Value
+              </th>
+              <th colSpan={2} className="betting-table-group">
+                PFF Insights and Data
+              </th>
+              <th colSpan={4} className="betting-table-group">
+                Hit Rates
+              </th>
+            </tr>
+            <tr>
+              <th>
+                Proj <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.proj} />
+              </th>
+              <th>
+                L10 Avg <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.l10Avg} />
+              </th>
+              <th>
+                Cov Prob <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.covProb} />
+              </th>
+              <th>
+                Edge <InfoTooltip text={EDGE_INFO_PLAYER_PROPS} />
+              </th>
+              <th>
+                Def vs Prop <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.defVsProp} />
+              </th>
+              <th>
+                Matchup <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.matchup} />
+              </th>
+              <th>
+                Sim Def <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.simDef} />
+              </th>
+              <th>
+                L5 <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.l5} />
+              </th>
+              <th>
+                L10 <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.l10} />
+              </th>
+              <th>
+                H2H <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.h2h} />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((e) => (
+              <tr key={`${e.playerName}-${e.consensusStat}`}>
+                <td className="betting-table-sticky-col">
+                  <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
+                </td>
+                <td>
+                  {e.consensusLine ?? "—"} {e.consensusStat}
+                </td>
+                <td>
+                  <div className="betting-pick-cell">
+                    {e.pickSportsbook && <SportsbookLink sportsbook={e.pickSportsbook} />}
+                    <span>
+                      {e.pickSide ?? ""} {e.pickLine ?? ""}
+                      {e.pickOdds != null && (
+                        <>
+                          <br />
+                          <span className="betting-player-team">{formatOdds(e.pickOdds)}</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </td>
+                <td className={e.projDirection === "Under" ? "betting-proj-under" : "betting-proj-over"}>
+                  {e.projValue ?? "—"}
+                  {e.projDirection && <div className="betting-hit-type">{e.projDirection}</div>}
+                </td>
+                <td>{e.l10Avg ?? "—"}</td>
+                <td>{e.covProbPct != null ? `${e.covProbPct}%` : "—"}</td>
+                <td>{e.edgePct != null ? <EdgeBadge pct={e.edgePct} /> : "—"}</td>
+                <td>
+                  {e.defVsPropRank && e.defVsPropRank !== "-" ? e.defVsPropRank : "—"}
+                  {e.matchupPosition && <div className="betting-hit-type">{e.matchupPosition} vs Prop</div>}
+                </td>
+                <td>
+                  <MatchupGradeBadge grade={e.matchupGrade} />
+                  {e.matchupPosition && <div className="betting-hit-type">{e.matchupPosition} vs Def</div>}
+                </td>
+                <HitRateCell record={e.simDefRecord} hitType={e.simDefHitType} />
+                <HitRateCell record={e.l5Record} hitType={e.l5HitType} />
+                <HitRateCell record={e.l10Record} hitType={e.l10HitType} />
+                <HitRateCell record={e.h2hRecord} hitType={e.h2hHitType} />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="betting-table-fade" aria-hidden="true" />
+      </div>
+
+      {/* Mobile-only: the grouped table (13 columns, built for desktop)
+          genuinely doesn't work as a shrunk-down table on a phone --
+          this is a second, independent rendering of the same `entries`
+          data as cards, matching PFF's own mobile Player Prop Tool
+          layout, toggled against the table above purely by CSS
+          min-width (see .betting-desktop-only/-mobile-only) so
+          there's no client-side layout-detection logic needed. */}
+      <div className="betting-mobile-only">
+        {entries.map((e) => (
+          <PropCard key={`${e.playerName}-${e.consensusStat}`} entry={e} game={game} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }) {
+  const isHome = e.playerTeam === game.teamB.alias;
+
+  return (
+    <div className="prop-card">
+      <div className="prop-card-top">
+        <span className="prop-card-stat">{e.consensusStat}</span>
+        <div className="prop-card-pick">
+          {e.edgePct != null && <EdgeBadge pct={e.edgePct} />}
+          <span className="prop-card-line">
+            {e.pickSide ?? ""} {e.pickLine ?? ""}
+          </span>
+          {e.pickSportsbook && <SportsbookLink sportsbook={e.pickSportsbook} />}
+        </div>
+      </div>
+      <div className="prop-card-body">
+        <div className="prop-card-player">
+          <PlayerHeadshot espnId={e.espnId} alias={e.playerTeam} size={48} />
+          <div>
+            <div className="prop-card-name">{e.playerName}</div>
+            <div className="prop-card-matchup">
+              <span className="betting-player-team">{e.playerTeam}</span>
+              {isHome ? "vs" : "@"} {e.opponentTeam}
+            </div>
+          </div>
+        </div>
+        <div className="prop-card-proj">
+          <div className="prop-card-proj-value">
+            {e.projValue ?? "—"}
+            <span className="prop-card-proj-label">PROJ</span>
+          </div>
+          {e.l10Avg != null && <div className="prop-card-avg">AVG: {e.l10Avg}</div>}
+        </div>
+      </div>
+      <div className="prop-card-stats-row">
+        <div className="prop-card-stat-box">
+          <div className="prop-card-stat-label">{e.matchupPosition ?? ""} Matchup</div>
+          <MatchupGradeBadge grade={e.matchupGrade} />
+        </div>
+        <div className="prop-card-stat-box">
+          <div className="prop-card-stat-label">Cover Prob</div>
+          <div className="prop-card-stat-value">{e.covProbPct != null ? `${e.covProbPct}%` : "—"}</div>
+        </div>
+        <div className="prop-card-stat-box">
+          <div className="prop-card-stat-label">{e.pickSide ?? ""} Hit Rate</div>
+          <div className="prop-card-stat-value">{e.l10Record ?? "—"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BettingEdgeView({ game }: { game: GameStat }) {
+  if (!game.bettingEdge) {
+    return (
+      <div className="stat-section">
+        <h2>Betting Edge</h2>
+        <div className="lineup-unavailable">Betting data isn&apos;t available for this game yet.</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <GameLinesSection game={game} />
+      <FirstTouchdownSection game={game} />
+      <KeyInsightsSection game={game} />
+      <PlayerPropsSection game={game} />
+    </>
+  );
+}
+
 function PageTabStrip({
   active,
   onChange,
 }: {
-  active: "overview" | "matchups";
-  onChange: (tab: "overview" | "matchups") => void;
+  active: "overview" | "matchups" | "bettingEdge";
+  onChange: (tab: "overview" | "matchups" | "bettingEdge") => void;
 }) {
   return (
     <div className="page-tab-strip" role="tablist">
@@ -1566,6 +2421,15 @@ function PageTabStrip({
         onClick={() => onChange("matchups")}
       >
         Matchups
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active === "bettingEdge"}
+        className={active === "bettingEdge" ? "active" : ""}
+        onClick={() => onChange("bettingEdge")}
+      >
+        Betting Edge
       </button>
     </div>
   );
@@ -1685,7 +2549,7 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
   const { isMember, toggle } = useMemberPreview();
   const router = useRouter();
   const locked = !game.premier && !isMember;
-  const [activeTab, setActiveTab] = useState<"overview" | "matchups">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "matchups" | "bettingEdge">("overview");
 
   useEffect(() => {
     if (game.status !== "live") return;
@@ -1844,9 +2708,13 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
           <PressureMatchupSection game={game} />
           <TeamGradesSection game={game} />
         </div>
-      ) : (
+      ) : activeTab === "matchups" ? (
         <div className="page-edge-section">
           <MatchupsView game={game} />
+        </div>
+      ) : (
+        <div className="page-edge-section">
+          <BettingEdgeView game={game} />
         </div>
       )}
     </>
