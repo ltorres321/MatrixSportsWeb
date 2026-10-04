@@ -111,7 +111,7 @@ export default async function HomePage() {
               <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
                 {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
               </div>
-              <MatchupCard matchup={premier} premier linkHref="/login" />
+              <MatchupCard matchup={premier} premier />
             </div>
           )}
 
