@@ -3770,6 +3770,16 @@ h1.glow span {
   color: var(--text);
 }
 
+/* The league-wide rank shown in parentheses next to the in-game
+   pRank -- deliberately smaller/muted so the in-game rank (what this
+   table is actually sorted by) stays the visual primary. */
+.betting-prank-overall {
+  font-weight: 400;
+  font-size: 0.7em;
+  color: var(--text-dim);
+  margin-left: 0.3em;
+}
+
 .betting-player-team {
   color: var(--text-dim);
   font-size: 0.72rem;

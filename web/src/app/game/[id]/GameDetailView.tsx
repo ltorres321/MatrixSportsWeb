@@ -1590,8 +1590,9 @@ const EDGE_INFO_PLAYER_PROPS =
 const PLAYER_PROP_COLUMN_INFO = {
   player: "The player this prop is for.",
   pRank:
-    "Our model's rank of how likely this pick is to hit, across every player prop this week " +
-    "(not just this game) -- 1 is the most likely to be correct.",
+    "Our model's rank of how likely this pick is to hit, among this game's own player props " +
+    "-- 1 is the most likely to be correct. The smaller number in parentheses is that same " +
+    "pick's rank across every player prop this week, league-wide.",
   consensus: "The standard line most sportsbooks are offering for this prop.",
   pick: "PFF's own recommended side for this prop.",
   proj: "PFF's own projected value for this stat.",
@@ -2391,7 +2392,10 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
             {entries.map((e) => (
               <tr key={`${e.playerName}-${e.consensusStat}`}>
                 <td className="betting-table-sticky-col betting-prank-cell">
-                  {e.pRank != null ? `#${e.pRank}` : "—"}
+                  {e.pRank != null ? e.pRank : "—"}
+                  {e.overallRank != null && (
+                    <span className="betting-prank-overall">({e.overallRank})</span>
+                  )}
                 </td>
                 <td>
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
@@ -2466,7 +2470,14 @@ function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }
       <div className="prop-card-top">
         <span className="prop-card-stat">{e.consensusStat}</span>
         <div className="prop-card-pick">
-          {e.pRank != null && <span className="prop-card-prank">#{e.pRank}</span>}
+          {e.pRank != null && (
+            <span className="prop-card-prank">
+              {e.pRank}
+              {e.overallRank != null && (
+                <span className="betting-prank-overall">({e.overallRank})</span>
+              )}
+            </span>
+          )}
           {e.edgePct != null && <EdgeBadge pct={e.edgePct} />}
           <span className="prop-card-line">
             {e.pickSide ?? ""} {e.pickLine ?? ""}
