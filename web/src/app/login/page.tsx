@@ -52,7 +52,7 @@ export default function LoginPage() {
 
               <p className="form-footer-note">
                 Don&apos;t have an account?{" "}
-                <Link href="/signup" style={{ color: "var(--green)" }}>
+                <Link href="/signup" className="gold-cta-link">
                   Sign up free
                 </Link>
               </p>
