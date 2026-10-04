@@ -3764,6 +3764,12 @@ h1.glow span {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.betting-prank-cell {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .betting-player-team {
   color: var(--text-dim);
   font-size: 0.72rem;
@@ -4376,6 +4382,13 @@ h1.glow span {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.prop-card-prank {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }
 
 .prop-card-line {

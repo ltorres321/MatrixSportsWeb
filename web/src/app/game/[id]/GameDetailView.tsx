@@ -1589,6 +1589,9 @@ const EDGE_INFO_PLAYER_PROPS =
 // Edge, not just a wording choice.
 const PLAYER_PROP_COLUMN_INFO = {
   player: "The player this prop is for.",
+  pRank:
+    "Our model's rank of how likely this pick is to hit, across every player prop this week " +
+    "(not just this game) -- 1 is the most likely to be correct.",
   consensus: "The standard line most sportsbooks are offering for this prop.",
   pick: "PFF's own recommended side for this prop.",
   proj: "PFF's own projected value for this stat.",
@@ -2312,8 +2315,9 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
     <div className="stat-section">
       <h2>Player Props</h2>
       <p className="stat-sub">
-        Prop picks for this game, sorted by Edge — the consensus line, the recommended side, its projection,
-        matchup context, and recent hit-rate form for each player prop.
+        Prop picks for this game, sorted by pRank (our model&apos;s rank of how likely each pick is to hit) —
+        the consensus line, the recommended side, its projection, matchup context, and recent hit-rate form for
+        each player prop.
       </p>
       {graded.length > 0 && (
         <p className="betting-props-summary">
@@ -2330,6 +2334,9 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
             <tr>
               <th rowSpan={2} className="betting-table-sticky-col">
                 Player <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.player} />
+              </th>
+              <th rowSpan={2}>
+                pRank <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.pRank} />
               </th>
               <th rowSpan={2}>
                 Consensus <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.consensus} />
@@ -2388,6 +2395,7 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
                   {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
                   <PickResultIcon result={e.pickResult} />
                 </td>
+                <td className="betting-prank-cell">{e.pRank != null ? `#${e.pRank}` : "—"}</td>
                 <td>
                   {e.consensusLine ?? "—"} {e.consensusStat}
                 </td>
@@ -2456,6 +2464,7 @@ function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }
       <div className="prop-card-top">
         <span className="prop-card-stat">{e.consensusStat}</span>
         <div className="prop-card-pick">
+          {e.pRank != null && <span className="prop-card-prank">#{e.pRank}</span>}
           {e.edgePct != null && <EdgeBadge pct={e.edgePct} />}
           <span className="prop-card-line">
             {e.pickSide ?? ""} {e.pickLine ?? ""}

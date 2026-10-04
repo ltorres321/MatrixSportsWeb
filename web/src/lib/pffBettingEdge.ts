@@ -162,6 +162,14 @@ export interface PlayerPropEntry {
   l10HitType: string | null;
   h2hRecord: string | null;
   h2hHitType: string | null;
+  // This model's rank of how likely this pick is to be correct,
+  // across ALL of this week's props league-wide (1 = most likely) --
+  // not scoped to just this game. Sourced from SportsAnalytics's own
+  // player_prop_predictions table (see that table's header for why
+  // there's no per-game id there), not from PFF's export. Null for a
+  // prop that table hasn't scored yet (e.g. already graded, or a
+  // pick_side spelling mismatch) -- sorts last, not an error.
+  pRank: number | null;
 }
 
 interface PlayerPropRow {
@@ -193,6 +201,7 @@ interface PlayerPropRow {
   l10_hit_type: string | null;
   h2h_record: string | null;
   h2h_hit_type: string | null;
+  p_rank: number | null;
 }
 
 // ----------------------------------------------------------------------
@@ -276,7 +285,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
               pp.pick_odds, pp.pick_result, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
               pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
               pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
-              pp.h2h_record, pp.h2h_hit_type
+              pp.h2h_record, pp.h2h_hit_type, pred.model_rank AS p_rank
        FROM etl.pff_player_props pp
        -- LATERAL + LIMIT 1, not a plain JOIN: etl.pff_player_props has
        -- no player id of its own to join on, only a name, and a plain
@@ -296,8 +305,23 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
        -- Same fallback as First Touchdown's query -- see
        -- sql/014_espn_player_crosswalk.sql's own docstring.
        LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = pp.player_name
+       -- pRank comes from a DIFFERENT repo's table (SportsAnalytics's
+       -- player_prop_predictions, public schema of this SAME shared
+       -- database) -- not from PFF's export at all, so it's a LATERAL
+       -- join on the key that table actually has (week + player +
+       -- stat + side), not universal_game_id. See PlayerPropEntry.
+       -- pRank's own comment for why no per-game id exists there yet.
+       LEFT JOIN LATERAL (
+         SELECT model_rank
+         FROM public.latest_player_prop_predictions pred
+         WHERE pred.source_week = pp.week
+           AND pred.player_name = pp.player_name
+           AND pred.consensus_stat = pp.consensus_stat
+           AND (pred.pick_side = pp.pick_side OR (pred.pick_side IS NULL AND pp.pick_side IS NULL))
+         LIMIT 1
+       ) pred ON true
        WHERE pp.universal_game_id = $1
-       ORDER BY pp.edge_pct DESC NULLS LAST`,
+       ORDER BY pred.model_rank ASC NULLS LAST`,
       [universalGameId]
     ),
     query<KeyInsightRow>(
@@ -385,6 +409,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     l10HitType: r.l10_hit_type,
     h2hRecord: r.h2h_record,
     h2hHitType: r.h2h_hit_type,
+    pRank: r.p_rank,
   }));
 
   const keyInsights: KeyInsightEntry[] = keyInsightRows.map((r) => ({
