@@ -104,14 +104,9 @@ function TeamRow({
 export default function MatchupCard({
   matchup,
   premier,
-  linkHref,
 }: {
   matchup: Matchup;
   premier?: boolean;
-  // Overrides the default /game/[id] destination -- e.g. the signed-out
-  // landing page sends this click to /login instead of the game detail
-  // page, since that page isn't part of the pre-signup marketing pitch.
-  linkHref?: string;
 }) {
   const premierClass = premier ? `premier-card ${matchup.lockOfWeek ? "gold" : ""}` : "";
   const card = (
@@ -137,7 +132,7 @@ export default function MatchupCard({
   );
 
   return (
-    <Link className="matchup-card-link" href={linkHref ?? `/game/${matchup.id}`}>
+    <Link className="matchup-card-link" href={`/game/${matchup.id}`}>
       {card}
     </Link>
   );
