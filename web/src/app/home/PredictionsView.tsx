@@ -125,14 +125,19 @@ export default function PredictionsView({
         <button className="league-chip active" type="button">
           NFL
         </button>
-        <button className="league-chip" type="button" disabled>
-          NBA
-          <span className="soon-tag">COMING SOON</span>
-        </button>
-        <button className="league-chip" type="button" disabled>
-          MLB
-          <span className="soon-tag">COMING SOON</span>
-        </button>
+        {/* NBA/MLB chips hidden here while that data/content gets built
+            out -- restore these two buttons once there's something real
+            behind them, rather than showing "Coming Soon" on a site
+            that's trying to read as a complete product:
+            <button className="league-chip" type="button" disabled>
+              NBA
+              <span className="soon-tag">COMING SOON</span>
+            </button>
+            <button className="league-chip" type="button" disabled>
+              MLB
+              <span className="soon-tag">COMING SOON</span>
+            </button>
+        */}
       </div>
 
       <nav className="season-rail" aria-label="Season selector">
