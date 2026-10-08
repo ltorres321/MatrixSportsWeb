@@ -1931,6 +1931,17 @@ h1.glow span {
   background: rgba(244, 248, 245, 0.94);
 }
 
+/* Same problem for the top nav bar and the scrolled side rail: their
+   shared var(--panel) is a ~6% blue tint, fine over the dark theme's
+   black but too see-through on light -- content scrolling underneath
+   (red tiles, headlines) bled straight through the nav text. Nearly
+   opaque pale blue instead, so it still reads as the same tinted-blue
+   family as the game tiles. */
+:root[data-theme="light"] .navbar,
+:root[data-theme="light"] .side-rail {
+  background: rgba(234, 241, 250, 0.95);
+}
+
 .game-sticky-bar .side {
   display: flex;
   align-items: center;
