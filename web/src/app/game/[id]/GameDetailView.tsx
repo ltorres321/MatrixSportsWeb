@@ -2401,7 +2401,7 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
           <span className="betting-props-summary-correct">{correctCount}</span>
           <span className="betting-props-summary-sep">/</span>
           <span className="betting-props-summary-total">{graded.length}</span>
-          <span className="betting-props-summary-pct">{correctPct}% correct</span>
+          <span className="betting-props-summary-pct">{correctPct}% Hit Rate</span>
         </p>
       )}
       <div className="betting-table-outer betting-desktop-only">
@@ -2631,6 +2631,16 @@ function parlayLegLabel(e: PlayerPropEntry): string {
   return `${e.pickSide ?? ""} ${e.pickLine ?? ""} ${e.consensusStat}`.trim();
 }
 
+// What the player actually did, once the game is final -- null pre-game
+// (see PlayerPropEntry.actualValue's own comment). "Anytime TD" stores
+// actualValue as 1/0, not a yardage-style number, so it gets its own
+// phrasing instead of "actual 1 Anytime TD".
+function parlayLegActualLabel(e: PlayerPropEntry): string | null {
+  if (e.actualValue === null) return null;
+  if (e.consensusStat === "Anytime TD") return e.actualValue > 0 ? "actual: scored a TD" : "actual: no TD";
+  return `actual ${e.actualValue} ${e.consensusStat}`;
+}
+
 // Hit only when every leg is graded correct, missed as soon as any leg
 // is graded incorrect, otherwise still pending (game not final yet).
 function parlayOutcome(parlay: Parlay): "hit" | "missed" | null {
@@ -2681,6 +2691,7 @@ function ParlayCard({ title, parlay }: { title: string; parlay: Parlay }) {
       <ul className="parlay-legs">
         {parlay.legs.map((leg) => {
           const e = leg.entry;
+          const actualLabel = parlayLegActualLabel(e);
           return (
             <li key={`${e.playerName}-${e.consensusStat}`} className="parlay-leg">
               <span className="parlay-leg-rank" title="Rank within this game">
@@ -2693,6 +2704,7 @@ function ParlayCard({ title, parlay }: { title: string; parlay: Parlay }) {
                   <PickResultIcon result={e.pickResult} />
                 </div>
                 <div className="parlay-leg-pick">{parlayLegLabel(e)}</div>
+                {actualLabel && <div className="parlay-leg-actual">{actualLabel}</div>}
               </div>
               <div className="parlay-leg-odds">
                 {leg.sportsbook && <SportsbookLink sportsbook={leg.sportsbook} />}
@@ -2708,7 +2720,13 @@ function ParlayCard({ title, parlay }: { title: string; parlay: Parlay }) {
 }
 
 function ParlayHelperView({ game }: { game: GameStat }) {
-  const [mixedBooks, setMixedBooks] = useState(false);
+  // Mixed-book mode is hidden, not removed -- with this many books now
+  // covering a game's props (see pffBettingEdge.ts's matchingLine* line-
+  // shopping), a single-book parlay is almost always findable, so the
+  // toggle just added confusion without much upside. parlays.mixed is
+  // still built and logged server-side exactly like parlays.single (see
+  // getGameBettingEdge/recordDisplayedParlays) in case this comes back.
+  const mixedBooks = false;
   // Built and logged on the server (getGameBettingEdge) so what's shown is
   // exactly what's recorded in public.site_parlay_log.
   const parlays = game.bettingEdge?.parlays;
@@ -2746,31 +2764,8 @@ function ParlayHelperView({ game }: { game: GameStat }) {
         </p>
       </div>
 
-      <div className="parlay-toggle-row">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={mixedBooks}
-          className={`parlay-toggle${mixedBooks ? " on" : ""}`}
-          onClick={() => setMixedBooks((v) => !v)}
-        >
-          <span className="parlay-toggle-track" aria-hidden="true">
-            <span className="parlay-toggle-thumb" />
-          </span>
-          Mixed book parlay
-        </button>
-        <span className="parlay-toggle-hint">
-          {mixedBooks
-            ? "Showing the most likely combination from any books. Legs at different books can't be placed as one parlay."
-            : "Off: every leg of a parlay is at the same sportsbook."}
-        </span>
-      </div>
-
       {twoLeg.length === 0 ? (
-        <div className="lineup-unavailable">
-          No parlay with every leg at one sportsbook for this game. Turn on Mixed book parlay to see the best
-          combination across books.
-        </div>
+        <div className="lineup-unavailable">No parlay with every leg at one sportsbook for this game.</div>
       ) : (
         <div className="parlay-grid">
           {twoLeg.map((parlay, i) => (

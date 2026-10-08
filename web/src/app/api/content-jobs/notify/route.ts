@@ -22,6 +22,11 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as NotifyBody;
   const label = body.kind === "premier_game" ? "Premier game" : "Weekly record";
+  // Only the premier-game job writes a Facebook variant (see
+  // runPremierGameJob.ts's image_fb.png) -- the other job kinds don't
+  // have Meta's link-cap problem this exists for.
+  const readyFiles =
+    body.kind === "premier_game" ? "image.png, image_ig.png, image_fb.png, and captions.json" : "image.png, image_ig.png, and captions.json";
 
   const html = `
     <div style="font-family: 'Courier New', Courier, monospace; padding: 24px; background: #04140a; color: #eafff2;">
@@ -29,7 +34,7 @@ export async function POST(request: Request) {
       <p style="margin: 0 0 8px;">${body.summary}</p>
       <p style="margin: 0 0 8px; color: #6fae83;">Folder: <code>${body.folderPath}</code></p>
       <p style="margin: 16px 0 0; color: #6fae83; font-size: 13px;">
-        image.png, image_ig.png, and captions.json are ready to post manually.
+        ${readyFiles} are ready to post manually.
       </p>
     </div>`;
 

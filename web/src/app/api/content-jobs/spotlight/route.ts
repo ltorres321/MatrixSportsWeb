@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedContentJob } from "@/lib/contentJobAuth";
 import { getCurrentSpotlightMatchup, getSpotlightMatchupById } from "@/lib/social/currentSpotlight";
-import { renderSpotlightCard, renderSpotlightCardSquare } from "@/lib/social/renderSpotlightCard";
+import { renderSpotlightCard, renderSpotlightCardSquare, renderSpotlightCardFacebook } from "@/lib/social/renderSpotlightCard";
 import { spotlightCaption, PLATFORMS } from "@/lib/social/captions";
 
 const DAY_ABBRS = new Set(["sun", "mon", "tue", "wed", "thu", "fri", "sat"]);
@@ -43,13 +43,15 @@ export async function GET(request: Request) {
     );
   }
 
-  const [imageResponse, imageSquareResponse] = await Promise.all([
+  const [imageResponse, imageSquareResponse, imageFacebookResponse] = await Promise.all([
     renderSpotlightCard(matchup),
     renderSpotlightCardSquare(matchup),
+    renderSpotlightCardFacebook(matchup),
   ]);
-  const [imageBuffer, imageSquareBuffer] = await Promise.all([
+  const [imageBuffer, imageSquareBuffer, imageFacebookBuffer] = await Promise.all([
     imageResponse.arrayBuffer().then(Buffer.from),
     imageSquareResponse.arrayBuffer().then(Buffer.from),
+    imageFacebookResponse.arrayBuffer().then(Buffer.from),
   ]);
 
   const captions = Object.fromEntries(PLATFORMS.map((p) => [p, spotlightCaption(matchup, p)])) as Record<
@@ -63,5 +65,6 @@ export async function GET(request: Request) {
     captions,
     imageBase64: imageBuffer.toString("base64"),
     imageSquareBase64: imageSquareBuffer.toString("base64"),
+    imageFacebookBase64: imageFacebookBuffer.toString("base64"),
   });
 }

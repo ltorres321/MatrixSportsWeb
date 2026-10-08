@@ -4111,6 +4111,12 @@ h1.glow span {
   margin-top: 0.1rem;
 }
 
+.parlay-leg-actual {
+  color: var(--gold);
+  font-size: 0.78rem;
+  margin-top: 0.1rem;
+}
+
 .parlay-leg-odds {
   display: flex;
   align-items: center;
