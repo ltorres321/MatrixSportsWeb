@@ -2401,7 +2401,7 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
           <span className="betting-props-summary-correct">{correctCount}</span>
           <span className="betting-props-summary-sep">/</span>
           <span className="betting-props-summary-total">{graded.length}</span>
-          <span className="betting-props-summary-pct">{correctPct}% correct</span>
+          <span className="betting-props-summary-pct">{correctPct}% Hit Rate</span>
         </p>
       )}
       <div className="betting-table-outer betting-desktop-only">
