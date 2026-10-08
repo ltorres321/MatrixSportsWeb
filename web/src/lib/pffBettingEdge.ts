@@ -148,6 +148,11 @@ export interface PlayerPropEntry {
   // their game is final -- see sql/012's own note on why this column
   // was already captured but, until now, never read.
   pickResult: string | null;
+  // The real stat number pickResult was graded against (e.g. 15 for a
+  // "Rec Yds" prop) -- null pre-game, or for "Anytime TD" rows it's
+  // just 1/0, not a yardage-style number (see
+  // grade_player_props.py's own docstring, SportsPipelines/pff_api).
+  actualValue: number | null;
   projValue: number | null;
   projDirection: string | null;
   l10Avg: number | null;
@@ -220,6 +225,7 @@ interface PlayerPropRow {
   pick_line: number | null;
   pick_odds: number | null;
   pick_result: string | null;
+  actual_value: number | null;
   proj_value: number | null;
   proj_direction: string | null;
   l10_avg: number | null;
@@ -328,7 +334,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
                 COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
                 COALESCE(lu.position, ec.position) AS lineup_position,
                 pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
-                pp.pick_odds, pp.pick_result, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
+                pp.pick_odds, pp.pick_result, pp.actual_value, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
                 pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
                 pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
                 pp.h2h_record, pp.h2h_hit_type, pp.updated_at AS odds_as_of,
@@ -499,6 +505,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     pickLine: r.pick_line,
     pickOdds: r.pick_odds,
     pickResult: r.pick_result,
+    actualValue: r.actual_value,
     projValue: r.proj_value,
     projDirection: r.proj_direction,
     l10Avg: r.l10_avg,

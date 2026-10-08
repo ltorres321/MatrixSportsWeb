@@ -2631,6 +2631,16 @@ function parlayLegLabel(e: PlayerPropEntry): string {
   return `${e.pickSide ?? ""} ${e.pickLine ?? ""} ${e.consensusStat}`.trim();
 }
 
+// What the player actually did, once the game is final -- null pre-game
+// (see PlayerPropEntry.actualValue's own comment). "Anytime TD" stores
+// actualValue as 1/0, not a yardage-style number, so it gets its own
+// phrasing instead of "actual 1 Anytime TD".
+function parlayLegActualLabel(e: PlayerPropEntry): string | null {
+  if (e.actualValue === null) return null;
+  if (e.consensusStat === "Anytime TD") return e.actualValue > 0 ? "actual: scored a TD" : "actual: no TD";
+  return `actual ${e.actualValue} ${e.consensusStat}`;
+}
+
 // Hit only when every leg is graded correct, missed as soon as any leg
 // is graded incorrect, otherwise still pending (game not final yet).
 function parlayOutcome(parlay: Parlay): "hit" | "missed" | null {
@@ -2681,6 +2691,7 @@ function ParlayCard({ title, parlay }: { title: string; parlay: Parlay }) {
       <ul className="parlay-legs">
         {parlay.legs.map((leg) => {
           const e = leg.entry;
+          const actualLabel = parlayLegActualLabel(e);
           return (
             <li key={`${e.playerName}-${e.consensusStat}`} className="parlay-leg">
               <span className="parlay-leg-rank" title="Rank within this game">
@@ -2693,6 +2704,7 @@ function ParlayCard({ title, parlay }: { title: string; parlay: Parlay }) {
                   <PickResultIcon result={e.pickResult} />
                 </div>
                 <div className="parlay-leg-pick">{parlayLegLabel(e)}</div>
+                {actualLabel && <div className="parlay-leg-actual">{actualLabel}</div>}
               </div>
               <div className="parlay-leg-odds">
                 {leg.sportsbook && <SportsbookLink sportsbook={leg.sportsbook} />}
