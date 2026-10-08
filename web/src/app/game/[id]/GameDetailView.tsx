@@ -2708,7 +2708,13 @@ function ParlayCard({ title, parlay }: { title: string; parlay: Parlay }) {
 }
 
 function ParlayHelperView({ game }: { game: GameStat }) {
-  const [mixedBooks, setMixedBooks] = useState(false);
+  // Mixed-book mode is hidden, not removed -- with this many books now
+  // covering a game's props (see pffBettingEdge.ts's matchingLine* line-
+  // shopping), a single-book parlay is almost always findable, so the
+  // toggle just added confusion without much upside. parlays.mixed is
+  // still built and logged server-side exactly like parlays.single (see
+  // getGameBettingEdge/recordDisplayedParlays) in case this comes back.
+  const mixedBooks = false;
   // Built and logged on the server (getGameBettingEdge) so what's shown is
   // exactly what's recorded in public.site_parlay_log.
   const parlays = game.bettingEdge?.parlays;
@@ -2746,31 +2752,8 @@ function ParlayHelperView({ game }: { game: GameStat }) {
         </p>
       </div>
 
-      <div className="parlay-toggle-row">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={mixedBooks}
-          className={`parlay-toggle${mixedBooks ? " on" : ""}`}
-          onClick={() => setMixedBooks((v) => !v)}
-        >
-          <span className="parlay-toggle-track" aria-hidden="true">
-            <span className="parlay-toggle-thumb" />
-          </span>
-          Mixed book parlay
-        </button>
-        <span className="parlay-toggle-hint">
-          {mixedBooks
-            ? "Showing the most likely combination from any books. Legs at different books can't be placed as one parlay."
-            : "Off: every leg of a parlay is at the same sportsbook."}
-        </span>
-      </div>
-
       {twoLeg.length === 0 ? (
-        <div className="lineup-unavailable">
-          No parlay with every leg at one sportsbook for this game. Turn on Mixed book parlay to see the best
-          combination across books.
-        </div>
+        <div className="lineup-unavailable">No parlay with every leg at one sportsbook for this game.</div>
       ) : (
         <div className="parlay-grid">
           {twoLeg.map((parlay, i) => (
