@@ -800,6 +800,31 @@ a {
   background: rgba(255, 214, 10, 0.12);
 }
 
+/* Light ("Blue Pill") theme counterpart: the nav text used the dim
+   green-grey --text-dim, which washed out against the translucent
+   blue-tinted bar (and anything blurred scrolling under it). Strong
+   deep blue instead (--green-dim, the darker of the theme's two
+   accent blues) with a slightly heavier weight -- the bar's own
+   see-through background is deliberately left alone. */
+:root[data-theme="light"] .navbar-links > a,
+:root[data-theme="light"] .navbar .nav-more-trigger,
+:root[data-theme="light"] .side-rail > a,
+:root[data-theme="light"] .side-rail .nav-more-trigger,
+:root[data-theme="light"] .nav-more-panel a {
+  color: var(--green-dim);
+  font-weight: 600;
+}
+
+:root[data-theme="light"] .navbar-links > a:hover,
+:root[data-theme="light"] .navbar .nav-more-trigger:hover,
+:root[data-theme="light"] .navbar .nav-more.open .nav-more-trigger,
+:root[data-theme="light"] .side-rail > a:hover,
+:root[data-theme="light"] .side-rail .nav-more-trigger:hover,
+:root[data-theme="light"] .side-rail .nav-more.open .nav-more-trigger,
+:root[data-theme="light"] .nav-more-panel a:hover {
+  color: var(--green);
+}
+
 .member-pill {
   display: inline-flex;
   align-items: center;
