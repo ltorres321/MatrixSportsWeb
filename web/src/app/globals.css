@@ -2396,7 +2396,8 @@ h1.glow span {
 }
 
 .injury-row-qb {
-  background: rgba(255, 214, 10, 0.08);
+  background: var(--inj-qb-bg);
+  box-shadow: inset 3px 0 0 var(--inj-qb-bar);
   border-radius: 6px;
   padding: 0.3rem 0.5rem;
   margin: -0.3rem -0.5rem;
@@ -2409,34 +2410,63 @@ h1.glow span {
 .injury-position {
   display: inline-block;
   min-width: 1.8em;
-  color: var(--text-dim);
-  font-size: 0.7rem;
+  color: var(--inj-position);
+  font-size: 0.72rem;
   font-weight: 700;
   margin-right: 0.5rem;
 }
 
 .injury-status {
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   letter-spacing: 0.04em;
   white-space: nowrap;
   text-transform: uppercase;
 }
 
 .injury-out {
-  color: var(--red);
+  color: var(--inj-out);
 }
 
 .injury-doubtful {
-  color: #ff9d3b;
+  color: var(--inj-doubtful);
 }
 
 .injury-questionable {
-  color: var(--gold);
+  color: var(--inj-questionable);
 }
 
+/* DNP / Limited / Full -- practice-participation labels, not a game
+   designation, so they get the theme's calm "info" color instead of
+   the dim grey they used to share with ordinary secondary text. */
 .injury-status-mild {
-  color: var(--text-dim);
+  color: var(--inj-practice);
+}
+
+/* Injury report colors are picked per theme for legibility rather than
+   following the shared accent (--green flips green->blue, --text-dim is
+   too faint on both): Matrix/dark uses red, orange, yellow and a light
+   blue on black; Blue Pill/light uses red, deep orange-red, blue and
+   green -- yellow has no usable contrast on a pale background, so the
+   QB highlight is green there instead. */
+:root {
+  --inj-qb-bg: rgba(255, 214, 10, 0.2);
+  --inj-qb-bar: #ffd60a;
+  --inj-position: #6cb6ff;
+  --inj-out: #ff5c5c;
+  --inj-doubtful: #ff9d3b;
+  --inj-questionable: #ffd60a;
+  --inj-practice: #6cb6ff;
+}
+
+:root[data-theme="light"] {
+  --inj-qb-bg: rgba(21, 128, 61, 0.16);
+  --inj-qb-bar: #15803d;
+  --inj-position: #0b5cc4;
+  --inj-out: #c0261f;
+  --inj-doubtful: #c2410c;
+  --inj-questionable: #0b5cc4;
+  --inj-practice: #166534;
 }
 
 .percentile-block {
