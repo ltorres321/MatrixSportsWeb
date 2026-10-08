@@ -162,12 +162,20 @@ function SpotlightCardTree({
   logoB,
   ribbonText,
   theme,
+  urlCallout,
 }: {
   matchup: Matchup;
   logoA: string;
   logoB: string;
   ribbonText: string;
   theme: SpotlightTheme;
+  // Facebook-only: Meta's own link-post cap (2/month for non-paying
+  // Pages, see Meta One) means the caption can't rely on a clickable
+  // link getting the visitor to the site -- this renders the URL
+  // directly into the image itself, large and bold, so it's still
+  // readable/typeable even with no link. The other platforms (IG,
+  // X, LinkedIn) don't need this; their captions carry a real link.
+  urlCallout?: boolean;
 }) {
   return (
     <div
@@ -263,6 +271,12 @@ function SpotlightCardTree({
       <div style={{ display: "flex", marginTop: theme.footerMarginTop, fontSize: theme.footerFontSize, color: COLORS.textDim }}>
         100,000 Monte Carlo simulations · matrixsports.net
       </div>
+
+      {urlCallout && (
+        <div style={{ display: "flex", marginTop: 12, fontSize: 40, fontWeight: 800, letterSpacing: 1, color: COLORS.green }}>
+          MatrixSports.Net
+        </div>
+      )}
     </div>
   );
 }
@@ -289,6 +303,33 @@ export async function renderSpotlightCard(matchup: Matchup): Promise<ImageRespon
         logoB={logoB}
         ribbonText={ribbonTextFor(matchup)}
         theme={WIDE_THEME}
+      />
+    ),
+    socialCardSize
+  );
+}
+
+// Facebook-specific wide render -- identical to renderSpotlightCard
+// except for the urlCallout line (see SpotlightCardTree's comment on
+// that prop). A deliberate near-duplicate of renderSpotlightCard
+// rather than a shared helper with a boolean param, matching this
+// file's existing wide/square split -- each render fn stays a plain,
+// readable "here's exactly what this platform gets."
+export async function renderSpotlightCardFacebook(matchup: Matchup): Promise<ImageResponse> {
+  const [logoA, logoB] = await Promise.all([
+    logoDataUri(matchup.teamA.alias),
+    logoDataUri(matchup.teamB.alias),
+  ]);
+
+  return new ImageResponse(
+    (
+      <SpotlightCardTree
+        matchup={matchup}
+        logoA={logoA}
+        logoB={logoB}
+        ribbonText={ribbonTextFor(matchup)}
+        theme={WIDE_THEME}
+        urlCallout
       />
     ),
     socialCardSize
