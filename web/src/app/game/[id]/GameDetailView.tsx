@@ -16,6 +16,11 @@ type EdgeTrackRow = { teamSide: EdgeSide | null; oppositionSide: EdgeSide | null
 import type { InjuryEntry } from "@/lib/injuries";
 import type { StatWithRank, TeamPlayerGrades } from "@/lib/pffGameReport";
 import type { FirstTouchdownEntry, PlayerPropEntry } from "@/lib/pffBettingEdge";
+import {
+  MIN_THREE_LEG_LEG_PROBABILITY,
+  PARLAY_POOL_SIZE,
+  type Parlay,
+} from "@/lib/parlayHelper";
 import type { LineupPlayer } from "@/lib/lineup";
 import { teamPrimaryColor } from "@/lib/teamColors";
 import AdFrame from "@/components/AdFrame";
@@ -1607,12 +1612,20 @@ const PLAYER_PROP_COLUMN_INFO = {
 };
 
 // PFF's own export names the book but never shows it on the page --
-// a reader sees the price but not who's offering it. name/url back a
-// small clickable favicon at the end of each First Touchdown row
+// a reader sees the price but not who's offering it. name/url/logo
+// back a small clickable icon at the end of each First Touchdown row
 // instead of a text column, so it reads as "which book" at a glance
-// without widening the table. Favicon comes from Google's public
-// favicon service (no logo asset of our own to license/host) rather
-// than an unrecognized key appearing as plain text.
+// without widening the table.
+//
+// logo files are self-hosted at public/assets/favicons/<key>.png, not
+// fetched live from Google's favicon service -- pulled once (2026-10)
+// from each book's own domain via Google's lookup (so the *fetch* used
+// Google, the running *site* never calls out to it) so a reader's
+// request never depends on a third party staying up or keeping that
+// endpoint working. Re-fetch if a book rebrands: see the download
+// recipe this comment used to sit next to in git history, or just ask
+// Claude to redo it the same way.
+//
 // Links to each book's general NFL section, not a specific bet/event
 // id -- this data doesn't carry PFF's own per-bet deep-link id, and a
 // hardcoded one would go stale (or point at the wrong game entirely)
@@ -1627,26 +1640,43 @@ const PLAYER_PROP_COLUMN_INFO = {
 // all, it's what tells Caesars's own router "NFL," so unlike the
 // per-bet-id concern above, this one IS the stable, correct link to
 // keep.
-const SPORTSBOOK_INFO: Record<string, { name: string; url: string; domain: string }> = {
+//
+// The books below bovada are new (2026-10, from etl.player_prop_lines
+// via SportsPipelines/prop_lines/ -- see sql/016's docstring) and their
+// url is an unverified homepage root, not a click-through-confirmed
+// NFL deep link like caesars/draftKings/betmgm/fanduel above -- safer
+// to land on a page that definitely exists than guess a path that 404s.
+const SPORTSBOOK_INFO: Record<string, { name: string; url: string; logo: string }> = {
   caesars: {
     name: "Caesars Sportsbook",
     url: "https://sportsbook.caesars.com/us/nj/bet/americanfootball?id=007d7c61-07a7-4e18-bb40-15104b6eac92",
-    domain: "sportsbook.caesars.com",
+    logo: "/assets/favicons/caesars.png",
   },
   draftKings: {
     name: "DraftKings",
     url: "https://sportsbook.draftkings.com/leagues/football/nfl",
-    domain: "sportsbook.draftkings.com",
+    logo: "/assets/favicons/draftkings.png",
+  },
+  // Same book as draftKings above, under the lowercase key
+  // etl.player_prop_lines.bookmaker actually uses (SportsPipelines'
+  // prop_lines/ pollers store each source's own lowercase key) -- PFF's
+  // CSV-derived pick_sportsbook uses the capital-K spelling instead, so
+  // both keys need an entry or a line-shopped DraftKings quote falls
+  // through to the plain-text "unknown book" display.
+  draftkings: {
+    name: "DraftKings",
+    url: "https://sportsbook.draftkings.com/leagues/football/nfl",
+    logo: "/assets/favicons/draftkings.png",
   },
   betmgm: {
     name: "BetMGM",
     url: "https://www.nj.betmgm.com/en/engage/lan/geolocator?orh=sports.betmgm.com",
-    domain: "www.nj.betmgm.com",
+    logo: "/assets/favicons/betmgm.png",
   },
   fanduel: {
     name: "FanDuel",
     url: "https://sportsbook.fanduel.com/navigation/nfl",
-    domain: "sportsbook.fanduel.com",
+    logo: "/assets/favicons/fanduel.png",
   },
   // Not yet confirmed by click-through like the other four (seen in
   // Player Props' pick_sportsbook, not First Touchdown's set) -- same
@@ -1655,7 +1685,57 @@ const SPORTSBOOK_INFO: Record<string, { name: string; url: string; domain: strin
   fanatics: {
     name: "Fanatics Sportsbook",
     url: "https://sportsbook.fanatics.com/",
-    domain: "sportsbook.fanatics.com",
+    logo: "/assets/favicons/fanatics.png",
+  },
+  bovada: {
+    name: "Bovada",
+    url: "https://www.bovada.lv/",
+    logo: "/assets/favicons/bovada.png",
+  },
+  hardrock: {
+    name: "Hard Rock Bet",
+    url: "https://app.hardrock.bet/",
+    logo: "/assets/favicons/hardrock.png",
+  },
+  espnbet: {
+    name: "ESPN BET",
+    url: "https://espnbet.com/",
+    logo: "/assets/favicons/espnbet.png",
+  },
+  pinnacle: {
+    name: "Pinnacle",
+    url: "https://www.pinnacle.com/",
+    logo: "/assets/favicons/pinnacle.png",
+  },
+  betrivers: {
+    name: "BetRivers",
+    url: "https://www.betrivers.com/",
+    logo: "/assets/favicons/betrivers.png",
+  },
+  betway: {
+    name: "Betway",
+    url: "https://betway.com/",
+    logo: "/assets/favicons/betway.png",
+  },
+  fliff: {
+    name: "Fliff",
+    url: "https://www.getfliff.com/",
+    logo: "/assets/favicons/fliff.png",
+  },
+  rebet: {
+    name: "Rebet",
+    url: "https://rebet.app/",
+    logo: "/assets/favicons/rebet.png",
+  },
+  sportzino: {
+    name: "Sportzino",
+    url: "https://sportzino.com/",
+    logo: "/assets/favicons/sportzino.png",
+  },
+  courtside: {
+    name: "Courtside",
+    url: "https://www.courtside.app/",
+    logo: "/assets/favicons/courtside.png",
   },
 };
 
@@ -1671,11 +1751,7 @@ function SportsbookLink({ sportsbook }: { sportsbook: string }) {
       title={`Odds via ${info.name}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`https://www.google.com/s2/favicons?sz=32&domain=${info.domain}`}
-        alt={info.name}
-        className="betting-sportsbook-icon"
-      />
+      <img src={info.logo} alt={info.name} className="betting-sportsbook-icon" />
     </a>
   );
 }
@@ -2546,12 +2622,186 @@ function BettingEdgeView({ game }: { game: GameStat }) {
   );
 }
 
+function formatPercent(p: number): string {
+  return `${(p * 100).toFixed(1)}%`;
+}
+
+function parlayLegLabel(e: PlayerPropEntry): string {
+  if (e.consensusStat === "Anytime TD") return "Anytime TD";
+  return `${e.pickSide ?? ""} ${e.pickLine ?? ""} ${e.consensusStat}`.trim();
+}
+
+// Hit only when every leg is graded correct, missed as soon as any leg
+// is graded incorrect, otherwise still pending (game not final yet).
+function parlayOutcome(parlay: Parlay): "hit" | "missed" | null {
+  if (parlay.legs.some((l) => l.entry.pickResult === "incorrect")) return "missed";
+  if (parlay.legs.every((l) => l.entry.pickResult === "correct")) return "hit";
+  return null;
+}
+
+function sportsbookName(key: string): string {
+  return SPORTSBOOK_INFO[key]?.name ?? key;
+}
+
+function ParlayCard({ title, parlay }: { title: string; parlay: Parlay }) {
+  const outcome = parlayOutcome(parlay);
+  return (
+    <div className={`parlay-card${outcome ? ` parlay-card-${outcome}` : ""}`}>
+      <div className="parlay-card-head">
+        <div className="parlay-card-titles">
+          <span className="parlay-card-title">
+            {title}
+            {outcome && (
+              <span className={`parlay-outcome parlay-outcome-${outcome}`}>{outcome === "hit" ? "Hit" : "Missed"}</span>
+            )}
+          </span>
+          <span className="parlay-card-book">
+            {parlay.sportsbook ? (
+              <>
+                <SportsbookLink sportsbook={parlay.sportsbook} />
+                All legs at {sportsbookName(parlay.sportsbook)}
+              </>
+            ) : (
+              "Legs are at different books"
+            )}
+          </span>
+        </div>
+        <div className="parlay-card-stats">
+          <div className="parlay-stat">
+            <span className="parlay-stat-value">{formatPercent(parlay.probability)}</span>
+            <span className="parlay-stat-label">chance to hit</span>
+          </div>
+          <div className="parlay-stat">
+            <span className="parlay-stat-value parlay-stat-payout">${parlay.decimalOdds.toFixed(2)}</span>
+            <span className="parlay-stat-label">payout on a $1 bet</span>
+            <span className="parlay-stat-sub">(${(parlay.decimalOdds - 1).toFixed(2)} profit)</span>
+          </div>
+        </div>
+      </div>
+      <ul className="parlay-legs">
+        {parlay.legs.map((leg) => {
+          const e = leg.entry;
+          return (
+            <li key={`${e.playerName}-${e.consensusStat}`} className="parlay-leg">
+              <span className="parlay-leg-rank" title="Rank within this game">
+                {e.pRank}
+              </span>
+              <div className="parlay-leg-main">
+                <div className="parlay-leg-player">
+                  <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
+                  {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
+                  <PickResultIcon result={e.pickResult} />
+                </div>
+                <div className="parlay-leg-pick">{parlayLegLabel(e)}</div>
+              </div>
+              <div className="parlay-leg-odds">
+                {leg.sportsbook && <SportsbookLink sportsbook={leg.sportsbook} />}
+                <span>{formatOdds(leg.odds)}</span>
+              </div>
+              <div className="parlay-leg-prob">{formatPercent(leg.probability)}</div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function ParlayHelperView({ game }: { game: GameStat }) {
+  const [mixedBooks, setMixedBooks] = useState(false);
+  // Built and logged on the server (getGameBettingEdge) so what's shown is
+  // exactly what's recorded in public.site_parlay_log.
+  const parlays = game.bettingEdge?.parlays;
+  const { twoLeg, threeLeg } = (mixedBooks ? parlays?.mixed : parlays?.single) ?? { twoLeg: [], threeLeg: null };
+
+  if (!parlays || parlays.mixed.twoLeg.length === 0) {
+    return (
+      <div className="stat-section">
+        <h2>Parlay Helper</h2>
+        <div className="lineup-unavailable">Parlay suggestions aren&apos;t available for this game yet.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stat-section">
+      <h2>Parlay Helper</h2>
+      <p className="stat-sub">
+        Same-game parlays built from this game&apos;s top {PARLAY_POOL_SIZE} player props by pRank, using our model&apos;s
+        estimate of how likely each pick is to hit based on historical results. One leg per player.
+      </p>
+
+      <div className="parlay-notice" role="note">
+        <p>
+          <strong>Play responsibly.</strong> Gambling carries real risk, and parlays are long shots that lose far more
+          often than they win. Only bet what you can afford to lose, set limits, and treat any winnings as a bonus. If
+          gambling stops being fun, call or text 1-800-GAMBLER. You must be of legal betting age where you live.
+        </p>
+        <p>
+          <strong>Use these as a starting point, not a guarantee.</strong> These are the strongest combinations we can
+          build from this game&apos;s props, but every leg in a parlay has to be offered by the same sportsbook, and a
+          book may not offer a given leg or may price the combination differently. So by default each parlay below uses
+          legs from a single book you can place as one slip. Check that your book offers every leg, at these lines,
+          before you bet.
+        </p>
+      </div>
+
+      <div className="parlay-toggle-row">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={mixedBooks}
+          className={`parlay-toggle${mixedBooks ? " on" : ""}`}
+          onClick={() => setMixedBooks((v) => !v)}
+        >
+          <span className="parlay-toggle-track" aria-hidden="true">
+            <span className="parlay-toggle-thumb" />
+          </span>
+          Mixed book parlay
+        </button>
+        <span className="parlay-toggle-hint">
+          {mixedBooks
+            ? "Showing the most likely combination from any books. Legs at different books can't be placed as one parlay."
+            : "Off: every leg of a parlay is at the same sportsbook."}
+        </span>
+      </div>
+
+      {twoLeg.length === 0 ? (
+        <div className="lineup-unavailable">
+          No parlay with every leg at one sportsbook for this game. Turn on Mixed book parlay to see the best
+          combination across books.
+        </div>
+      ) : (
+        <div className="parlay-grid">
+          {twoLeg.map((parlay, i) => (
+            <ParlayCard key={i} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} />
+          ))}
+          {threeLeg && <ParlayCard title="3-Leg Parlay" parlay={threeLeg} />}
+        </div>
+      )}
+      {twoLeg.length > 0 && !threeLeg && (
+        <p className="parlay-note">
+          No 3-leg parlay for this game: fewer than three players{mixedBooks ? "" : " at a single sportsbook"} have a
+          prop rated at least {Math.round(MIN_THREE_LEG_LEG_PROBABILITY * 100)}% likely to hit.
+        </p>
+      )}
+      <p className="parlay-note">
+        Chance to hit multiplies each leg&apos;s probability and assumes the legs are independent. Payout is the total
+        returned on a $1 bet, including your $1 stake, estimated from each leg&apos;s listed odds; sportsbooks price
+        same-game parlays themselves, so the real payout is usually lower.
+      </p>
+    </div>
+  );
+}
+
+type PageTab = "overview" | "matchups" | "bettingEdge" | "parlayHelper";
+
 function PageTabStrip({
   active,
   onChange,
 }: {
-  active: "overview" | "matchups" | "bettingEdge";
-  onChange: (tab: "overview" | "matchups" | "bettingEdge") => void;
+  active: PageTab;
+  onChange: (tab: PageTab) => void;
 }) {
   return (
     <div className="page-tab-strip" role="tablist">
@@ -2581,6 +2831,15 @@ function PageTabStrip({
         onClick={() => onChange("bettingEdge")}
       >
         Betting Edge
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active === "parlayHelper"}
+        className={active === "parlayHelper" ? "active" : ""}
+        onClick={() => onChange("parlayHelper")}
+      >
+        Parlay Helper
       </button>
     </div>
   );
@@ -2700,7 +2959,7 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
   const { isMember, toggle } = useMemberPreview();
   const router = useRouter();
   const locked = !game.premier && !isMember;
-  const [activeTab, setActiveTab] = useState<"overview" | "matchups" | "bettingEdge">("overview");
+  const [activeTab, setActiveTab] = useState<PageTab>("overview");
 
   useEffect(() => {
     if (game.status !== "live") return;
@@ -2897,9 +3156,13 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
               <div className="page-edge-section">
                 <MatchupsView game={game} />
               </div>
-            ) : (
+            ) : activeTab === "bettingEdge" ? (
               <div className="page-edge-section">
                 <BettingEdgeView game={game} />
+              </div>
+            ) : (
+              <div className="page-edge-section">
+                <ParlayHelperView game={game} />
               </div>
             )}
           </div>
@@ -2938,9 +3201,13 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
         <div className="page-edge-section">
           <MatchupsView game={game} />
         </div>
-      ) : (
+      ) : activeTab === "bettingEdge" ? (
         <div className="page-edge-section">
           <BettingEdgeView game={game} />
+        </div>
+      ) : (
+        <div className="page-edge-section">
+          <ParlayHelperView game={game} />
         </div>
       )}
     </>

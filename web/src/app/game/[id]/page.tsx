@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: `${a} vs ${b} — Win Probability | Matrix Sports Analytics`,
     description,
+    alternates: { canonical: `https://matrixsports.net/game/${id}` },
     twitter: { card: "summary_large_image" },
   };
 }
@@ -39,7 +40,26 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
   const game = await getGameDetail(id);
   if (game) {
     const story = game.finalResult ? await getStoryForGame(id) : null;
-    return <GameDetailView game={game} story={story} />;
+    const articleJsonLd = story
+      ? {
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: story.headline,
+          articleBody: story.body,
+          datePublished: story.published_at ?? undefined,
+          url: `https://matrixsports.net/game/${id}`,
+          author: { "@type": "Organization", name: "Matrix Sports Analytics" },
+          publisher: { "@type": "Organization", name: "Matrix Sports Analytics" },
+        }
+      : null;
+    return (
+      <>
+        {articleJsonLd && (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+        )}
+        <GameDetailView game={game} story={story} />
+      </>
+    );
   }
 
   // No prediction row yet -- fall back to the schedule (kickoff time,

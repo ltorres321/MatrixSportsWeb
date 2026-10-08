@@ -6,6 +6,12 @@
    own JS for what's real vs. placeholder data. */
 
 :root {
+  /* .navbar's own real rendered height (measured live, not guessed --
+     see that rule's comment) -- every sticky element meant to stack
+     directly under it (.page-tab-strip, .game-sticky-bar) reads this
+     instead of repeating the number, so there's one place to fix if
+     the navbar's height ever changes. */
+  --navbar-height: 4.6rem;
   --bg: #030603;
   --panel: rgba(4, 20, 8, 0.72);
   --panel-solid: #061a0c;
@@ -435,7 +441,9 @@ a {
    --------------------------------------------------------------- */
 
 .navbar {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -444,6 +452,15 @@ a {
   margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
+  /* Light frosted-glass treatment, not a solid backdrop -- same
+     var(--panel) + blur(6px) pairing already used site-wide for cards
+     sitting above the page background (.value-card, .matchup-card,
+     .form-panel). Plain transparency (no blur) was tried first but
+     made scrolled-under content hard to read through the nav text;
+     this keeps the see-through matrix-rain look at rest while
+     softening whatever's actually scrolling underneath once stuck. */
+  background: var(--panel);
+  backdrop-filter: blur(6px);
 }
 
 /* Hidden on desktop -- see the <=768px block below, which reveals
@@ -533,6 +550,278 @@ a {
 }
 
 .navbar-links a:hover {
+  color: var(--green);
+}
+
+/* "More" dropdown -- About/Contact/Sign-In-or-Profile/Admin, moved out
+   of the top-level bar (2026-10) so the now-sticky .navbar stays slim.
+   .nav-more is the positioning anchor for the floating panel on
+   desktop; the <=768px block below turns it into an inline accordion
+   instead, since it's nested inside the mobile menu's own dropdown. */
+.nav-more {
+  position: relative;
+}
+
+.nav-more-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.nav-more-trigger:hover,
+.nav-more.open .nav-more-trigger {
+  color: var(--green);
+}
+
+/* Same trigger, two looks depending on context: text + caret in the
+   top bar (default, below), icon-only to match the rest of .side-rail
+   (overridden further down where .side-rail is defined). */
+.nav-more-trigger-icon {
+  display: none;
+}
+
+.nav-more-trigger-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.nav-more-caret {
+  font-size: 0.7em;
+  transition: transform 0.15s;
+}
+
+.nav-more.open .nav-more-caret {
+  transform: rotate(180deg);
+}
+
+.nav-more-panel {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.6rem;
+  min-width: 190px;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0.4rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  z-index: 60;
+}
+
+.nav-more.open .nav-more-panel {
+  display: flex;
+}
+
+.nav-more-panel a {
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.nav-more-panel a:hover {
+  background: var(--green-faint);
+}
+
+.nav-more-divider {
+  height: 1px;
+  background: var(--panel-border);
+  margin: 0.35rem 0.25rem;
+}
+
+/* ---------------------------------------------------------------
+   Side rail -- desktop-only replacement for the top bar once you've
+   scrolled down to the tab strip (2026-10b/c; SiteNav.tsx computes
+   that exact scroll depth live, see its own comment -- not a guessed
+   pixel constant, since it has to match regardless of how long a given
+   game's injury report/props table make the page). document.body.
+   nav-rail-mode is toggled by that same scroll listener; .navbar
+   fades out (opacity, not display -- see that rule's own comment on
+   why) and this fades in.
+
+   Upper bound at 1899.98px is deliberate, not just the lower one:
+   .promo-rail-left/-right (this file's own ad-rail rules, further up)
+   start rendering at exactly 1900px, positioned at left: -384px
+   relative to .content-split -- close enough to this rail's own
+   left: 1rem that the two WOULD contest the same screen space at
+   some widths. Simplest guarantee against ever covering a live ad
+   slot: this feature simply doesn't exist up there. >=1900px keeps
+   the plain sticky .navbar from before this feature existed, same as
+   it already coexists safely with the ad rail today. */
+
+.side-rail {
+  display: none;
+}
+
+@media (min-width: 769px) and (max-width: 1899.98px) {
+  .side-rail {
+    display: flex;
+    position: fixed;
+    top: 1.5rem;
+    left: 1rem;
+    z-index: 55;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 190px;
+    background: var(--panel);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 0.6rem;
+    opacity: 0;
+    transform: translateX(-12px);
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+
+  body.nav-rail-mode .side-rail {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  /* Faded out, not display:none -- the bar's own layout slot has to
+     stay put or hiding it would yank every element below it up by its
+     height the moment you cross the scroll threshold. aria-hidden
+     (set in SiteNav.tsx alongside this class) keeps it out of the
+     accessibility tree while it's invisible. */
+  body.nav-rail-mode .navbar {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* With the top bar faded out, nothing needs the navbar-height gap
+     above them anymore -- reclaim the full top of the viewport instead
+     of leaving an invisible strip where the bar used to be. */
+  body.nav-rail-mode .game-sticky-bar,
+  body.nav-rail-mode .page-tab-strip {
+    top: 0;
+  }
+}
+
+/* ">" everywhere here on purpose -- .side-rail's own descendants
+   include the MoreMenu flyout's About/Contact Us/etc. links too (same
+   .nav-more-panel markup as the top bar uses), which must NOT pick up
+   this row styling meant only for the rail's own direct
+   Home/Predictions/Recaps links and the Menu trigger button itself.
+   Icon + full text label (2026-10c) -- icon-only was tried first and
+   turned out not self-explanatory enough; spelled out now, same as
+   the top bar's own links always have been. */
+.side-rail > a,
+.side-rail .nav-more-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  transition: color 0.15s, background 0.15s;
+}
+
+.side-rail > a:hover,
+.side-rail .nav-more-trigger:hover,
+.side-rail .nav-more.open .nav-more-trigger {
+  color: var(--green);
+  background: var(--green-faint);
+}
+
+.side-rail svg {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+}
+
+/* Icon AND label both shown here, unlike the top bar's Menu trigger
+   (text + caret only, no icon -- see .nav-more-trigger-icon/-label's
+   default above). */
+.side-rail .nav-more-trigger-icon {
+  display: flex;
+}
+
+.side-rail .nav-more-trigger-label {
+  display: inline-flex;
+  flex: 1;
+  justify-content: space-between;
+}
+
+/* The shared dropdown panel flies out to the RIGHT of the rail here,
+   instead of dropping below the trigger like the top bar's version. */
+.side-rail .nav-more-panel {
+  top: 0;
+  left: calc(100% + 0.6rem);
+  right: auto;
+  margin-top: 0;
+}
+
+/* Gold ("machine-world" #ffd60a, same as .week-pill.active/.gold-cta-link)
+   for the primary nav items -- Home/Predictions/Recaps/Menu -- and the
+   Menu flyout's own items (About/Contact/Profile-or-Sign-In/Admin) in
+   both the top bar and the side rail. Dark theme only, per this
+   color's existing convention -- light theme keeps the regular
+   dim-text/accent-on-hover look instead of yellow-on-white. */
+:root:not([data-theme="light"]) .navbar-links > a,
+:root:not([data-theme="light"]) .navbar .nav-more-trigger,
+:root:not([data-theme="light"]) .side-rail > a,
+:root:not([data-theme="light"]) .side-rail .nav-more-trigger,
+:root:not([data-theme="light"]) .nav-more-panel a {
+  color: #ffd60a;
+  text-shadow: 0 0 8px rgba(255, 214, 10, 0.45);
+}
+
+:root:not([data-theme="light"]) .navbar-links > a:hover,
+:root:not([data-theme="light"]) .navbar .nav-more-trigger:hover,
+:root:not([data-theme="light"]) .navbar .nav-more.open .nav-more-trigger,
+:root:not([data-theme="light"]) .side-rail > a:hover,
+:root:not([data-theme="light"]) .side-rail .nav-more-trigger:hover,
+:root:not([data-theme="light"]) .side-rail .nav-more.open .nav-more-trigger,
+:root:not([data-theme="light"]) .nav-more-panel a:hover {
+  color: #ffe55c;
+  text-shadow: 0 0 14px rgba(255, 214, 10, 0.85);
+}
+
+:root:not([data-theme="light"]) .side-rail > a:hover,
+:root:not([data-theme="light"]) .side-rail .nav-more-trigger:hover,
+:root:not([data-theme="light"]) .side-rail .nav-more.open .nav-more-trigger,
+:root:not([data-theme="light"]) .nav-more-panel a:hover {
+  background: rgba(255, 214, 10, 0.12);
+}
+
+/* Light ("Blue Pill") theme counterpart: the nav text used the dim
+   green-grey --text-dim, which washed out against the translucent
+   blue-tinted bar (and anything blurred scrolling under it). Strong
+   deep blue instead (--green-dim, the darker of the theme's two
+   accent blues) with a slightly heavier weight -- the bar's own
+   see-through background is deliberately left alone. */
+:root[data-theme="light"] .navbar-links > a,
+:root[data-theme="light"] .navbar .nav-more-trigger,
+:root[data-theme="light"] .side-rail > a,
+:root[data-theme="light"] .side-rail .nav-more-trigger,
+:root[data-theme="light"] .nav-more-panel a {
+  color: var(--green-dim);
+  font-weight: 600;
+}
+
+:root[data-theme="light"] .navbar-links > a:hover,
+:root[data-theme="light"] .navbar .nav-more-trigger:hover,
+:root[data-theme="light"] .navbar .nav-more.open .nav-more-trigger,
+:root[data-theme="light"] .side-rail > a:hover,
+:root[data-theme="light"] .side-rail .nav-more-trigger:hover,
+:root[data-theme="light"] .side-rail .nav-more.open .nav-more-trigger,
+:root[data-theme="light"] .nav-more-panel a:hover {
   color: var(--green);
 }
 
@@ -1616,7 +1905,11 @@ h1.glow span {
 
 .game-sticky-bar {
   position: sticky;
-  top: 0;
+  /* Stacks under the sticky .navbar (top: that bar's own rendered
+     height -- see its comment) instead of top: 0, which would put both
+     at the same spot and leave this one hidden behind the opaque navbar
+     the whole time it's supposed to be visible. */
+  top: var(--navbar-height);
   z-index: 20;
   display: flex;
   align-items: center;
@@ -2103,7 +2396,8 @@ h1.glow span {
 }
 
 .injury-row-qb {
-  background: rgba(255, 214, 10, 0.08);
+  background: var(--inj-qb-bg);
+  box-shadow: inset 3px 0 0 var(--inj-qb-bar);
   border-radius: 6px;
   padding: 0.3rem 0.5rem;
   margin: -0.3rem -0.5rem;
@@ -2116,34 +2410,63 @@ h1.glow span {
 .injury-position {
   display: inline-block;
   min-width: 1.8em;
-  color: var(--text-dim);
-  font-size: 0.7rem;
+  color: var(--inj-position);
+  font-size: 0.72rem;
   font-weight: 700;
   margin-right: 0.5rem;
 }
 
 .injury-status {
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   letter-spacing: 0.04em;
   white-space: nowrap;
   text-transform: uppercase;
 }
 
 .injury-out {
-  color: var(--red);
+  color: var(--inj-out);
 }
 
 .injury-doubtful {
-  color: #ff9d3b;
+  color: var(--inj-doubtful);
 }
 
 .injury-questionable {
-  color: var(--gold);
+  color: var(--inj-questionable);
 }
 
+/* DNP / Limited / Full -- practice-participation labels, not a game
+   designation, so they get the theme's calm "info" color instead of
+   the dim grey they used to share with ordinary secondary text. */
 .injury-status-mild {
-  color: var(--text-dim);
+  color: var(--inj-practice);
+}
+
+/* Injury report colors are picked per theme for legibility rather than
+   following the shared accent (--green flips green->blue, --text-dim is
+   too faint on both): Matrix/dark uses red, orange, yellow and a light
+   blue on black; Blue Pill/light uses red, deep orange-red, blue and
+   green -- yellow has no usable contrast on a pale background, so the
+   QB highlight is green there instead. */
+:root {
+  --inj-qb-bg: rgba(255, 214, 10, 0.2);
+  --inj-qb-bar: #ffd60a;
+  --inj-position: #6cb6ff;
+  --inj-out: #ff5c5c;
+  --inj-doubtful: #ff9d3b;
+  --inj-questionable: #ffd60a;
+  --inj-practice: #6cb6ff;
+}
+
+:root[data-theme="light"] {
+  --inj-qb-bg: rgba(21, 128, 61, 0.16);
+  --inj-qb-bar: #15803d;
+  --inj-position: #0b5cc4;
+  --inj-out: #c0261f;
+  --inj-doubtful: #c2410c;
+  --inj-questionable: #0b5cc4;
+  --inj-practice: #166534;
 }
 
 .percentile-block {
@@ -2758,6 +3081,36 @@ h1.glow span {
   }
 
   .navbar-links a:last-child {
+    border-bottom: none;
+  }
+
+  /* On mobile, "More" lives inside the hamburger panel's own vertical
+     list instead of floating -- an accordion that expands in place
+     rather than the desktop's absolutely-positioned panel. */
+  .nav-more-trigger {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .nav-more-panel {
+    position: static;
+    min-width: 0;
+    margin-top: 0;
+    padding: 0 0 0 1rem;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .nav-more-panel a {
+    padding: 0.85rem 0;
+    border-radius: 0;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .nav-more-panel a:last-child {
     border-bottom: none;
   }
 
@@ -3419,6 +3772,15 @@ h1.glow span {
   display: flex;
   margin: 1.5rem 0 2rem;
   border-bottom: 1px solid var(--panel-border);
+  /* Stacks directly under the sticky .navbar (top: the navbar's own
+     rendered height, measured live -- see that rule's comment) so both
+     stay reachable without scrolling back to the top of a long game
+     page. z-index one below the navbar's so neither's shadow/border
+     fights the other where they meet. */
+  position: sticky;
+  top: var(--navbar-height);
+  z-index: 40;
+  background: var(--panel-solid);
 }
 
 .page-tab-strip button {
@@ -3443,6 +3805,317 @@ h1.glow span {
 .page-tab-strip button.active {
   color: var(--text-strong);
   border-bottom-color: var(--green);
+}
+
+/* Four tabs (Parlay Helper's label is the longest) don't fit a phone's
+   width at the desktop spacing -- tighten the gaps and let the strip
+   scroll sideways rather than wrapping or clipping a tab. */
+@media (max-width: 520px) {
+  .page-tab-strip {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .page-tab-strip button {
+    margin-right: 1rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 0.82rem;
+  }
+}
+
+/* ----------------------------------------------------------------------
+   Parlay Helper tab -- same-game parlay suggestions built from the
+   game's top-ranked player props (see web/src/lib/parlayHelper.ts).
+   ---------------------------------------------------------------------- */
+.parlay-notice {
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(var(--gold-rgb), 0.4);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: rgba(var(--gold-rgb), 0.06);
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.parlay-notice p {
+  margin: 0;
+}
+
+.parlay-notice p + p {
+  margin-top: 0.55rem;
+}
+
+.parlay-notice strong {
+  color: var(--text-strong);
+}
+
+.parlay-toggle-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  margin-top: 1rem;
+}
+
+.parlay-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-strong);
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.parlay-toggle-track {
+  position: relative;
+  width: 2.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-solid);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.parlay-toggle-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0.15rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transform: translateY(-50%);
+  transition: left 0.15s, background 0.15s;
+}
+
+.parlay-toggle.on .parlay-toggle-track {
+  background: var(--green-faint);
+  border-color: var(--green);
+}
+
+.parlay-toggle.on .parlay-toggle-thumb {
+  left: 1.2rem;
+  background: var(--green);
+}
+
+.parlay-toggle:focus-visible .parlay-toggle-track {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.parlay-toggle-hint {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.parlay-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.parlay-card {
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Graded parlays. Hit = gold box (every leg correct). Missed = red box,
+   the same red tint/border as the wrong-pick highlight
+   (.team-row.winner.pred-wrong). The tint is layered over the solid card
+   fill so the matrix-rain backdrop doesn't show through. */
+.parlay-card-hit {
+  border-color: rgba(var(--gold-rgb), 0.6);
+  background:
+    linear-gradient(rgba(var(--gold-rgb), 0.12), rgba(var(--gold-rgb), 0.12)),
+    var(--panel-solid);
+}
+
+.parlay-card-missed {
+  border-color: rgba(var(--wrong-rgb), 0.45);
+  background:
+    linear-gradient(rgba(var(--wrong-rgb), 0.1), rgba(var(--wrong-rgb), 0.1)),
+    var(--panel-solid);
+}
+
+.parlay-card-hit .parlay-card-head,
+.parlay-card-hit .parlay-leg {
+  border-color: rgba(var(--gold-rgb), 0.3);
+}
+
+.parlay-card-missed .parlay-card-head,
+.parlay-card-missed .parlay-leg {
+  border-color: rgba(var(--wrong-rgb), 0.28);
+}
+
+.parlay-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.parlay-card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.parlay-card-book {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+
+.parlay-card-title {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-strong);
+}
+
+.parlay-card-stats {
+  display: flex;
+  gap: 1.1rem;
+}
+
+.parlay-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.parlay-stat-value {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--text);
+}
+
+.parlay-stat-payout {
+  color: var(--gold);
+}
+
+.parlay-stat-label {
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.parlay-stat-sub {
+  color: var(--text-dim);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.parlay-outcome {
+  margin-left: 0.5rem;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+}
+
+.parlay-outcome-hit {
+  color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.16);
+}
+
+.parlay-outcome-missed {
+  color: rgb(var(--wrong-rgb));
+  background: rgba(var(--wrong-rgb), 0.14);
+}
+
+.parlay-legs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.parlay-leg {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.parlay-leg:last-child {
+  border-bottom: none;
+}
+
+.parlay-leg-rank {
+  flex-shrink: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--green-faint);
+  color: var(--text-strong);
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.parlay-leg-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.parlay-leg-player {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.parlay-leg-pick {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  margin-top: 0.1rem;
+}
+
+.parlay-leg-odds {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  color: var(--text);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.82rem;
+}
+
+.parlay-leg-prob {
+  flex-shrink: 0;
+  min-width: 3.4rem;
+  text-align: right;
+  color: var(--text-strong);
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.parlay-note {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  margin: 0.9rem 0 0;
 }
 
 .lineup-card {

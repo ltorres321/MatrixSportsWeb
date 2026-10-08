@@ -1,6 +1,8 @@
 import "server-only";
 import { query } from "@/lib/db";
 import { getScheduledGame } from "@/lib/schedule";
+import { buildGameParlays, type GameParlays, type ParlayBookMode } from "@/lib/parlayHelper";
+import { recordDisplayedParlays } from "@/lib/parlayLog";
 
 // Read layer over the four tables SportsPipelines/sql/010-013 added
 // (etl.pff_best_bets, pff_first_touchdown, pff_player_props,
@@ -182,6 +184,27 @@ export interface PlayerPropEntry {
   // league-wide is a real signal worth keeping visible, not noise to
   // hide.
   overallRank: number | null;
+  // The model's estimated probability (0-1) that this pick hits -- the
+  // number pRank/overallRank are both just orderings of. Powers the
+  // Parlay Helper tab's leg and combined-parlay probabilities.
+  modelProbability: number | null;
+  // When the PFF odds on this row were last refreshed (etl.pff_player_props.
+  // updated_at, ISO). Recorded with every parlay the site shows so the odds'
+  // age is always on file.
+  oddsAsOf: string | null;
+  // Line-shopping: the best price among books in etl.player_prop_lines_current
+  // quoting the EXACT SAME line and side as PFF's pick -- never a different
+  // line (see reference_prop_line_apis memory for why a different line can't
+  // be compared like-for-like). Null when no book currently matches.
+  // parlayHelper.ts's toLeg() compares this against pickSportsbook/pickOdds
+  // and uses whichever is actually better; the model's probability is
+  // unchanged either way since the line itself is identical.
+  matchingLineSportsbook: string | null;
+  matchingLineOdds: number | null;
+  // How many books currently quote that same line/side -- shown as a
+  // confidence signal, not used in pricing.
+  matchingLineBookCount: number;
+  matchingLineAsOf: string | null;
 }
 
 interface PlayerPropRow {
@@ -215,6 +238,12 @@ interface PlayerPropRow {
   h2h_hit_type: string | null;
   p_rank: number | null;
   overall_rank: number | null;
+  predicted_correct_probability: number | null;
+  odds_as_of: Date | string | null;
+  matching_line_sportsbook: string | null;
+  matching_line_odds: number | null;
+  matching_line_book_count: number;
+  matching_line_as_of: Date | string | null;
 }
 
 // ----------------------------------------------------------------------
@@ -248,6 +277,9 @@ export interface GameBettingEdge {
   firstTouchdown: FirstTouchdownEntry[];
   keyInsights: KeyInsightEntry[];
   playerProps: PlayerPropEntry[];
+  // Built here on the server, not in the browser, so the exact parlays the
+  // Parlay Helper tab shows are the ones recorded in public.site_parlay_log.
+  parlays: Record<ParlayBookMode, GameParlays>;
 }
 
 export async function getGameBettingEdge(universalGameId: string): Promise<GameBettingEdge | null> {
@@ -299,8 +331,12 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
                 pp.pick_odds, pp.pick_result, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
                 pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
                 pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
-                pp.h2h_record, pp.h2h_hit_type,
-                pred.predicted_correct_probability, pred.model_rank AS overall_rank
+                pp.h2h_record, pp.h2h_hit_type, pp.updated_at AS odds_as_of,
+                pred.predicted_correct_probability, pred.model_rank AS overall_rank,
+                market.bookmaker AS matching_line_sportsbook,
+                market.price AS matching_line_odds,
+                COALESCE(market.book_count, 0) AS matching_line_book_count,
+                market.last_seen_at AS matching_line_as_of
          FROM etl.pff_player_props pp
          -- LATERAL + LIMIT 1, not a plain JOIN: etl.pff_player_props has
          -- no player id of its own to join on, only a name, and a plain
@@ -335,6 +371,43 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
              AND pred.consensus_stat = pp.consensus_stat
            LIMIT 1
          ) pred ON true
+         -- Line-shopping join: the best-priced book currently quoting
+         -- the EXACT SAME line and side PFF picked (etl.player_prop_lines,
+         -- SportsPipelines/prop_lines/ -- see sql/016's own docstring).
+         -- American odds sort correctly with a plain ORDER BY ... DESC
+         -- across the +/- boundary (decimal-odds value is monotonic in
+         -- the raw American number), so this is the single best price,
+         -- not just the first row found. NULL for Anytime TD rows
+         -- (pick_side is NULL there -- not modeled here, no change
+         -- vs. before) and for any prop no live book currently matches.
+         --
+         -- EXCLUDED on purpose: peer-to-peer exchanges (novig, prophetx)
+         -- and prediction markets (kalshi, polymarket_us) quote a strike
+         -- ladder, not a parlay-combinable retail book -- same reason
+         -- Kalshi/Polymarket were ruled out for the Parlay Helper's
+         -- single-book mode; pick6 is DFS pick'em, same issue. Fine as a
+         -- model/probability signal elsewhere, not fine as "place this
+         -- parlay here."
+         LEFT JOIN LATERAL (
+           SELECT l.bookmaker, l.price, l.last_seen_at,
+                  (SELECT COUNT(DISTINCT l2.bookmaker)
+                     FROM etl.player_prop_lines_current l2
+                    WHERE l2.universal_game_id = pp.universal_game_id
+                      AND l2.player_name = pp.player_name
+                      AND l2.stat = pp.consensus_stat
+                      AND l2.line = pp.consensus_line
+                      AND l2.side = pp.pick_side
+                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6')) AS book_count
+             FROM etl.player_prop_lines_current l
+            WHERE l.universal_game_id = pp.universal_game_id
+              AND l.player_name = pp.player_name
+              AND l.stat = pp.consensus_stat
+              AND l.line = pp.consensus_line
+              AND l.side = pp.pick_side
+              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6')
+            ORDER BY l.price DESC
+            LIMIT 1
+         ) market ON true
          WHERE pp.universal_game_id = $1
        )
        -- overall_rank (pred.model_rank, above) ranks across EVERY prop
@@ -442,8 +515,15 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     l10HitType: r.l10_hit_type,
     h2hRecord: r.h2h_record,
     h2hHitType: r.h2h_hit_type,
-    pRank: r.p_rank,
+    // ROW_NUMBER() comes back from pg as a string (bigint); the rest of the app expects a number.
+    pRank: r.p_rank == null ? null : Number(r.p_rank),
     overallRank: r.overall_rank,
+    modelProbability: r.predicted_correct_probability,
+    oddsAsOf: r.odds_as_of ? new Date(r.odds_as_of).toISOString() : null,
+    matchingLineSportsbook: r.matching_line_sportsbook,
+    matchingLineOdds: r.matching_line_odds,
+    matchingLineBookCount: Number(r.matching_line_book_count ?? 0),
+    matchingLineAsOf: r.matching_line_as_of ? new Date(r.matching_line_as_of).toISOString() : null,
   }));
 
   const keyInsights: KeyInsightEntry[] = keyInsightRows.map((r) => ({
@@ -456,5 +536,18 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     headshotUrl: r.headshot_url,
   }));
 
-  return { bestGameBets, firstTouchdown, keyInsights, playerProps };
+  const parlays = {
+    single: buildGameParlays(playerProps, "single"),
+    mixed: buildGameParlays(playerProps, "mixed"),
+  };
+
+  // Every odds value the site shows is saved with a timestamp. A logging
+  // failure must never take the page down, so it's reported and swallowed.
+  try {
+    await recordDisplayedParlays(universalGameId, parlays);
+  } catch (error) {
+    console.error("site_parlay_log write failed:", error instanceof Error ? error.message : error);
+  }
+
+  return { bestGameBets, firstTouchdown, keyInsights, playerProps, parlays };
 }
