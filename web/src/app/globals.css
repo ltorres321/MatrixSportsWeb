@@ -1922,6 +1922,26 @@ h1.glow span {
   margin: 0 -1.5rem 2rem;
 }
 
+/* The near-black backdrop above is hardcoded for the dark/Matrix theme
+   and stood out as a black slab on the light ("Blue Pill") page. Light
+   gets the page's own pale --bg instead, still nearly opaque so the
+   content scrolling underneath the sticky bar doesn't show through its
+   text. */
+:root[data-theme="light"] .game-sticky-bar {
+  background: rgba(244, 248, 245, 0.94);
+}
+
+/* Same problem for the top nav bar and the scrolled side rail: their
+   shared var(--panel) is a ~6% blue tint, fine over the dark theme's
+   black but too see-through on light -- content scrolling underneath
+   (red tiles, headlines) bled straight through the nav text. Nearly
+   opaque pale blue instead, so it still reads as the same tinted-blue
+   family as the game tiles. */
+:root[data-theme="light"] .navbar,
+:root[data-theme="light"] .side-rail {
+  background: rgba(234, 241, 250, 0.95);
+}
+
 .game-sticky-bar .side {
   display: flex;
   align-items: center;
