@@ -768,16 +768,16 @@ a {
 }
 
 /* Gold ("machine-world" #ffd60a, same as .week-pill.active/.gold-cta-link)
-   for the four primary nav items -- Home/Predictions/Recaps/Menu -- in
-   both the top bar and the side rail. ">" on the links and the trigger
-   itself on purpose: the Menu flyout's own About/Contact/Sign-In items
-   (.nav-more-panel a) stay the normal dim text. Dark theme only, per
-   this color's existing convention -- light theme keeps the regular
+   for the primary nav items -- Home/Predictions/Recaps/Menu -- and the
+   Menu flyout's own items (About/Contact/Profile-or-Sign-In/Admin) in
+   both the top bar and the side rail. Dark theme only, per this
+   color's existing convention -- light theme keeps the regular
    dim-text/accent-on-hover look instead of yellow-on-white. */
 :root:not([data-theme="light"]) .navbar-links > a,
 :root:not([data-theme="light"]) .navbar .nav-more-trigger,
 :root:not([data-theme="light"]) .side-rail > a,
-:root:not([data-theme="light"]) .side-rail .nav-more-trigger {
+:root:not([data-theme="light"]) .side-rail .nav-more-trigger,
+:root:not([data-theme="light"]) .nav-more-panel a {
   color: #ffd60a;
   text-shadow: 0 0 8px rgba(255, 214, 10, 0.45);
 }
@@ -787,14 +787,16 @@ a {
 :root:not([data-theme="light"]) .navbar .nav-more.open .nav-more-trigger,
 :root:not([data-theme="light"]) .side-rail > a:hover,
 :root:not([data-theme="light"]) .side-rail .nav-more-trigger:hover,
-:root:not([data-theme="light"]) .side-rail .nav-more.open .nav-more-trigger {
+:root:not([data-theme="light"]) .side-rail .nav-more.open .nav-more-trigger,
+:root:not([data-theme="light"]) .nav-more-panel a:hover {
   color: #ffe55c;
   text-shadow: 0 0 14px rgba(255, 214, 10, 0.85);
 }
 
 :root:not([data-theme="light"]) .side-rail > a:hover,
 :root:not([data-theme="light"]) .side-rail .nav-more-trigger:hover,
-:root:not([data-theme="light"]) .side-rail .nav-more.open .nav-more-trigger {
+:root:not([data-theme="light"]) .side-rail .nav-more.open .nav-more-trigger,
+:root:not([data-theme="light"]) .nav-more-panel a:hover {
   background: rgba(255, 214, 10, 0.12);
 }
 
