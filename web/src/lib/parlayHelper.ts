@@ -71,7 +71,7 @@ export function americanToDecimal(odds: number): number {
 // see reference_prop_line_apis memory). American odds compare correctly with
 // a plain `>` across the +/- boundary (decimal odds are monotonic in the
 // raw American number), so whichever number is larger pays more.
-function pickBestPrice(entry: PlayerPropEntry): Pick<ParlayLeg, "sportsbook" | "odds" | "oddsSource" | "oddsAsOf"> | null {
+export function pickBestPrice(entry: PlayerPropEntry): Pick<ParlayLeg, "sportsbook" | "odds" | "oddsSource" | "oddsAsOf"> | null {
   const pff = entry.pickOdds != null
     ? { sportsbook: entry.pickSportsbook, odds: entry.pickOdds, oddsSource: "pff" as const, oddsAsOf: entry.oddsAsOf }
     : null;
@@ -126,7 +126,7 @@ function pickDistinctPlayers(candidates: ParlayLeg[], count: number): ParlayLeg[
 // legs all clear `minLegProbability`. In single-book mode it builds the best
 // parlay available at each sportsbook and keeps the most likely one; legs
 // with no known sportsbook can't be placed anywhere, so they're skipped.
-function bestParlay(
+export function bestParlay(
   pool: ParlayLeg[],
   count: number,
   mode: ParlayBookMode,

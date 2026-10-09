@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { query } from "@/lib/db";
 import type { GameParlays, Parlay, ParlayBookMode } from "@/lib/parlayHelper";
+import type { LeagueParlays } from "@/lib/leagueParlayHelper";
 
 // Records every parlay the Parlay Helper tab shows into public.site_parlay_log
 // (see sql/012_site_parlay_log.sql for the why). Called from
@@ -74,6 +75,61 @@ export async function recordDisplayedParlays(
   await query(
     `INSERT INTO public.site_parlay_log AS t
        (parlay_hash, universal_game_id, mode, leg_count, sportsbook, parlay_probability, payout_per_dollar, legs)
+     VALUES ${placeholders.join(", ")}
+     ON CONFLICT (parlay_hash) DO UPDATE SET
+       last_shown_at = now(),
+       times_shown = t.times_shown + 1`,
+    values,
+  );
+}
+
+// League-wide counterpart to recordDisplayedParlays/legSnapshot above,
+// for the "Parlays" page (app/parlays) -- same legSnapshot shape, same
+// "DO NOT touch the odds, just hash + log what's shown" contract, keyed
+// by season+week (see sql/013_site_league_parlay_log.sql) instead of
+// universal_game_id since a league-wide parlay's legs can span several
+// games.
+function leagueParlayHash(season: number, week: number, mode: ParlayBookMode, legs: ReturnType<typeof legSnapshot>[]) {
+  const identity = legs.map((l) => [l.player, l.stat, l.side, l.line, l.odds, l.sportsbook]);
+  return createHash("sha256").update(JSON.stringify([season, week, mode, identity])).digest("hex");
+}
+
+export async function recordDisplayedLeagueParlays(
+  season: number,
+  week: number,
+  parlaysByMode: Record<ParlayBookMode, LeagueParlays>,
+): Promise<void> {
+  const rows = new Map<string, unknown[]>();
+  for (const mode of ["single", "mixed"] as const) {
+    const { twoLeg, threeLeg } = parlaysByMode[mode];
+    for (const parlay of [...twoLeg, ...threeLeg]) {
+      const legs = parlay.legs.map(legSnapshot);
+      const hash = leagueParlayHash(season, week, mode, legs);
+      rows.set(hash, [
+        hash,
+        season,
+        week,
+        mode,
+        legs.length,
+        parlay.sportsbook,
+        parlay.probability,
+        parlay.decimalOdds,
+        JSON.stringify(legs),
+      ]);
+    }
+  }
+  if (rows.size === 0) return;
+
+  const values: unknown[] = [];
+  const placeholders = [...rows.values()].map((row, i) => {
+    values.push(...row);
+    const o = i * 9;
+    return `($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}, $${o + 5}, $${o + 6}, $${o + 7}, $${o + 8}, $${o + 9}::jsonb)`;
+  });
+
+  await query(
+    `INSERT INTO public.site_league_parlay_log AS t
+       (parlay_hash, season, week, mode, leg_count, sportsbook, parlay_probability, payout_per_dollar, legs)
      VALUES ${placeholders.join(", ")}
      ON CONFLICT (parlay_hash) DO UPDATE SET
        last_shown_at = now(),

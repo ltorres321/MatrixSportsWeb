@@ -558,3 +558,123 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
 
   return { bestGameBets, firstTouchdown, keyInsights, playerProps, parlays };
 }
+
+// Same player-props CTE as getGameBettingEdge above (same joins to
+// pff_lineup/espn_player_crosswalk/latest_player_prop_predictions/
+// player_prop_lines_current), scoped to every game in a season+week
+// instead of a single universal_game_id -- backs the league-wide
+// "Parlays" page (app/parlays), which picks legs across the whole
+// week's slate rather than one game's own top 10. overall_rank
+// (pred.model_rank) is already a league-wide-per-week value in
+// public.latest_player_prop_predictions, so widening the WHERE clause
+// is the only change needed; no new ranking math.
+export async function getLeagueBettingEdge(season: number, week: number): Promise<PlayerPropEntry[]> {
+  const rows = await query<PlayerPropRow>(
+    `WITH props AS (
+       SELECT pp.player_name, pp.player_team, pp.opponent_team,
+              COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
+              COALESCE(lu.position, ec.position) AS lineup_position,
+              pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
+              pp.pick_odds, pp.pick_result, pp.actual_value, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
+              pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
+              pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
+              pp.h2h_record, pp.h2h_hit_type, pp.updated_at AS odds_as_of,
+              pred.predicted_correct_probability, pred.model_rank AS overall_rank,
+              market.bookmaker AS matching_line_sportsbook,
+              market.price AS matching_line_odds,
+              COALESCE(market.book_count, 0) AS matching_line_book_count,
+              market.last_seen_at AS matching_line_as_of
+         FROM etl.pff_player_props pp
+         LEFT JOIN LATERAL (
+           SELECT espn_id, position FROM etl.pff_lineup
+           WHERE player_name = pp.player_name AND season = pp.season
+           LIMIT 1
+         ) lu ON true
+         LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = pp.player_name
+         LEFT JOIN LATERAL (
+           SELECT predicted_correct_probability, model_rank
+           FROM public.latest_player_prop_predictions pred
+           WHERE pred.universal_game_id = pp.universal_game_id
+             AND pred.player_name = pp.player_name
+             AND pred.consensus_stat = pp.consensus_stat
+           LIMIT 1
+         ) pred ON true
+         LEFT JOIN LATERAL (
+           SELECT l.bookmaker, l.price, l.last_seen_at,
+                  (SELECT COUNT(DISTINCT l2.bookmaker)
+                     FROM etl.player_prop_lines_current l2
+                    WHERE l2.universal_game_id = pp.universal_game_id
+                      AND l2.player_name = pp.player_name
+                      AND l2.stat = pp.consensus_stat
+                      AND l2.line = pp.consensus_line
+                      AND l2.side = pp.pick_side
+                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6')) AS book_count
+             FROM etl.player_prop_lines_current l
+            WHERE l.universal_game_id = pp.universal_game_id
+              AND l.player_name = pp.player_name
+              AND l.stat = pp.consensus_stat
+              AND l.line = pp.consensus_line
+              AND l.side = pp.pick_side
+              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6')
+            ORDER BY l.price DESC
+            LIMIT 1
+         ) market ON true
+         WHERE pp.universal_game_id IN (
+           SELECT universal_game_id FROM latest_predictions WHERE season = $1 AND week = $2
+         )
+       )
+       -- p_rank here re-ranks within this SAME league-wide population
+       -- (there's no single game to scope it to), so it lands on the
+       -- same ordering overall_rank already has -- kept anyway so
+       -- PlayerPropEntry.pRank (what ParlayCard's leg-rank badge reads)
+       -- is never null for a scored row, same contract as the per-game
+       -- query.
+       SELECT *,
+              CASE WHEN predicted_correct_probability IS NOT NULL
+                   THEN ROW_NUMBER() OVER (ORDER BY predicted_correct_probability DESC NULLS LAST)
+              END AS p_rank
+       FROM props
+       ORDER BY p_rank ASC NULLS LAST`,
+    [season, week]
+  );
+
+  return rows.map((r) => ({
+    playerName: r.player_name,
+    playerTeam: r.player_team,
+    opponentTeam: r.opponent_team,
+    espnId: r.espn_id,
+    lineupPosition: r.lineup_position,
+    consensusStat: r.consensus_stat,
+    consensusLine: r.consensus_line,
+    pickSportsbook: r.pick_sportsbook,
+    pickSide: r.pick_side,
+    pickLine: r.pick_line,
+    pickOdds: r.pick_odds,
+    pickResult: r.pick_result,
+    actualValue: r.actual_value,
+    projValue: r.proj_value,
+    projDirection: r.proj_direction,
+    l10Avg: r.l10_avg,
+    covProbPct: r.cov_prob_pct,
+    edgePct: r.edge_pct,
+    defVsPropRank: r.def_vs_prop_rank,
+    matchupGrade: r.matchup_grade,
+    matchupPosition: r.matchup_position,
+    simDefRecord: r.sim_def_record,
+    simDefHitType: r.sim_def_hit_type,
+    l5Record: r.l5_record,
+    l5HitType: r.l5_hit_type,
+    l10Record: r.l10_record,
+    l10HitType: r.l10_hit_type,
+    h2hRecord: r.h2h_record,
+    h2hHitType: r.h2h_hit_type,
+    pRank: r.p_rank == null ? null : Number(r.p_rank),
+    overallRank: r.overall_rank,
+    modelProbability: r.predicted_correct_probability,
+    oddsAsOf: r.odds_as_of ? new Date(r.odds_as_of).toISOString() : null,
+    matchingLineSportsbook: r.matching_line_sportsbook,
+    matchingLineOdds: r.matching_line_odds,
+    matchingLineBookCount: Number(r.matching_line_book_count ?? 0),
+    matchingLineAsOf: r.matching_line_as_of ? new Date(r.matching_line_as_of).toISOString() : null,
+  }));
+}
