@@ -16,7 +16,7 @@ type EdgeTrackRow = { teamSide: EdgeSide | null; oppositionSide: EdgeSide | null
 import type { InjuryEntry } from "@/lib/injuries";
 import type { StatWithRank, TeamPlayerGrades } from "@/lib/pffGameReport";
 import type { FirstTouchdownEntry, PlayerPropEntry } from "@/lib/pffBettingEdge";
-import { MIN_THREE_LEG_LEG_PROBABILITY, PARLAY_POOL_SIZE } from "@/lib/parlayHelper";
+import { THREE_LEG_PRANK_CAP, PARLAY_POOL_SIZE } from "@/lib/parlayHelper";
 import type { LineupPlayer } from "@/lib/lineup";
 import { teamPrimaryColor } from "@/lib/teamColors";
 import AdFrame from "@/components/AdFrame";
@@ -2498,8 +2498,8 @@ function ParlayHelperView({ game }: { game: GameStat }) {
       )}
       {twoLeg.length > 0 && !threeLeg && (
         <p className="parlay-note">
-          No 3-leg parlay for this game: fewer than three players{mixedBooks ? "" : " at a single sportsbook"} have a
-          prop rated at least {Math.round(MIN_THREE_LEG_LEG_PROBABILITY * 100)}% likely to hit.
+          No 3-leg parlay for this game: fewer than three players{mixedBooks ? "" : " at a single sportsbook"} are
+          within this game&apos;s top {THREE_LEG_PRANK_CAP} ranked picks.
         </p>
       )}
       <p className="parlay-note">

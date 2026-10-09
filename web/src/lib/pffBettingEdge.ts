@@ -334,7 +334,31 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
                 COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
                 COALESCE(lu.position, ec.position) AS lineup_position,
                 pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
-                pp.pick_odds, pp.pick_result, pp.actual_value, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
+                pp.pick_odds,
+                -- Derived fallback for when SportsPipelines' grading job has
+                -- filled in actual_value but hasn't (yet, or at all -- a
+                -- confirmed gap, not just a timing lag) set pick_result
+                -- itself: compute the same correct/incorrect call ourselves
+                -- from actual_value vs. pick_line/pick_side so the result
+                -- icon never disagrees with the "actual ..." text right next
+                -- to it. pp.pick_result still wins whenever it's actually
+                -- set -- this only fills the gap, never overrides PFF's own
+                -- call. "Anytime TD" rows have pick_side NULL and store
+                -- actual_value as 1/0 (see PlayerPropEntry.actualValue's own
+                -- comment), so they get their own branch.
+                COALESCE(
+                  pp.pick_result,
+                  CASE
+                    WHEN pp.actual_value IS NULL THEN NULL
+                    WHEN pp.pick_side IS NULL THEN
+                      CASE WHEN pp.actual_value > 0 THEN 'correct' ELSE 'incorrect' END
+                    WHEN pp.pick_side = 'over' THEN
+                      CASE WHEN pp.actual_value > pp.pick_line THEN 'correct' ELSE 'incorrect' END
+                    WHEN pp.pick_side = 'under' THEN
+                      CASE WHEN pp.actual_value < pp.pick_line THEN 'correct' ELSE 'incorrect' END
+                  END
+                ) AS pick_result,
+                pp.actual_value, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
                 pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
                 pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
                 pp.h2h_record, pp.h2h_hit_type, pp.updated_at AS odds_as_of,
@@ -575,7 +599,21 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
               COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
               COALESCE(lu.position, ec.position) AS lineup_position,
               pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
-              pp.pick_odds, pp.pick_result, pp.actual_value, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
+              pp.pick_odds,
+              -- See getGameBettingEdge's identical derivation above for why.
+              COALESCE(
+                pp.pick_result,
+                CASE
+                  WHEN pp.actual_value IS NULL THEN NULL
+                  WHEN pp.pick_side IS NULL THEN
+                    CASE WHEN pp.actual_value > 0 THEN 'correct' ELSE 'incorrect' END
+                  WHEN pp.pick_side = 'over' THEN
+                    CASE WHEN pp.actual_value > pp.pick_line THEN 'correct' ELSE 'incorrect' END
+                  WHEN pp.pick_side = 'under' THEN
+                    CASE WHEN pp.actual_value < pp.pick_line THEN 'correct' ELSE 'incorrect' END
+                END
+              ) AS pick_result,
+              pp.actual_value, pp.proj_value, pp.proj_direction, pp.l10_avg, pp.cov_prob_pct, pp.edge_pct,
               pp.def_vs_prop_rank, pp.matchup_grade, pp.matchup_position, pp.sim_def_record,
               pp.sim_def_hit_type, pp.l5_record, pp.l5_hit_type, pp.l10_record, pp.l10_hit_type,
               pp.h2h_record, pp.h2h_hit_type, pp.updated_at AS odds_as_of,

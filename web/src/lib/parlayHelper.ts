@@ -9,11 +9,20 @@ import type { PlayerPropEntry } from "@/lib/pffBettingEdge";
 // within this game are eligible to be a leg.
 export const PARLAY_POOL_SIZE = 10;
 
-// A 3-leg parlay is only offered when EVERY leg is rated at least this
-// likely to hit; if fewer than three distinct players have a prop that
-// clears the bar, no 3-leg parlay is shown for the game. The parlay's own
-// combined probability has no minimum -- it's just displayed.
-export const MIN_THREE_LEG_LEG_PROBABILITY = 0.55;
+// A 3-leg parlay only uses legs from the pool's own strongest half --
+// pRank <= THREE_LEG_PRANK_CAP, out of the already-capped top
+// PARLAY_POOL_SIZE -- not a fixed probability floor. A probability floor
+// (this used to be MIN_THREE_LEG_LEG_PROBABILITY = 0.55) silently zeroes
+// every 3-leg parlay the moment the model's calibration shifts: confirmed
+// 2026-10 when a regularization retune dropped a week's top probability
+// from ~0.60 to ~0.48, and every 3-leg parlay site-wide vanished under the
+// old floor with no error, just an empty result. Rank is scale-invariant
+// -- whatever the model's current probability range happens to be, "the
+// pool's own best few" still means something. If fewer than three
+// distinct players have a prop within the cap, no 3-leg parlay is shown
+// for the game. The parlay's own combined probability has no minimum --
+// it's just displayed.
+export const THREE_LEG_PRANK_CAP = 5;
 
 export interface ParlayLeg {
   entry: PlayerPropEntry;
@@ -56,8 +65,8 @@ export interface Parlay {
 
 export interface GameParlays {
   twoLeg: Parlay[];
-  // Null when fewer than three distinct players have a leg at or above
-  // MIN_THREE_LEG_LEG_PROBABILITY.
+  // Null when fewer than three distinct players have a leg within
+  // THREE_LEG_PRANK_CAP.
   threeLeg: Parlay | null;
 }
 
@@ -184,6 +193,10 @@ export function buildGameParlays(
 
   return {
     twoLeg,
-    threeLeg: bestParlay(pool, 3, mode, MIN_THREE_LEG_LEG_PROBABILITY),
+    threeLeg: bestParlay(
+      pool.filter((leg) => leg.entry.pRank != null && leg.entry.pRank <= THREE_LEG_PRANK_CAP),
+      3,
+      mode,
+    ),
   };
 }

@@ -3,7 +3,6 @@ import {
   americanToDecimal,
   pickBestPrice,
   bestParlay,
-  MIN_THREE_LEG_LEG_PROBABILITY,
   type Parlay,
   type ParlayLeg,
   type ParlayBookMode,
@@ -16,6 +15,18 @@ import {
 // top 10. Backs the "Parlays" page (app/parlays), the league-wide
 // sibling of the per-game "Parlay Helper" tab.
 
+// A 3-leg parlay only uses legs within the week's own top
+// LEAGUE_THREE_LEG_PRANK_CAP (by entry.pRank, league-wide here -- see
+// getLeagueBettingEdge) -- NOT a fixed probability floor. Same
+// "scale-invariant, not scale-dependent" reasoning as
+// parlayHelper.ts's THREE_LEG_PRANK_CAP (see that constant's own
+// comment for the 2026-10 incident this replaced). Scaled up from the
+// per-game cap of 5 (out of a 10-prop pool) for a week with roughly
+// 3x as many games/props in play -- not a precise ratio, just "a
+// generous multiple of the per-game cap," revisit if it ever feels too
+// loose or too tight in practice.
+export const LEAGUE_THREE_LEG_PRANK_CAP = 30;
+
 export interface LeagueParlays {
   // 3 bets, each using the next-best legs after the ones before it --
   // "2-Leg Parlay 1/2/3" are genuinely different bets, not overlapping
@@ -25,8 +36,8 @@ export interface LeagueParlays {
   // other as twoLeg -- independently built from the full pool (not
   // excluding twoLeg's own legs), same relationship buildGameParlays'
   // single threeLeg has to its twoLeg today. Either or both can be
-  // missing if fewer than 3 distinct players clear
-  // MIN_THREE_LEG_LEG_PROBABILITY.
+  // missing if fewer than 3 distinct players have a leg within
+  // LEAGUE_THREE_LEG_PRANK_CAP.
   threeLeg: Parlay[];
 }
 
@@ -51,13 +62,11 @@ function nextBestParlay(
   used: Set<ParlayLeg>,
   count: number,
   mode: ParlayBookMode,
-  minLegProbability = 0,
 ): Parlay | null {
   return bestParlay(
     pool.filter((leg) => !used.has(leg)),
     count,
     mode,
-    minLegProbability,
   );
 }
 
@@ -79,10 +88,13 @@ export function buildLeagueParlays(
     for (const leg of parlay.legs) twoLegUsed.add(leg);
   }
 
+  const threeLegPool = pool.filter(
+    (leg) => leg.entry.pRank != null && leg.entry.pRank <= LEAGUE_THREE_LEG_PRANK_CAP,
+  );
   const threeLeg: Parlay[] = [];
   const threeLegUsed = new Set<ParlayLeg>();
   for (let i = 0; i < 2; i++) {
-    const parlay = nextBestParlay(pool, threeLegUsed, 3, mode, MIN_THREE_LEG_LEG_PROBABILITY);
+    const parlay = nextBestParlay(threeLegPool, threeLegUsed, 3, mode);
     if (!parlay) break;
     threeLeg.push(parlay);
     for (const leg of parlay.legs) threeLegUsed.add(leg);
