@@ -264,7 +264,7 @@ function ParlayCardTree({
 
       {urlCallout && (
         <div style={{ display: "flex", marginTop: 12, fontSize: 40, fontWeight: 800, letterSpacing: 1, color: COLORS.green }}>
-          MatrixSports.Net
+          MatrixSports.Net/Parlays
         </div>
       )}
     </div>
