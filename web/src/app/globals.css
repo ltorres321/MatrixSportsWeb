@@ -4039,6 +4039,26 @@ h1.glow span {
   border-color: rgba(var(--wrong-rgb), 0.28);
 }
 
+/* Light theme: "Hit" cards get a light green tint instead of gold --
+   gold's light-theme value is a muted brown, which read as closer to
+   the page's other warm/beige tones than a clear "this won" signal.
+   Same translucent-wash-over-solid-panel mechanism as the gold/red
+   versions above, just recolored; "Missed" (red) is left as-is, it
+   already reads fine in light theme. Deliberately green, not the blue
+   used for current-week cards/per-leg checkmarks, so "Hit" stays its
+   own distinct signal rather than blending with that unrelated blue. */
+:root[data-theme="light"] .parlay-card-hit {
+  border-color: rgba(26, 127, 55, 0.5);
+  background:
+    linear-gradient(rgba(26, 127, 55, 0.12), rgba(26, 127, 55, 0.12)),
+    var(--panel-solid);
+}
+
+:root[data-theme="light"] .parlay-card-hit .parlay-card-head,
+:root[data-theme="light"] .parlay-card-hit .parlay-leg {
+  border-color: rgba(26, 127, 55, 0.3);
+}
+
 .parlay-card-head {
   display: flex;
   align-items: center;
@@ -4124,6 +4144,13 @@ h1.glow span {
 .parlay-outcome-hit {
   color: var(--gold);
   background: rgba(var(--gold-rgb), 0.16);
+}
+
+/* Light theme: same green swap as .parlay-card-hit's own override
+   above, same reasoning. */
+:root[data-theme="light"] .parlay-outcome-hit {
+  color: #1a7f37;
+  background: rgba(26, 127, 55, 0.16);
 }
 
 .parlay-outcome-missed {
