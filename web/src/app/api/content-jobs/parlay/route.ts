@@ -69,10 +69,20 @@ export async function GET(request: Request) {
     string
   >;
 
+  // Stable identifier for the SPECIFIC parlay picked, not just the
+  // week -- lines can move mid-week and change which legs are
+  // actually the best value, and runParlayJob.ts needs to tell "same
+  // parlay, nothing to regenerate" apart from "same week, but a
+  // genuinely different pick now" rather than deduping on week alone.
+  const parlayKey = featured.legs
+    .map((leg) => `${leg.entry.playerName}-${leg.entry.consensusStat}-${leg.entry.pickSide}-${leg.entry.pickLine}`)
+    .join("|");
+
   return NextResponse.json({
     season: activeSeason,
     week,
     weekKey: `${activeSeason}-w${week}`,
+    parlayKey,
     captions,
     imageBase64: imageBuffer.toString("base64"),
     imageSquareBase64: imageSquareBuffer.toString("base64"),
