@@ -86,7 +86,7 @@ export default function ParlaysView({
     <>
       <header className="site-header">
         <h1 className="glow">{season} SEASON — PARLAYS</h1>
-        <p className="subtitle">{"// our model's 5 best-probability parlays, picked from every game each week"}</p>
+        <p className="subtitle">{"// our model's 6 best-probability parlays, picked from every game each week"}</p>
       </header>
 
       <main>
@@ -98,7 +98,7 @@ export default function ParlaysView({
             you live.
           </p>
           <p>
-            <strong>Use these as a starting point, not a guarantee.</strong> These are the 5 strongest combinations
+            <strong>Use these as a starting point, not a guarantee.</strong> These are the 6 strongest combinations
             our model finds across the entire week&apos;s slate, picked purely by probability -- legs can come from
             different games, and from the same game when that game&apos;s props happen to rank highest. By default
             each parlay below uses legs from a single book you can place as one slip. Check that your book offers

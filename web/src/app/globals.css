@@ -3853,7 +3853,11 @@ h1.glow span {
   border: 1px solid rgba(var(--gold-rgb), 0.4);
   border-left-width: 3px;
   border-radius: 8px;
-  background: rgba(var(--gold-rgb), 0.06);
+  /* Was a near-transparent gold tint (6% opacity) -- the rain canvas
+     behind it bled straight through, making the responsible-gambling
+     notice hard to read. var(--panel-solid) is the same genuinely
+     opaque backing .parlay-card itself already uses. */
+  background: var(--panel-solid);
   color: var(--text);
   font-size: 0.8rem;
   line-height: 1.55;
