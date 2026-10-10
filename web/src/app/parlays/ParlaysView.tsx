@@ -118,13 +118,19 @@ export default function ParlaysView({
           data={previous}
         />
 
-        <p className="parlay-note">
-          Legs are drawn from every player prop our model scored that week (no top-{PARLAY_POOL_SIZE}-per-game cap,
-          unlike a single game&apos;s Parlay Helper tab), ranked purely by the model&apos;s own probability. Chance to
-          hit multiplies each leg&apos;s probability and assumes the legs are independent. Payout is the total
-          returned on a $1 bet, including your $1 stake, estimated from each leg&apos;s listed odds; sportsbooks price
-          parlays themselves, so the real payout is usually lower.
-        </p>
+        <div className="parlay-notice" role="note">
+          <p>
+            Legs are drawn from every player prop our model scored that week (no top-{PARLAY_POOL_SIZE}-per-game cap,
+            unlike a single game&apos;s Parlay Helper tab), ranked purely by the model&apos;s own probability. Chance to
+            hit multiplies each leg&apos;s probability and assumes the legs are independent. Payout is the total
+            returned on a $1 bet, including your $1 stake, estimated from each leg&apos;s listed odds; sportsbooks price
+            parlays themselves, so the real payout is usually lower.
+          </p>
+          <p>
+            Weeks 1-3 of this season have no picks on record -- there wasn&apos;t yet enough graded data for the
+            model to train on when those weeks were played, not a gap in the data itself.
+          </p>
+        </div>
       </main>
     </>
   );
