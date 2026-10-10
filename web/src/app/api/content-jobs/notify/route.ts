@@ -5,7 +5,7 @@ import { sendNotifyEmail } from "@/lib/notifyEmail";
 const NOTIFY_TO = "neo@matrixsports.net";
 
 interface NotifyBody {
-  kind: "premier_game" | "weekly_record";
+  kind: "premier_game" | "weekly_record" | "parlay";
   folderPath: string;
   summary: string;
 }
@@ -21,12 +21,14 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as NotifyBody;
-  const label = body.kind === "premier_game" ? "Premier game" : "Weekly record";
-  // Only the premier-game job writes a Facebook variant (see
-  // runPremierGameJob.ts's image_fb.png) -- the other job kinds don't
-  // have Meta's link-cap problem this exists for.
+  const label = body.kind === "premier_game" ? "Premier game" : body.kind === "parlay" ? "Parlay" : "Weekly record";
+  // Premier-game and parlay both write a Facebook variant (see
+  // runPremierGameJob.ts/runParlayJob.ts's image_fb.png) -- weekly
+  // record doesn't have Meta's link-cap problem this exists for.
   const readyFiles =
-    body.kind === "premier_game" ? "image.png, image_ig.png, image_fb.png, and captions.json" : "image.png, image_ig.png, and captions.json";
+    body.kind === "premier_game" || body.kind === "parlay"
+      ? "image.png, image_ig.png, image_fb.png, and captions.json"
+      : "image.png, image_ig.png, and captions.json";
 
   const html = `
     <div style="font-family: 'Courier New', Courier, monospace; padding: 24px; background: #04140a; color: #eafff2;">

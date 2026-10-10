@@ -4,6 +4,7 @@
 import { teamByAlias } from "@/lib/teams";
 import type { Matchup } from "@/lib/matchups";
 import type { Story } from "@/lib/stories";
+import type { Parlay } from "@/lib/parlayHelper";
 import { getWeekRecord, getBestPick, getBiggestMiss, type WeeklyInsight } from "./weeklyStats";
 
 function teamDisplay(alias: string): string {
@@ -189,6 +190,36 @@ function truncateForTease(text: string, maxChars = 150): string {
 // to do that (see siteLink's `path` param) -- since a tease only works
 // if the click lands on the actual piece, not a front page the reader
 // then has to go find it from.
+// Same wording as ParlayCard.tsx's parlayLegLabel/renderParlayCard.tsx's
+// legLabel -- duplicated rather than imported for the same reason
+// renderParlayCard.tsx's own copy is: this one needs to stay a plain
+// string function callable from caption text, not a component.
+function legLabel(e: Parlay["legs"][number]["entry"]): string {
+  if (e.consensusStat === "Anytime TD") return "Anytime TD";
+  return `${e.pickSide ?? ""} ${e.pickLine ?? ""} ${e.consensusStat}`.trim();
+}
+
+// Links to /parlays itself (member-gated, see that page's SignUpGate),
+// not the homepage -- same "land on the actual thing, not a front page
+// the reader has to go find it from" reasoning as
+// performanceReviewCaption. A signed-out click still converts: it
+// lands on the sign-up prompt with "parlays" as the obvious context
+// for why they're there, rather than a generic landing page.
+export function parlayCaption(season: number, week: number, parlay: Parlay, platform: Platform): string {
+  const legsLine = parlay.legs.map((leg) => `${leg.entry.playerName} ${legLabel(leg.entry)}`).join(" + ");
+  const link = siteLink(platform, "weekly_parlays", `${season}-w${week}`, "/parlays");
+
+  return [
+    `🎰 This week's top ${parlay.legs.length}-leg parlay, ${Math.round(parlay.probability * 100)}% to hit:`,
+    "",
+    legsLine,
+    "",
+    `$1 pays $${parlay.decimalOdds.toFixed(2)} if it hits.`,
+    "",
+    `See this week's full slate of parlays → ${link}`,
+  ].join("\n");
+}
+
 export function performanceReviewCaption(story: Story, platform: Platform): string {
   const hook = truncateForTease(story.body);
   const link = siteLink(
