@@ -1,6 +1,6 @@
 import "server-only";
 import { query } from "@/lib/db";
-import { getScheduledGame } from "@/lib/schedule";
+import { getScheduledGame, gameDayAbbrev } from "@/lib/schedule";
 import { buildGameParlays, type GameParlays, type ParlayBookMode } from "@/lib/parlayHelper";
 import { recordDisplayedParlays } from "@/lib/parlayLog";
 
@@ -127,6 +127,13 @@ export interface PlayerPropEntry {
   playerName: string;
   playerTeam: string;
   opponentTeam: string;
+  // Short weekday ("Mon".."Sun") the game kicks off, ET -- see
+  // schedule.ts's gameDayAbbrev. Only shown today next to the matchup
+  // label on the league-wide Parlays page (showMatchup), where legs can
+  // come from any day in the week, not just Sunday -- null if the
+  // game's kickoff time wasn't resolvable (no TheSportsDB/
+  // latest_predictions row).
+  gameDay: string | null;
   espnId: string | null;
   // Independent of matchupPosition below -- "what position this player
   // plays" vs. "did PFF compute a matchup grade for them," two
@@ -216,6 +223,11 @@ interface PlayerPropRow {
   player_name: string;
   player_team: string;
   opponent_team: string;
+  // Only selected by getLeagueBettingEdge's query below (legs there can
+  // come from any game in the week) -- getGameBettingEdge derives
+  // gameDay from its own already-fetched scheduledGame instead, since
+  // every row there is the same one game.
+  game_date?: Date | string | null;
   espn_id: string | null;
   lineup_position: string | null;
   consensus_stat: string;
@@ -516,10 +528,14 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
     isActualFirstScorer: r.is_actual_first_scorer,
   }));
 
+  // Every row here is the same single game, so the same gameDay for all of them.
+  const gameDay = scheduledGame ? gameDayAbbrev(scheduledGame.game_date) : null;
+
   const playerProps: PlayerPropEntry[] = playerPropRows.map((r) => ({
     playerName: r.player_name,
     playerTeam: r.player_team,
     opponentTeam: r.opponent_team,
+    gameDay,
     espnId: r.espn_id,
     lineupPosition: r.lineup_position,
     consensusStat: r.consensus_stat,
@@ -621,8 +637,16 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
               market.bookmaker AS matching_line_sportsbook,
               market.price AS matching_line_odds,
               COALESCE(market.book_count, 0) AS matching_line_book_count,
-              market.last_seen_at AS matching_line_as_of
+              market.last_seen_at AS matching_line_as_of,
+              lp.game_date
          FROM etl.pff_player_props pp
+         -- Replaces a WHERE universal_game_id IN (...) scoping subquery --
+         -- same effect (every game in this season+week, any day), but
+         -- also gets game_date onto every row for the matchup day label
+         -- (gameDayAbbrev below). One row per game in latest_predictions,
+         -- so this can't duplicate a prop row.
+         JOIN latest_predictions lp
+           ON lp.universal_game_id = pp.universal_game_id AND lp.season = $1 AND lp.week = $2
          LEFT JOIN LATERAL (
            SELECT espn_id, position FROM etl.pff_lineup
            WHERE player_name = pp.player_name AND season = pp.season
@@ -657,9 +681,6 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
-         WHERE pp.universal_game_id IN (
-           SELECT universal_game_id FROM latest_predictions WHERE season = $1 AND week = $2
-         )
        )
        -- p_rank here re-ranks within this SAME league-wide population
        -- (there's no single game to scope it to), so it lands on the
@@ -680,6 +701,7 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
     playerName: r.player_name,
     playerTeam: r.player_team,
     opponentTeam: r.opponent_team,
+    gameDay: r.game_date ? gameDayAbbrev(new Date(r.game_date)) : null,
     espnId: r.espn_id,
     lineupPosition: r.lineup_position,
     consensusStat: r.consensus_stat,

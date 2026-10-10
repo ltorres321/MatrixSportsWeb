@@ -13,6 +13,21 @@ import { TEAMS } from "@/lib/teams";
 // already fully covered by the backfilled predictions table and
 // don't need an external call on every request.
 
+// Short weekday label ("Mon".."Sun") for a game's kickoff, in ET --
+// NFL scheduling (and broadcast-window slots elsewhere in the app) is
+// ET-based, so a plain UTC Date.getDay() can land on the wrong day for
+// a game_date stored as, say, 00:15 UTC Tuesday that's actually Monday
+// night ET. Shared by pffBettingEdge.ts's league-wide parlay legs (so a
+// reader can spot a Thursday/Monday-night leg at a glance) -- lives
+// here rather than predictions.ts since predictions.ts already imports
+// from pffBettingEdge.ts, and that would be circular.
+export function gameDayAbbrev(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+  }).format(date);
+}
+
 const NFL_LEAGUE_ID = "4391";
 // Regular season only -- TheSportsDB uses intRound 500 for preseason
 // and 150/160/200 for not-yet-determined future postseason rounds
