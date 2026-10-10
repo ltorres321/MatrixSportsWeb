@@ -255,6 +255,7 @@ export function ParlayCard({
                 {showMatchup && (
                   <div className="parlay-leg-matchup">
                     {e.playerTeam} vs {e.opponentTeam}
+                    {e.gameDay && ` (${e.gameDay})`}
                   </div>
                 )}
                 <div className="parlay-leg-pick">{parlayLegLabel(e)}</div>
