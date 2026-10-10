@@ -114,7 +114,7 @@ export default function ParlaysView({
 
         <WeekSection
           title={previous ? `Week ${previous.week} Parlays` : "Last Week's Parlays"}
-          subtitle="What the model would have picked last week, graded against what actually happened."
+          subtitle="What the model picked last week, graded against what actually happened."
           data={previous}
         />
 
