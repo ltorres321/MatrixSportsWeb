@@ -2097,6 +2097,24 @@ h1.glow span {
   margin: 0 0 1.25rem;
 }
 
+/* Parlays page only (app/parlays/ParlaysView.tsx's two WeekSection
+   subtitles) -- one size up and the site's gold accent, same reasoning
+   as .parlay-notice's own legibility fix, kept as its own class rather
+   than changing .stat-sub itself since that rule is shared across every
+   other .stat-section on the site (Betting Edge, Matchups, ...).
+   Three class-selectors deep on purpose -- .stat-section .stat-sub
+   above is itself two classes (specificity 0,2,0); a plain single-class
+   .parlay-week-subtitle (0,1,0) silently loses to it regardless of
+   source order, so this has to out-specify it, not just come later. */
+.stat-section .stat-sub.parlay-week-subtitle {
+  color: var(--gold);
+  font-size: 0.92rem;
+  display: inline-block;
+  background: var(--panel-solid);
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+}
+
 .bucket-list {
   display: flex;
   flex-direction: column;
@@ -3853,9 +3871,13 @@ h1.glow span {
   border: 1px solid rgba(var(--gold-rgb), 0.4);
   border-left-width: 3px;
   border-radius: 8px;
-  background: rgba(var(--gold-rgb), 0.06);
-  color: var(--text);
-  font-size: 0.8rem;
+  /* Was a near-transparent gold tint (6% opacity) -- the rain canvas
+     behind it bled straight through, making the responsible-gambling
+     notice hard to read. var(--panel-solid) is the same genuinely
+     opaque backing .parlay-card itself already uses. */
+  background: var(--panel-solid);
+  color: var(--gold);
+  font-size: 0.9rem;
   line-height: 1.55;
 }
 
@@ -3868,7 +3890,7 @@ h1.glow span {
 }
 
 .parlay-notice strong {
-  color: var(--text-strong);
+  color: var(--gold);
 }
 
 .parlay-toggle-row {

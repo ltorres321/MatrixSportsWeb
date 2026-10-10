@@ -27,17 +27,25 @@ import {
 // loose or too tight in practice.
 export const LEAGUE_THREE_LEG_PRANK_CAP = 30;
 
+// 6 bets total (2026-10: bumped from 3+2=5 to fill out the page).
+// Design rule: the 3-leg count must never exceed the 2-leg count --
+// a 3-leg parlay is the longer shot of the two, so this page should
+// never offer more of the riskier bet than the safer one. If either
+// count changes again, keep LEAGUE_THREE_LEG_COUNT <= LEAGUE_TWO_LEG_COUNT.
+export const LEAGUE_TWO_LEG_COUNT = 4;
+export const LEAGUE_THREE_LEG_COUNT = 2;
+
 export interface LeagueParlays {
-  // 3 bets, each using the next-best legs after the ones before it --
-  // "2-Leg Parlay 1/2/3" are genuinely different bets, not overlapping
-  // slips of the same two picks.
+  // Up to LEAGUE_TWO_LEG_COUNT bets, each using the next-best legs
+  // after the ones before it -- "2-Leg Parlay 1/2/3/4" are genuinely
+  // different bets, not overlapping slips of the same two picks.
   twoLeg: Parlay[];
-  // Up to 2 bets, same "next-best, no repeats" relationship to each
-  // other as twoLeg -- independently built from the full pool (not
-  // excluding twoLeg's own legs), same relationship buildGameParlays'
-  // single threeLeg has to its twoLeg today. Either or both can be
-  // missing if fewer than 3 distinct players have a leg within
-  // LEAGUE_THREE_LEG_PRANK_CAP.
+  // Up to LEAGUE_THREE_LEG_COUNT bets, same "next-best, no repeats"
+  // relationship to each other as twoLeg -- independently built from
+  // the full pool (not excluding twoLeg's own legs), same relationship
+  // buildGameParlays' single threeLeg has to its twoLeg today. Any of
+  // these can be missing if fewer than 3 distinct players have a leg
+  // within LEAGUE_THREE_LEG_PRANK_CAP.
   threeLeg: Parlay[];
 }
 
@@ -81,7 +89,7 @@ export function buildLeagueParlays(
 
   const twoLeg: Parlay[] = [];
   const twoLegUsed = new Set<ParlayLeg>();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < LEAGUE_TWO_LEG_COUNT; i++) {
     const parlay = nextBestParlay(pool, twoLegUsed, 2, mode);
     if (!parlay) break;
     twoLeg.push(parlay);
@@ -93,7 +101,7 @@ export function buildLeagueParlays(
   );
   const threeLeg: Parlay[] = [];
   const threeLegUsed = new Set<ParlayLeg>();
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < LEAGUE_THREE_LEG_COUNT; i++) {
     const parlay = nextBestParlay(threeLegPool, threeLegUsed, 3, mode);
     if (!parlay) break;
     threeLeg.push(parlay);

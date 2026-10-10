@@ -60,7 +60,7 @@ function WeekSection({
   return (
     <div className="stat-section">
       <h2>{title}</h2>
-      <p className="stat-sub">{subtitle}</p>
+      <p className="stat-sub parlay-week-subtitle">{subtitle}</p>
       <div className="parlay-grid">
         {twoLeg.map((parlay, i) => (
           <ParlayCard key={`2-${i}`} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
@@ -86,7 +86,7 @@ export default function ParlaysView({
     <>
       <header className="site-header">
         <h1 className="glow">{season} SEASON — PARLAYS</h1>
-        <p className="subtitle">{"// our model's 5 best-probability parlays, picked from every game each week"}</p>
+        <p className="subtitle">{"// our model's 6 best-probability parlays, picked from every game each week"}</p>
       </header>
 
       <main>
@@ -98,7 +98,7 @@ export default function ParlaysView({
             you live.
           </p>
           <p>
-            <strong>Use these as a starting point, not a guarantee.</strong> These are the 5 strongest combinations
+            <strong>Use these as a starting point, not a guarantee.</strong> These are the 6 strongest combinations
             our model finds across the entire week&apos;s slate, picked purely by probability -- legs can come from
             different games, and from the same game when that game&apos;s props happen to rank highest. By default
             each parlay below uses legs from a single book you can place as one slip. Check that your book offers
@@ -114,17 +114,23 @@ export default function ParlaysView({
 
         <WeekSection
           title={previous ? `Week ${previous.week} Parlays` : "Last Week's Parlays"}
-          subtitle="What the model would have picked last week, graded against what actually happened."
+          subtitle="What the model picked last week, graded against what actually happened."
           data={previous}
         />
 
-        <p className="parlay-note">
-          Legs are drawn from every player prop our model scored that week (no top-{PARLAY_POOL_SIZE}-per-game cap,
-          unlike a single game&apos;s Parlay Helper tab), ranked purely by the model&apos;s own probability. Chance to
-          hit multiplies each leg&apos;s probability and assumes the legs are independent. Payout is the total
-          returned on a $1 bet, including your $1 stake, estimated from each leg&apos;s listed odds; sportsbooks price
-          parlays themselves, so the real payout is usually lower.
-        </p>
+        <div className="parlay-notice" role="note">
+          <p>
+            Legs are drawn from every player prop our model scored that week (no top-{PARLAY_POOL_SIZE}-per-game cap,
+            unlike a single game&apos;s Parlay Helper tab), ranked purely by the model&apos;s own probability. Chance to
+            hit multiplies each leg&apos;s probability and assumes the legs are independent. Payout is the total
+            returned on a $1 bet, including your $1 stake, estimated from each leg&apos;s listed odds; sportsbooks price
+            parlays themselves, so the real payout is usually lower.
+          </p>
+          <p>
+            Weeks 1-3 of this season have no picks on record -- there wasn&apos;t yet enough graded data for the
+            model to train on when those weeks were played, not a gap in the data itself.
+          </p>
+        </div>
       </main>
     </>
   );

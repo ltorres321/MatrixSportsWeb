@@ -15,7 +15,7 @@ import ParlaysView from "./ParlaysView";
 export const metadata = {
   title: "NFL Parlays — Matrix Sports Analytics",
   description:
-    "The week's 5 best-probability NFL parlays, built from our model's highest-confidence player props across every game -- plus how last week's picks actually graded out.",
+    "The week's 6 best-probability NFL parlays, built from our model's highest-confidence player props across every game -- plus how last week's picks actually graded out.",
   alternates: { canonical: "https://matrixsports.net/parlays" },
 };
 
@@ -72,7 +72,7 @@ function SignUpGate() {
             <span className="lock-icon">🔒</span>
             <h3>Sign In to View Parlays</h3>
             <p>
-              Create a free account to see our model&apos;s 5 best-probability parlays every week --
+              Create a free account to see our model&apos;s 6 best-probability parlays every week --
               no credit card required.
             </p>
             <Link className="btn btn-primary btn-block" href="/signup">
