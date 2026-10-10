@@ -210,7 +210,7 @@ export function parlayCaption(season: number, week: number, parlay: Parlay, plat
   const link = siteLink(platform, "weekly_parlays", `${season}-w${week}`, "/parlays");
 
   return [
-    `🎰 This week's top ${parlay.legs.length}-leg parlay, ${Math.round(parlay.probability * 100)}% to hit:`,
+    `🎰 This week's value ${parlay.legs.length}-leg parlay, ${Math.round(parlay.probability * 100)}% to hit:`,
     "",
     legsLine,
     "",
