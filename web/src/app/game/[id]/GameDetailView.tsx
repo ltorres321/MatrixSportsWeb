@@ -16,17 +16,20 @@ type EdgeTrackRow = { teamSide: EdgeSide | null; oppositionSide: EdgeSide | null
 import type { InjuryEntry } from "@/lib/injuries";
 import type { StatWithRank, TeamPlayerGrades } from "@/lib/pffGameReport";
 import type { FirstTouchdownEntry, PlayerPropEntry } from "@/lib/pffBettingEdge";
-import {
-  MIN_THREE_LEG_LEG_PROBABILITY,
-  PARLAY_POOL_SIZE,
-  type Parlay,
-} from "@/lib/parlayHelper";
+import { THREE_LEG_PRANK_CAP, PARLAY_POOL_SIZE } from "@/lib/parlayHelper";
 import type { LineupPlayer } from "@/lib/lineup";
 import { teamPrimaryColor } from "@/lib/teamColors";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
 import { TrendingUpArrow } from "@/components/MatchupCard";
+import {
+  SportsbookLink,
+  formatOdds,
+  displayPosition,
+  PickResultIcon,
+  ParlayCard,
+} from "@/components/ParlayCard";
 
 const LIVE_REFRESH_MS = 20_000;
 
@@ -1611,190 +1614,6 @@ const PLAYER_PROP_COLUMN_INFO = {
   h2h: "This player's hit rate on this prop in past meetings against this exact opponent.",
 };
 
-// PFF's own export names the book but never shows it on the page --
-// a reader sees the price but not who's offering it. name/url/logo
-// back a small clickable icon at the end of each First Touchdown row
-// instead of a text column, so it reads as "which book" at a glance
-// without widening the table.
-//
-// logo files are self-hosted at public/assets/favicons/<key>.png, not
-// fetched live from Google's favicon service -- pulled once (2026-10)
-// from each book's own domain via Google's lookup (so the *fetch* used
-// Google, the running *site* never calls out to it) so a reader's
-// request never depends on a third party staying up or keeping that
-// endpoint working. Re-fetch if a book rebrands: see the download
-// recipe this comment used to sit next to in git history, or just ask
-// Claude to redo it the same way.
-//
-// Links to each book's general NFL section, not a specific bet/event
-// id -- this data doesn't carry PFF's own per-bet deep-link id, and a
-// hardcoded one would go stale (or point at the wrong game entirely)
-// the moment it's reused for any game other than the one it was
-// copied from. caesars.com itself silently redirects to williamhill.us
-// (confirmed 2026-10 -- a real rebrand/redirect quirk, not a typo) --
-// sportsbook.caesars.com is the actual working subdomain.
-//
-// EXCEPTION: Caesars's own /bet/americanfootball with no query string
-// lands on COLLEGE football, not NFL (confirmed 2026-10 by actually
-// clicking it) -- the `?id=` here isn't a specific bet/event after
-// all, it's what tells Caesars's own router "NFL," so unlike the
-// per-bet-id concern above, this one IS the stable, correct link to
-// keep.
-//
-// The books below bovada are new (2026-10, from etl.player_prop_lines
-// via SportsPipelines/prop_lines/ -- see sql/016's docstring) and their
-// url is an unverified homepage root, not a click-through-confirmed
-// NFL deep link like caesars/draftKings/betmgm/fanduel above -- safer
-// to land on a page that definitely exists than guess a path that 404s.
-const SPORTSBOOK_INFO: Record<string, { name: string; url: string; logo: string }> = {
-  caesars: {
-    name: "Caesars Sportsbook",
-    url: "https://sportsbook.caesars.com/us/nj/bet/americanfootball?id=007d7c61-07a7-4e18-bb40-15104b6eac92",
-    logo: "/assets/favicons/caesars.png",
-  },
-  draftKings: {
-    name: "DraftKings",
-    url: "https://sportsbook.draftkings.com/leagues/football/nfl",
-    logo: "/assets/favicons/draftkings.png",
-  },
-  // Same book as draftKings above, under the lowercase key
-  // etl.player_prop_lines.bookmaker actually uses (SportsPipelines'
-  // prop_lines/ pollers store each source's own lowercase key) -- PFF's
-  // CSV-derived pick_sportsbook uses the capital-K spelling instead, so
-  // both keys need an entry or a line-shopped DraftKings quote falls
-  // through to the plain-text "unknown book" display.
-  draftkings: {
-    name: "DraftKings",
-    url: "https://sportsbook.draftkings.com/leagues/football/nfl",
-    logo: "/assets/favicons/draftkings.png",
-  },
-  betmgm: {
-    name: "BetMGM",
-    url: "https://www.nj.betmgm.com/en/engage/lan/geolocator?orh=sports.betmgm.com",
-    logo: "/assets/favicons/betmgm.png",
-  },
-  fanduel: {
-    name: "FanDuel",
-    url: "https://sportsbook.fanduel.com/navigation/nfl",
-    logo: "/assets/favicons/fanduel.png",
-  },
-  // Not yet confirmed by click-through like the other four (seen in
-  // Player Props' pick_sportsbook, not First Touchdown's set) -- same
-  // "general section, not a specific bet" reasoning, but this URL is
-  // a best guess, not a verified one.
-  fanatics: {
-    name: "Fanatics Sportsbook",
-    url: "https://sportsbook.fanatics.com/",
-    logo: "/assets/favicons/fanatics.png",
-  },
-  bovada: {
-    name: "Bovada",
-    url: "https://www.bovada.lv/",
-    logo: "/assets/favicons/bovada.png",
-  },
-  hardrock: {
-    name: "Hard Rock Bet",
-    url: "https://app.hardrock.bet/",
-    logo: "/assets/favicons/hardrock.png",
-  },
-  espnbet: {
-    name: "ESPN BET",
-    url: "https://espnbet.com/",
-    logo: "/assets/favicons/espnbet.png",
-  },
-  pinnacle: {
-    name: "Pinnacle",
-    url: "https://www.pinnacle.com/",
-    logo: "/assets/favicons/pinnacle.png",
-  },
-  betrivers: {
-    name: "BetRivers",
-    url: "https://www.betrivers.com/",
-    logo: "/assets/favicons/betrivers.png",
-  },
-  betway: {
-    name: "Betway",
-    url: "https://betway.com/",
-    logo: "/assets/favicons/betway.png",
-  },
-  fliff: {
-    name: "Fliff",
-    url: "https://www.getfliff.com/",
-    logo: "/assets/favicons/fliff.png",
-  },
-  rebet: {
-    name: "Rebet",
-    url: "https://rebet.app/",
-    logo: "/assets/favicons/rebet.png",
-  },
-  sportzino: {
-    name: "Sportzino",
-    url: "https://sportzino.com/",
-    logo: "/assets/favicons/sportzino.png",
-  },
-  courtside: {
-    name: "Courtside",
-    url: "https://www.courtside.app/",
-    logo: "/assets/favicons/courtside.png",
-  },
-};
-
-function SportsbookLink({ sportsbook }: { sportsbook: string }) {
-  const info = SPORTSBOOK_INFO[sportsbook];
-  if (!info) return <span className="betting-sportsbook-unknown">{sportsbook}</span>;
-  return (
-    <a
-      className="betting-sportsbook-link"
-      href={info.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={`Odds via ${info.name}`}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={info.logo} alt={info.name} className="betting-sportsbook-icon" />
-    </a>
-  );
-}
-
-function formatOdds(odds: number): string {
-  return odds > 0 ? `+${odds}` : `${odds}`;
-}
-
-// matchupPosition is "No Matchup" for backups PFF didn't run a
-// matchup analysis on -- that's a real, honest signal about matchup
-// *grade* availability (left alone everywhere else this entry is
-// used), but it isn't the right answer to "what position do they
-// play," which lineupPosition (sourced independently, from the same
-// roster data First Touchdown's position column uses) still usually
-// knows even when PFF's own matchup field doesn't.
-function displayPosition(entry: PlayerPropEntry): string | null {
-  if (entry.matchupPosition && entry.matchupPosition !== "No Matchup") return entry.matchupPosition;
-  return entry.lineupPosition;
-}
-
-// null pre-game (PFF hasn't graded it yet -- most props on this site,
-// since most games haven't been played). Yellow check (this site's own
-// accent color, not PFF's green) for a hit, red X for a miss -- same
-// semantic PFF's own page uses, different color for the positive case
-// to match the rest of the site's theme.
-function PickResultIcon({ result }: { result: string | null }) {
-  if (result === "correct") {
-    return (
-      <span className="pick-result-icon pick-result-correct" title="Hit" aria-label="Correct pick">
-        ✓
-      </span>
-    );
-  }
-  if (result === "incorrect") {
-    return (
-      <span className="pick-result-icon pick-result-incorrect" title="Miss" aria-label="Incorrect pick">
-        ✕
-      </span>
-    );
-  }
-  return null;
-}
-
 // Yellow check ONLY, never a red X here -- unlike Player Props (every
 // prop has a clean correct/incorrect grade), First Touchdown and Game
 // Lines are both single-winner markets: everyone/everything that
@@ -2622,103 +2441,6 @@ function BettingEdgeView({ game }: { game: GameStat }) {
   );
 }
 
-function formatPercent(p: number): string {
-  return `${(p * 100).toFixed(1)}%`;
-}
-
-function parlayLegLabel(e: PlayerPropEntry): string {
-  if (e.consensusStat === "Anytime TD") return "Anytime TD";
-  return `${e.pickSide ?? ""} ${e.pickLine ?? ""} ${e.consensusStat}`.trim();
-}
-
-// What the player actually did, once the game is final -- null pre-game
-// (see PlayerPropEntry.actualValue's own comment). "Anytime TD" stores
-// actualValue as 1/0, not a yardage-style number, so it gets its own
-// phrasing instead of "actual 1 Anytime TD".
-function parlayLegActualLabel(e: PlayerPropEntry): string | null {
-  if (e.actualValue === null) return null;
-  if (e.consensusStat === "Anytime TD") return e.actualValue > 0 ? "actual: scored a TD" : "actual: no TD";
-  return `actual ${e.actualValue} ${e.consensusStat}`;
-}
-
-// Hit only when every leg is graded correct, missed as soon as any leg
-// is graded incorrect, otherwise still pending (game not final yet).
-function parlayOutcome(parlay: Parlay): "hit" | "missed" | null {
-  if (parlay.legs.some((l) => l.entry.pickResult === "incorrect")) return "missed";
-  if (parlay.legs.every((l) => l.entry.pickResult === "correct")) return "hit";
-  return null;
-}
-
-function sportsbookName(key: string): string {
-  return SPORTSBOOK_INFO[key]?.name ?? key;
-}
-
-function ParlayCard({ title, parlay }: { title: string; parlay: Parlay }) {
-  const outcome = parlayOutcome(parlay);
-  return (
-    <div className={`parlay-card${outcome ? ` parlay-card-${outcome}` : ""}`}>
-      <div className="parlay-card-head">
-        <div className="parlay-card-titles">
-          <span className="parlay-card-title">
-            {title}
-            {outcome && (
-              <span className={`parlay-outcome parlay-outcome-${outcome}`}>{outcome === "hit" ? "Hit" : "Missed"}</span>
-            )}
-          </span>
-          <span className="parlay-card-book">
-            {parlay.sportsbook ? (
-              <>
-                <SportsbookLink sportsbook={parlay.sportsbook} />
-                All legs at {sportsbookName(parlay.sportsbook)}
-              </>
-            ) : (
-              "Legs are at different books"
-            )}
-          </span>
-        </div>
-        <div className="parlay-card-stats">
-          <div className="parlay-stat">
-            <span className="parlay-stat-value">{formatPercent(parlay.probability)}</span>
-            <span className="parlay-stat-label">chance to hit</span>
-          </div>
-          <div className="parlay-stat">
-            <span className="parlay-stat-value parlay-stat-payout">${parlay.decimalOdds.toFixed(2)}</span>
-            <span className="parlay-stat-label">payout on a $1 bet</span>
-            <span className="parlay-stat-sub">(${(parlay.decimalOdds - 1).toFixed(2)} profit)</span>
-          </div>
-        </div>
-      </div>
-      <ul className="parlay-legs">
-        {parlay.legs.map((leg) => {
-          const e = leg.entry;
-          const actualLabel = parlayLegActualLabel(e);
-          return (
-            <li key={`${e.playerName}-${e.consensusStat}`} className="parlay-leg">
-              <span className="parlay-leg-rank" title="Rank within this game">
-                {e.pRank}
-              </span>
-              <div className="parlay-leg-main">
-                <div className="parlay-leg-player">
-                  <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
-                  {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
-                  <PickResultIcon result={e.pickResult} />
-                </div>
-                <div className="parlay-leg-pick">{parlayLegLabel(e)}</div>
-                {actualLabel && <div className="parlay-leg-actual">{actualLabel}</div>}
-              </div>
-              <div className="parlay-leg-odds">
-                {leg.sportsbook && <SportsbookLink sportsbook={leg.sportsbook} />}
-                <span>{formatOdds(leg.odds)}</span>
-              </div>
-              <div className="parlay-leg-prob">{formatPercent(leg.probability)}</div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
 function ParlayHelperView({ game }: { game: GameStat }) {
   // Mixed-book mode is hidden, not removed -- with this many books now
   // covering a game's props (see pffBettingEdge.ts's matchingLine* line-
@@ -2776,8 +2498,8 @@ function ParlayHelperView({ game }: { game: GameStat }) {
       )}
       {twoLeg.length > 0 && !threeLeg && (
         <p className="parlay-note">
-          No 3-leg parlay for this game: fewer than three players{mixedBooks ? "" : " at a single sportsbook"} have a
-          prop rated at least {Math.round(MIN_THREE_LEG_LEG_PROBABILITY * 100)}% likely to hit.
+          No 3-leg parlay for this game: fewer than three players{mixedBooks ? "" : " at a single sportsbook"} are
+          within this game&apos;s top {THREE_LEG_PRANK_CAP} ranked picks.
         </p>
       )}
       <p className="parlay-note">

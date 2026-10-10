@@ -170,6 +170,14 @@ function PredictionsIcon() {
   );
 }
 
+function ParlaysIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 4h14l-5 7v7l-4 2v-9L5 4Z" />
+    </svg>
+  );
+}
+
 function RecapsIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -203,6 +211,10 @@ function SideRail({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }
       <Link href="/home">
         <PredictionsIcon />
         <span>Predictions</span>
+      </Link>
+      <Link href="/parlays">
+        <ParlaysIcon />
+        <span>Parlays</span>
       </Link>
       <Link href="/stories">
         <RecapsIcon />
@@ -308,6 +320,9 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
           </Link>
           <Link href="/home" onClick={close}>
             Predictions
+          </Link>
+          <Link href="/parlays" onClick={close}>
+            Parlays
           </Link>
           <Link href="/stories" onClick={close}>
             Recaps
