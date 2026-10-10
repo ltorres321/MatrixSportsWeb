@@ -192,7 +192,7 @@ function ParlayCardTree({
             marginRight: 18,
           }}
         />
-        THIS WEEK&apos;S TOP PARLAY
+        THIS WEEK&apos;S VALUE PARLAY
       </div>
 
       <div
