@@ -3858,8 +3858,8 @@ h1.glow span {
      notice hard to read. var(--panel-solid) is the same genuinely
      opaque backing .parlay-card itself already uses. */
   background: var(--panel-solid);
-  color: var(--text);
-  font-size: 0.8rem;
+  color: var(--gold);
+  font-size: 0.9rem;
   line-height: 1.55;
 }
 
@@ -3872,7 +3872,7 @@ h1.glow span {
 }
 
 .parlay-notice strong {
-  color: var(--text-strong);
+  color: var(--gold);
 }
 
 .parlay-toggle-row {
