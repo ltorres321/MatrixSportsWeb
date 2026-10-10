@@ -2101,8 +2101,12 @@ h1.glow span {
    subtitles) -- one size up and the site's gold accent, same reasoning
    as .parlay-notice's own legibility fix, kept as its own class rather
    than changing .stat-sub itself since that rule is shared across every
-   other .stat-section on the site (Betting Edge, Matchups, ...). */
-.parlay-week-subtitle {
+   other .stat-section on the site (Betting Edge, Matchups, ...).
+   Three class-selectors deep on purpose -- .stat-section .stat-sub
+   above is itself two classes (specificity 0,2,0); a plain single-class
+   .parlay-week-subtitle (0,1,0) silently loses to it regardless of
+   source order, so this has to out-specify it, not just come later. */
+.stat-section .stat-sub.parlay-week-subtitle {
   color: var(--gold);
   font-size: 0.92rem;
 }
