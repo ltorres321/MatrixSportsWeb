@@ -12,10 +12,20 @@ function WeekSection({
   title,
   subtitle,
   data,
+  isCurrent,
 }: {
   title: string;
   subtitle: string;
   data: WeekParlays | null;
+  // Only the ungraded, current-week section gets the pale-blue card
+  // backdrop (light theme) -- the previous week's cards keep their
+  // plain background specifically so ParlayCard's Hit/Missed coloring
+  // (parlay-card-hit/parlay-card-missed) stays the only color signal
+  // there. A current-week card CAN still end up graded mid-week (some
+  // games finish before others), so this is enforced in the CSS via
+  // :not(.parlay-card-hit):not(.parlay-card-missed), not just by which
+  // section it's in.
+  isCurrent: boolean;
 }) {
   // Mixed-book mode is hidden, not removed -- same reasoning as
   // GameDetailView.tsx's ParlayHelperView, with an extra wrinkle here:
@@ -61,7 +71,7 @@ function WeekSection({
     <div className="stat-section">
       <h2>{title}</h2>
       <p className="stat-sub parlay-week-subtitle">{subtitle}</p>
-      <div className="parlay-grid">
+      <div className={`parlay-grid${isCurrent ? " parlay-grid-current" : ""}`}>
         {twoLeg.map((parlay, i) => (
           <ParlayCard key={`2-${i}`} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
         ))}
@@ -110,12 +120,14 @@ export default function ParlaysView({
           title={current ? `Week ${current.week} Parlays` : "This Week's Parlays"}
           subtitle="This week's games haven't been played yet -- these are the model's current best picks, not graded results."
           data={current}
+          isCurrent
         />
 
         <WeekSection
           title={previous ? `Week ${previous.week} Parlays` : "Last Week's Parlays"}
           subtitle="What the model picked last week, graded against what actually happened."
           data={previous}
+          isCurrent={false}
         />
 
         <div className="parlay-notice" role="note">

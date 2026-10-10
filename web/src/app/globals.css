@@ -2115,6 +2115,15 @@ h1.glow span {
   padding: 0.35rem 0.65rem;
 }
 
+/* Light theme: same blue swap as .parlay-notice's own override --
+   --gold's light-theme value is a muted brown meant for small accents,
+   not a readable subtitle line. Same pale-blue backdrop swap too, off
+   plain white var(--panel-solid), for the same reason. */
+:root[data-theme="light"] .stat-section .stat-sub.parlay-week-subtitle {
+  color: var(--green);
+  background: rgba(234, 241, 250, 0.95);
+}
+
 .bucket-list {
   display: flex;
   flex-direction: column;
@@ -3893,6 +3902,24 @@ h1.glow span {
   color: var(--gold);
 }
 
+/* Light theme: blue (var(--green), the theme's own repurposed accent
+   name -- same color "2026 SEASON -- PARLAYS" h1.glow uses) reads much
+   better here than --gold's light-theme value (a muted brown, #8a6208,
+   meant for small accents, not a whole paragraph of body text). Also
+   swaps the box's own background off var(--panel-solid) (plain white
+   -- too much flat white on the page) for the exact pale-blue
+   rgba(234, 241, 250, 0.95) the navbar/side-rail already use in light
+   theme, so the box reads as part of the same blue-tinted family
+   instead of a plain white card. */
+:root[data-theme="light"] .parlay-notice {
+  background: rgba(234, 241, 250, 0.95);
+}
+
+:root[data-theme="light"] .parlay-notice,
+:root[data-theme="light"] .parlay-notice strong {
+  color: var(--green);
+}
+
 .parlay-toggle-row {
   display: flex;
   align-items: center;
@@ -3969,6 +3996,19 @@ h1.glow span {
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   overflow: hidden;
+}
+
+/* Light theme, current (ungraded) week's parlay cards only -- the
+   pale-blue navbar/side-rail backdrop instead of plain white, same
+   "too much flat white" fix as .parlay-notice/.parlay-week-subtitle's
+   own light-theme overrides above. Scoped to .parlay-grid-current
+   (see ParlaysView.tsx's WeekSection) and explicitly excludes
+   parlay-card-hit/parlay-card-missed so a current-week card that's
+   already graded (some games finish before others) keeps its own
+   right/wrong coloring instead of this background winning by
+   specificity. */
+:root[data-theme="light"] .parlay-grid-current .parlay-card:not(.parlay-card-hit):not(.parlay-card-missed) {
+  background: rgba(234, 241, 250, 0.95);
 }
 
 /* Graded parlays. Hit = gold box (every leg correct). Missed = red box,
@@ -4050,6 +4090,14 @@ h1.glow span {
 
 .parlay-stat-payout {
   color: var(--gold);
+}
+
+/* Light theme: #1a7f37 (money-green) still didn't have enough
+   contrast in practice -- switched to var(--green), the same blue
+   "2026 SEASON -- PARLAYS" (h1.glow) uses, for consistency with every
+   other light-theme accent swap on this page. */
+:root[data-theme="light"] .parlay-stat-payout {
+  color: var(--green);
 }
 
 .parlay-stat-label {
@@ -4544,6 +4592,16 @@ h1.glow span {
 .pick-result-correct {
   background: #ffd60a;
   color: #1a1a1a;
+}
+
+/* Light theme: same blue accent as h1.glow/var(--green) instead of the
+   dark-theme yellow -- white glyph instead of dark, same "near-black
+   text doesn't contrast well on the medium blue accent" reasoning the
+   .btn-primary/.team-badge.fallback light-theme overrides already use
+   above. */
+:root[data-theme="light"] .pick-result-correct {
+  background: var(--green);
+  color: #ffffff;
 }
 
 .pick-result-incorrect {
