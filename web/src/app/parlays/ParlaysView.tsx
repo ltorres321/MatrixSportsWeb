@@ -60,7 +60,7 @@ function WeekSection({
   return (
     <div className="stat-section">
       <h2>{title}</h2>
-      <p className="stat-sub">{subtitle}</p>
+      <p className="stat-sub parlay-week-subtitle">{subtitle}</p>
       <div className="parlay-grid">
         {twoLeg.map((parlay, i) => (
           <ParlayCard key={`2-${i}`} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />

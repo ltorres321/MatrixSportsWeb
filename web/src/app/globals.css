@@ -2097,6 +2097,16 @@ h1.glow span {
   margin: 0 0 1.25rem;
 }
 
+/* Parlays page only (app/parlays/ParlaysView.tsx's two WeekSection
+   subtitles) -- one size up and the site's gold accent, same reasoning
+   as .parlay-notice's own legibility fix, kept as its own class rather
+   than changing .stat-sub itself since that rule is shared across every
+   other .stat-section on the site (Betting Edge, Matchups, ...). */
+.parlay-week-subtitle {
+  color: var(--gold);
+  font-size: 0.92rem;
+}
+
 .bucket-list {
   display: flex;
   flex-direction: column;
