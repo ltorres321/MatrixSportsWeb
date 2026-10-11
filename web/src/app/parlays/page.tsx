@@ -11,13 +11,14 @@ import type { ParlayBookMode } from "@/lib/parlayHelper";
 import { recordDisplayedLeagueParlays } from "@/lib/parlayLog";
 import { createClient } from "@/lib/supabase/server";
 import ParlaysView from "./ParlaysView";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "NFL Parlays — Matrix Sports Analytics",
   description:
     "The week's 6 best-probability NFL parlays, built from our model's highest-confidence player props across every game -- plus how last week's picks actually graded out.",
-  alternates: { canonical: "https://matrixsports.net/parlays" },
-};
+  path: "/parlays",
+});
 
 export interface WeekParlays {
   season: number;

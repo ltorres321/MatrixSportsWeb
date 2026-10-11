@@ -7,13 +7,14 @@ import {
   getCurrentSeasonYear,
 } from "@/lib/predictions";
 import PredictionsView from "./PredictionsView";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "NFL Predictions This Week — Matrix Sports Analytics",
   description:
     "Simulated win probabilities for every NFL matchup this week, run 100,000 times per game against the real betting line.",
-  alternates: { canonical: "https://matrixsports.net/home" },
-};
+  path: "/home",
+});
 
 // Server Component: season/week live in the URL (?season=&week=) so
 // each combination is a real server-rendered fetch against

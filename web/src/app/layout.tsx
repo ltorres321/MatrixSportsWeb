@@ -8,12 +8,14 @@ import GoogleAnalytics from "@/components/GoogleAnalytics";
 import AdSenseScript from "@/components/AdSenseScript";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAdminUserId } from "@/lib/admin";
+import { siteJsonLdGraph } from "@/lib/seo";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://matrixsports.net"),
   title: "Matrix Sports Analytics",
   description: "AI-simulated NFL win probabilities.",
   openGraph: {
+    siteName: "Matrix Sports Analytics",
     title: "Matrix Sports Analytics",
     description: "AI-simulated NFL win probabilities.",
     images: [{ url: "/assets/brand/og-image.png", width: 1200, height: 627 }],
@@ -25,6 +27,7 @@ export const metadata: Metadata = {
     images: ["/assets/brand/og-image.png"],
   },
 };
+
 
 // Appearance (theme, rain effect) is a per-account preference set on
 // the Profile page. Read server-side here so the right theme is in
@@ -72,6 +75,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" data-theme={theme}>
       <body>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLdGraph) }} />
         {rainEnabled && <RainCanvas theme={theme} />}
         <GoogleAnalytics />
         <AdSenseScript />

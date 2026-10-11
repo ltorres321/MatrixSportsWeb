@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoryById } from "@/lib/stories";
 import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
+import { SITE_URL, organizationRef } from "@/lib/seo";
 
 // Standalone article page for a story with no universal_game_id (a
 // weekly performance review, not a per-game recap -- see
@@ -19,13 +20,21 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const accuracyPct = accuracyPctFromStory(story);
   const image = accuracyPct !== null ? performanceTierImagePath(accuracyPct) : undefined;
+  const title = `${story.headline} | Matrix Sports Analytics`;
+  const description = story.body.slice(0, 200);
+  const url = `${SITE_URL}/stories/${id}`;
 
   return {
-    title: `${story.headline} | Matrix Sports Analytics`,
-    description: story.body.slice(0, 200),
-    alternates: { canonical: `https://matrixsports.net/stories/${id}` },
-    openGraph: image ? { images: [{ url: image, width: 1774, height: 887 }] } : undefined,
-    twitter: { card: "summary_large_image", images: image ? [image] : undefined },
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      images: image ? [{ url: image, width: 1774, height: 887 }] : undefined,
+    },
+    twitter: { card: "summary_large_image" as const, title, description, images: image ? [image] : undefined },
   };
 }
 
@@ -42,11 +51,14 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
     "@context": "https://schema.org",
     "@type": "Article",
     headline: story.headline,
+    description: story.body.slice(0, 200),
     articleBody: story.body,
+    articleSection: "Weekly Performance Review",
+    inLanguage: "en-US",
     datePublished: story.published_at ?? undefined,
-    url: `https://matrixsports.net/stories/${id}`,
-    author: { "@type": "Organization", name: "Matrix Sports Analytics" },
-    publisher: { "@type": "Organization", name: "Matrix Sports Analytics" },
+    url: `${SITE_URL}/stories/${id}`,
+    author: { ...organizationRef, url: SITE_URL },
+    publisher: organizationRef,
   };
 
   return (

@@ -1,65 +1,16 @@
-"use client";
+import { pageMetadata } from "@/lib/seo";
+import LoginForm from "./LoginForm";
 
-import { useActionState } from "react";
-import Link from "next/link";
-import { login, type LoginState } from "./actions";
-import SocialSignInButtons from "@/components/SocialSignInButtons";
-
-const initialState: LoginState = {};
+// Split from the form itself (LoginForm.tsx, "use client" for
+// useActionState) because a client component can't export metadata --
+// this page previously inherited the generic site-wide title/
+// description and had no canonical at all.
+export const metadata = pageMetadata({
+  title: "Sign In — Matrix Sports Analytics",
+  description: "Sign in to your Matrix Sports Analytics account to see this week's full NFL slate.",
+  path: "/login",
+});
 
 export default function LoginPage() {
-  const [state, formAction, pending] = useActionState(login, initialState);
-
-  return (
-    <main>
-      <div className="form-shell">
-        <div className="form-panel">
-          <h2>Sign In</h2>
-          <p className="form-intro">Welcome back — pick up right where you left off.</p>
-
-          <SocialSignInButtons />
-          <div className="or-divider">OR SIGN IN WITH EMAIL</div>
-
-          <form action={formAction}>
-            {state.error && (
-              <p className="form-footer-note" style={{ color: "var(--red)" }}>
-                {state.error}
-              </p>
-            )}
-
-            <div className="form-grid">
-              <div className="field full">
-                <label htmlFor="email">Email</label>
-                <input id="email" name="email" type="email" autoComplete="email" required />
-              </div>
-
-              <div className="field full">
-                <label htmlFor="password">Password</label>
-                <input id="password" name="password" type="password" autoComplete="current-password" required />
-                <Link
-                  href="/forgot-password"
-                  style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginTop: "0.35rem", display: "inline-block" }}
-                >
-                  Forgot password?
-                </Link>
-              </div>
-
-              <div className="field full">
-                <button type="submit" className="btn btn-primary btn-block" disabled={pending}>
-                  {pending ? "Signing In..." : "Sign In"}
-                </button>
-              </div>
-
-              <p className="form-footer-note">
-                Don&apos;t have an account?{" "}
-                <Link href="/signup" className="gold-cta-link">
-                  Sign up free
-                </Link>
-              </p>
-            </div>
-          </form>
-        </div>
-      </div>
-    </main>
-  );
+  return <LoginForm />;
 }

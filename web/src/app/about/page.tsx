@@ -1,8 +1,11 @@
-export const metadata = {
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
   title: "How It Works — Matrix Sports Analytics",
   description:
     "How a Matrix Sports Analytics prediction gets made: the 100,000-run Monte Carlo model, what factors are tested, and what got cut.",
-};
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

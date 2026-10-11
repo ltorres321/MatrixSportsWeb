@@ -3,12 +3,14 @@ import { getPublishedStories, getPublishedPerformanceReviews, type Story } from 
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Game Recaps & Analysis — Matrix Sports Analytics",
   description:
     "Every NFL game recap and weekly model performance review published on Matrix Sports Analytics, newest first.",
-};
+  path: "/stories",
+});
 
 // Home-page cards truncate to a teaser (see page.tsx's truncateTeaser);
 // this archive is the same idea, just listing everything published

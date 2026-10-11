@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
 // A working draft, not a substitute for a lawyer's review -- it's
 // written to genuinely describe what this site does today (Supabase
@@ -9,9 +10,12 @@ import Link from "next/link";
 // since an AdSense reviewer reading "may display ads" on a page that
 // already has ads running is exactly the kind of inaccurate
 // declaration the Program Policies ask publishers not to make.
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Privacy Policy — Matrix Sports Analytics",
-};
+  description:
+    "What Matrix Sports Analytics collects when you use the site, why, and the choices you have about it -- accounts, analytics, cookies and advertising.",
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (
