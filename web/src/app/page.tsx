@@ -141,6 +141,12 @@ export default async function HomePage() {
             </MobileAdFrame>
           </div>
 
+          {/* h2, not visible as its own element -- the h3 feature
+              cards below had nothing between them and the page's h1,
+              skipping a level. The grid itself makes "why sign up"
+              obvious visually, so this just gives crawlers/screen
+              readers the same structure without adding visible text. */}
+          <h2 className="sr-only">Why Matrix Sports Analytics</h2>
           <div className="value-grid">
             <div className="value-card">
               <span className="icon">🎯</span>
@@ -161,9 +167,9 @@ export default async function HomePage() {
 
           {recentStories.length > 0 && (
             <div className="news-section">
-              <div className="section-label">
+              <h2 className="section-label">
                 <span className="dot" /> LATEST GAME RECAPS
-              </div>
+              </h2>
               <div className="news-grid">
                 {recentStories.map((story) => (
                   <Link key={story.id} className="news-card" href={`/game/${story.universal_game_id}`}>
@@ -336,9 +342,9 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
 
           {(performanceReviewFeatured || stories.length > 0 || news.length > 0) && (
             <div className="news-section">
-              <div className="section-label">
+              <h2 className="section-label">
                 <span className="dot" /> LATEST NFL COVERAGE
-              </div>
+              </h2>
               <div className="news-grid">
                 {performanceReviewFeatured && latestPerformanceReview && (
                   <Link className="news-card" href={`/stories/${latestPerformanceReview.id}`}>
@@ -406,9 +412,9 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
             </MobileAdFrame>
           </div>
 
-          <div className="section-label">
+          <h2 className="section-label">
             <span className="dot" /> INSIGHTS &amp; ARTICLES
-          </div>
+          </h2>
 
           <div className="article-grid">
             <Link className="article-card" href="/about">

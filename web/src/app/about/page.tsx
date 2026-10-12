@@ -17,9 +17,9 @@ export default function AboutPage() {
 
       <main className="about-main">
         <section className="about-block">
-          <div className="section-label">
+          <h2 className="section-label">
             <span className="dot" /> HOW A PREDICTION GETS MADE
-          </div>
+          </h2>
           <p>
             We don&apos;t start by guessing. Before we simulate a single game, we
             start from the actual point spread and point total that real
@@ -46,9 +46,9 @@ export default function AboutPage() {
         </section>
 
         <section className="about-block">
-          <div className="section-label">
+          <h2 className="section-label">
             <span className="dot" /> WHY START FROM THE BETTING LINE AT ALL?
-          </div>
+          </h2>
           <p>
             Some sites act like the betting line doesn&apos;t exist, as if a
             purely &quot;independent&quot; prediction is somehow more
@@ -62,9 +62,9 @@ export default function AboutPage() {
         </section>
 
         <section className="about-block">
-          <div className="section-label">
+          <h2 className="section-label">
             <span className="dot" /> WHAT WE TESTED — AND CUT
-          </div>
+          </h2>
           <p className="about-intro">
             Not every idea that sounds smart actually helps. Here&apos;s what
             we tested against real outcomes, and were honest about, when it
@@ -107,9 +107,9 @@ export default function AboutPage() {
         </section>
 
         <section className="about-block">
-          <div className="section-label">
+          <h2 className="section-label">
             <span className="dot" /> WHY 100,000 GAMES, NOT ONE GUESS
-          </div>
+          </h2>
           <p>
             Think about flipping a coin. Flip it 10 times and you might get 7
             heads — that doesn&apos;t mean the coin is unfair, it just means

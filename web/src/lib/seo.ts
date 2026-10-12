@@ -46,6 +46,25 @@ export const siteJsonLdGraph = {
 // restating name, url, logo and sameAs on every single game/story page.
 export const organizationRef = { "@id": ORGANIZATION_ID };
 
+// Next merges metadata per top-level key, not deeply -- a page that
+// declares its own `openGraph` object replaces the root layout's
+// *entire* openGraph object, images included, rather than layering on
+// top of it. The default image has to be restated here every time, or
+// every page using this helper silently loses its og:image (exactly
+// what happened the first time this shipped without it).
+const DEFAULT_OG_IMAGE = { url: `${SITE_URL}/assets/brand/og-image.png`, width: 1200, height: 627 };
+
+// Same word-boundary-cut-plus-ellipsis pattern as the page-local
+// truncateTeaser() helpers (app/page.tsx, app/stories/page.tsx) --
+// this one's for meta descriptions specifically, which have their own
+// narrower aim (70-160 chars) than a visible card teaser does.
+export function metaDescription(text: string, maxChars = 155): string {
+  if (text.length <= maxChars) return text;
+  const cut = text.slice(0, maxChars);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${cut.slice(0, lastSpace > 0 ? lastSpace : maxChars)}…`;
+}
+
 // Next's Metadata API does NOT sync a page's title/description into
 // its openGraph/twitter blocks automatically -- a page that sets only
 // `title`/`description` silently keeps the root layout's generic
@@ -67,7 +86,12 @@ export function pageMetadata({
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url },
-    twitter: { card: "summary_large_image" as const, title, description },
+    openGraph: { title, description, url, images: [DEFAULT_OG_IMAGE] },
+    twitter: {
+      card: "summary_large_image" as const,
+      title,
+      description,
+      images: [DEFAULT_OG_IMAGE.url],
+    },
   };
 }

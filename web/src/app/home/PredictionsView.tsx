@@ -229,7 +229,10 @@ export default function PredictionsView({
                   <div className="unlock-panel">
                     <div className="unlock-card">
                       <span className="lock-icon">🔒</span>
-                      <h3>Unlock the Full Slate</h3>
+                      {/* h2, not h3 -- this page's h1 has nothing
+                          between it and this, so h3 here would skip
+                          a level. */}
+                      <h2>Unlock the Full Slate</h2>
                       <p>
                         Create a free account to see win probabilities for every
                         game, every week — no credit card required.

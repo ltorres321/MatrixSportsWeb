@@ -1,6 +1,5 @@
 "use client";
 
-import Script from "next/script";
 import { useEffect, useState } from "react";
 
 declare global {
@@ -55,22 +54,38 @@ export default function GoogleAnalytics() {
 
   return (
     <>
-      <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`} strategy="afterInteractive" />
-      <Script id="ga-init" strategy="afterInteractive">
-        {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          window.gtag = gtag;
-          gtag('consent', 'default', {
-            analytics_storage: 'denied',
-            ad_storage: 'denied',
-            ad_user_data: 'denied',
-            ad_personalization: 'denied'
-          });
-          gtag('js', new Date());
-          gtag('config', '${GA_MEASUREMENT_ID}');
-        `}
-      </Script>
+      {/* Plain native <script> elements, NOT next/script's <Script>
+          component -- same lesson as AdSenseScript.tsx (see its
+          comment): every next/script strategy here registers the URL
+          through an internal `__next_s` queue and injects it via
+          client-side JS rather than emitting literal markup, so a
+          crawler reading raw HTML (which is most of them -- Googlebot
+          itself only executes JS on a separate, later pass) never
+          sees the consent default actually declared, even though a
+          real browser runs it correctly. The inline script below has
+          to render as literal text in the initial response for
+          Consent Mode's own "declared before any tag loads" guarantee
+          to be checkable from the page source, not just true at
+          runtime in a browser. */}
+      <script
+        id="ga-init"
+        dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            window.gtag = gtag;
+            gtag('consent', 'default', {
+              analytics_storage: 'denied',
+              ad_storage: 'denied',
+              ad_user_data: 'denied',
+              ad_personalization: 'denied'
+            });
+            gtag('js', new Date());
+            gtag('config', '${GA_MEASUREMENT_ID}');
+          `,
+        }}
+      />
+      <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`} />
 
       {consent === "unset" && (
         <div className="cookie-banner" role="dialog" aria-label="Cookie consent">
