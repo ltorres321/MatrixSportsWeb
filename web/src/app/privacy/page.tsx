@@ -58,7 +58,9 @@ export default function PrivacyPage() {
             information about how you use the site — pages viewed, links
             clicked, approximate location from IP address, device and browser
             type. This is used in aggregate to understand what&apos;s
-            working, not to identify you personally.
+            working, not to identify you personally. We also use Ahrefs Web
+            Analytics, a cookieless traffic-counting service that doesn&apos;t
+            collect personal data or require consent.
           </p>
           <p>
             <strong>Cookies.</strong> We use cookies to keep you signed in
@@ -117,10 +119,10 @@ export default function PrivacyPage() {
           <p>
             Supabase (accounts, authentication, database), Twilio (phone
             verification, if you choose to add a phone number), Resend
-            (transactional and prediction emails), Google Analytics, and
-            Google AdSense. Game and score data comes from public sports
-            data providers (including ESPN and TheSportsDB); no personal
-            information is shared with
+            (transactional and prediction emails), Google Analytics, Google
+            AdSense, and Ahrefs Web Analytics. Game and score data comes from
+            public sports data providers (including ESPN and TheSportsDB); no
+            personal information is shared with
             them.
           </p>
         </section>

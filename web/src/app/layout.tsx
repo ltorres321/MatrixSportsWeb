@@ -5,6 +5,7 @@ import RainCanvas from "@/components/RainCanvas";
 import SiteNav from "@/components/SiteNav";
 import FollowUsLinks from "@/components/FollowUsLinks";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import AhrefsAnalytics from "@/components/AhrefsAnalytics";
 import AdSenseScript from "@/components/AdSenseScript";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAdminUserId } from "@/lib/admin";
@@ -78,6 +79,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLdGraph) }} />
         {rainEnabled && <RainCanvas theme={theme} />}
         <GoogleAnalytics />
+        <AhrefsAnalytics />
         <AdSenseScript />
         <div className="page">
           <SiteNav signedIn={!!userData.user} isAdmin={isAdmin} />
