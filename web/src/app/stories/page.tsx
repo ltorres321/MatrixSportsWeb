@@ -129,6 +129,10 @@ export default async function StoriesArchivePage({
             </p>
           ) : (
             <>
+              {/* h2, not visible -- the h3 card headlines below had
+                  nothing between them and the page's h1, skipping a
+                  level. */}
+              <h2 className="sr-only">{activeWeek === null ? "All Recaps" : `Week ${activeWeek} Recaps`}</h2>
               <div className="news-grid">
                 {entries.map((story) => (
                   <StoryCard key={story.id} story={story} />

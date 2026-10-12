@@ -1886,6 +1886,7 @@ h1.glow span {
   display: block;
 }
 
+.unlock-card h2,
 .unlock-card h3 {
   font-family: 'Chakra Petch', monospace;
   color: var(--text);

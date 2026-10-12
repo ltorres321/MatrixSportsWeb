@@ -71,7 +71,9 @@ function SignUpGate() {
         <div style={{ display: "flex", justifyContent: "center", padding: "3rem 1rem" }}>
           <div className="unlock-card">
             <span className="lock-icon">🔒</span>
-            <h3>Sign In to View Parlays</h3>
+            {/* h2, not h3 -- this page's h1 ("PARLAYS") has nothing
+                between it and this, so h3 here would skip a level. */}
+            <h2>Sign In to View Parlays</h2>
             <p>
               Create a free account to see our model&apos;s 6 best-probability parlays every week --
               no credit card required.

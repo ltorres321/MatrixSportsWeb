@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoryById } from "@/lib/stories";
 import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
-import { SITE_URL, organizationRef } from "@/lib/seo";
+import { SITE_URL, organizationRef, metaDescription } from "@/lib/seo";
 
 // Standalone article page for a story with no universal_game_id (a
 // weekly performance review, not a per-game recap -- see
@@ -20,8 +20,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const accuracyPct = accuracyPctFromStory(story);
   const image = accuracyPct !== null ? performanceTierImagePath(accuracyPct) : undefined;
-  const title = `${story.headline} | Matrix Sports Analytics`;
-  const description = story.body.slice(0, 200);
+  // No "| Matrix Sports Analytics" suffix -- headline alone can
+  // already run long (this was the one page the scan still flagged
+  // at 75 characters after every other title got shortened). Brand
+  // still comes through via openGraph.siteName.
+  const title = story.headline;
+  const description = metaDescription(story.body);
   const url = `${SITE_URL}/stories/${id}`;
 
   return {
@@ -51,10 +55,11 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
     "@context": "https://schema.org",
     "@type": "Article",
     headline: story.headline,
-    description: story.body.slice(0, 200),
+    description: metaDescription(story.body),
     articleBody: story.body,
     articleSection: "Weekly Performance Review",
     inLanguage: "en-US",
+    image: heroImage ? `${SITE_URL}${heroImage}` : undefined,
     datePublished: story.published_at ?? undefined,
     url: `${SITE_URL}/stories/${id}`,
     author: { ...organizationRef, url: SITE_URL },
