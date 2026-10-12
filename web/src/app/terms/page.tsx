@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
 
 // A working draft, same caveat as the Privacy Policy: not a
 // substitute for a lawyer's review. Written to cover what actually
@@ -6,9 +7,12 @@ import Link from "next/link";
 // win probabilities are model output, not guarantees or gambling
 // advice, since that's the real liability surface here, not
 // boilerplate.
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Terms of Service — Matrix Sports Analytics",
-};
+  description:
+    "Terms for using matrixsports.net: what the site is (and isn't), account rules, and the disclaimer that win probabilities are model output, not gambling advice.",
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

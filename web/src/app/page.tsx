@@ -19,6 +19,7 @@ import ExternalWindowLink from "@/components/ExternalWindowLink";
 import { getPublishedStories, isStoryFeatured, getLatestPerformanceReview, isPerformanceReviewFeatured } from "@/lib/stories";
 import { getEffectiveNow } from "@/lib/admin";
 import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
+import { pageMetadata } from "@/lib/seo";
 
 // The only page a signed-out visitor or crawler (including Google's
 // AdSense reviewer, which never logs in) ever lands on -- see the
@@ -26,12 +27,16 @@ import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanc
 // own and silently inherited the generic layout-wide title/description,
 // which undersold the actual free-picks pitch on the one page search
 // engines can actually see.
-export const metadata: Metadata = {
-  title: "Free NFL Win Probabilities — 100,000 Simulations Per Game | Matrix Sports Analytics",
+//
+// Title kept under 60 characters (the Free NFL Win Probabilities --
+// 100,000 Simulations Per Game | Matrix Sports Analytics version
+// this replaced ran 83 and was getting truncated mid-phrase in results).
+export const metadata: Metadata = pageMetadata({
+  title: "Free NFL Win Probabilities — Matrix Sports Analytics",
   description:
     "Matrix Sports Analytics simulates every NFL matchup 100,000 times, grounded in the real betting line. See this week's free model picks and game recaps.",
-  alternates: { canonical: "https://matrixsports.net/" },
-};
+  path: "/",
+});
 
 // Home-page article cards are teasers, not the full recap -- the
 // 250-300 word body belongs on the game's own page (linked via "View

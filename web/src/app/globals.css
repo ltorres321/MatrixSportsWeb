@@ -152,6 +152,7 @@
 :root[data-theme="light"] .hero-title span,
 :root[data-theme="light"] .team-row.winner .team-prob,
 :root[data-theme="light"] .game-hero-team .big-prob,
+:root[data-theme="light"] .form-panel h1,
 :root[data-theme="light"] .form-panel h2 {
   text-shadow: none;
 }
@@ -2628,6 +2629,22 @@ h1.glow span {
    Forms (signup.html)
    --------------------------------------------------------------- */
 
+/* Visually hidden but present for screen readers and crawlers --
+   for headings/labels a page genuinely needs (every page needs
+   exactly one real <h1>) but that would duplicate text already
+   shown some other way visually. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .form-shell {
   max-width: 640px;
   margin: 0 auto;
@@ -2642,6 +2659,7 @@ h1.glow span {
   backdrop-filter: blur(6px);
 }
 
+.form-panel h1,
 .form-panel h2 {
   font-family: 'Chakra Petch', monospace;
   color: var(--green);

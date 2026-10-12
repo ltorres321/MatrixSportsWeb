@@ -102,6 +102,15 @@ function HeroTeam({ side, status }: { side: GameStatSide; status: GameStat["stat
 function Hero({ game }: { game: GameStat }) {
   return (
     <div className="game-hero">
+      {/* The matchup name and probabilities below are real content,
+          just not marked up as a heading anywhere -- this page had no
+          H1 at all. Visually hidden since the hero's own layout
+          (two team cards + "VS") already conveys this, but a crawler
+          or screen reader still needs one real heading describing
+          what the page is. */}
+      <h1 className="sr-only">
+        {teamDisplay(game.teamA.alias)} vs {teamDisplay(game.teamB.alias)} — Win Probability
+      </h1>
       <div className="matchup-status" style={{ justifyContent: "center", marginBottom: "1.5rem" }}>
         {game.status === "final" ? (
           <span className="tag final">FINAL</span>
