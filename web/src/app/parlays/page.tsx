@@ -88,9 +88,11 @@ function SignUpGate() {
   );
 }
 
-// Server Component: no season/week picker here, unlike /home -- this page
-// is deliberately just "the two weeks a visitor actually cares about right
-// now," the upcoming slate and how the model's last slate actually graded.
+// Server Component: no season/week picker here, unlike /home -- every
+// week through the current one is shown stacked (current on top, most
+// recent first below it), rather than a picker for one week at a time,
+// since the whole point of this page is "how did the model do, and
+// what's it saying now" at a glance.
 export default async function ParlaysPage() {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -104,13 +106,15 @@ export default async function ParlaysPage() {
 
   const weeks = await getWeeksForSeason(activeSeason);
   const currentWeek = (await getDefaultWeek(activeSeason)) ?? weeks[weeks.length - 1] ?? null;
-  const currentWeekIndex = currentWeek == null ? -1 : weeks.indexOf(currentWeek);
-  const previousWeek = currentWeekIndex > 0 ? weeks[currentWeekIndex - 1] : null;
 
-  const [current, previous] = await Promise.all([
-    currentWeek != null ? buildWeekParlays(activeSeason, currentWeek) : null,
-    previousWeek != null ? buildWeekParlays(activeSeason, previousWeek) : null,
-  ]);
+  // Every week up through currentWeek, most recent first. Weeks 1-3
+  // (before the model had graded data to train on) are included the
+  // same as any other week -- buildWeekParlays/WeekSection already
+  // render a clean "not available" state for a week with no props,
+  // which is exactly what those weeks hit.
+  const weeksToShow = currentWeek == null ? [] : weeks.filter((w) => w <= currentWeek).sort((a, b) => b - a);
 
-  return <ParlaysView season={activeSeason} current={current} previous={previous} />;
+  const weekParlays = await Promise.all(weeksToShow.map((w) => buildWeekParlays(activeSeason, w)));
+
+  return <ParlaysView season={activeSeason} currentWeek={currentWeek} weeks={weekParlays} />;
 }

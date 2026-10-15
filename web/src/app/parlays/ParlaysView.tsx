@@ -16,7 +16,7 @@ function WeekSection({
 }: {
   title: string;
   subtitle: string;
-  data: WeekParlays | null;
+  data: WeekParlays;
   // Only the ungraded, current-week section gets the pale-blue card
   // backdrop (light theme) -- the previous week's cards keep their
   // plain background specifically so ParlayCard's Hit/Missed coloring
@@ -45,7 +45,7 @@ function WeekSection({
   // mixed result means there's really no usable prop data yet -- a
   // single-book-only empty result, below, is a narrower "data exists,
   // just nothing combinable at one book" case.
-  if (!data || data.parlays.mixed.twoLeg.length === 0) {
+  if (data.parlays.mixed.twoLeg.length === 0) {
     return (
       <div className="stat-section">
         <h2>{title}</h2>
@@ -85,12 +85,15 @@ function WeekSection({
 
 export default function ParlaysView({
   season,
-  current,
-  previous,
+  currentWeek,
+  weeks,
 }: {
   season: number;
-  current: WeekParlays | null;
-  previous: WeekParlays | null;
+  currentWeek: number | null;
+  // Every week through currentWeek, most recent first (weeks[0] is
+  // current) -- see page.tsx's own note on why weeks 1-3 are included
+  // rather than filtered out.
+  weeks: WeekParlays[];
 }) {
   return (
     <>
@@ -116,19 +119,22 @@ export default function ParlaysView({
           </p>
         </div>
 
-        <WeekSection
-          title={current ? `Week ${current.week} Parlays` : "This Week's Parlays"}
-          subtitle="This week's games haven't been played yet -- these are the model's current best picks, not graded results."
-          data={current}
-          isCurrent
-        />
-
-        <WeekSection
-          title={previous ? `Week ${previous.week} Parlays` : "Last Week's Parlays"}
-          subtitle="What the model picked last week, graded against what actually happened."
-          data={previous}
-          isCurrent={false}
-        />
+        {weeks.map((data) => {
+          const isCurrent = data.week === currentWeek;
+          return (
+            <WeekSection
+              key={data.week}
+              title={`Week ${data.week} Parlays`}
+              subtitle={
+                isCurrent
+                  ? "This week's games haven't been played yet -- these are the model's current best picks, not graded results."
+                  : "What the model picked that week, graded against what actually happened."
+              }
+              data={data}
+              isCurrent={isCurrent}
+            />
+          );
+        })}
 
         <div className="parlay-notice" role="note">
           <p>
