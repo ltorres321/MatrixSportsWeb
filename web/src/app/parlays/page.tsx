@@ -20,6 +20,12 @@ export const metadata = pageMetadata({
   path: "/parlays",
 });
 
+// Weeks 1-2 of this season are hidden from this page on purpose (not
+// just filtered by "has data") -- the model hadn't trained on enough
+// graded data yet to trust those picks. Keep this in sync with
+// ParlaysView.tsx's matching footnote copy if it ever changes.
+const FIRST_PARLAY_WEEK = 3;
+
 export interface WeekParlays {
   season: number;
   week: number;
@@ -107,12 +113,13 @@ export default async function ParlaysPage() {
   const weeks = await getWeeksForSeason(activeSeason);
   const currentWeek = (await getDefaultWeek(activeSeason)) ?? weeks[weeks.length - 1] ?? null;
 
-  // Every week up through currentWeek, most recent first. Weeks 1-3
-  // (before the model had graded data to train on) are included the
-  // same as any other week -- buildWeekParlays/WeekSection already
-  // render a clean "not available" state for a week with no props,
-  // which is exactly what those weeks hit.
-  const weeksToShow = currentWeek == null ? [] : weeks.filter((w) => w <= currentWeek).sort((a, b) => b - a);
+  // Every week from FIRST_PARLAY_WEEK through currentWeek, most recent
+  // first. Weeks 1-2 are deliberately hidden, not just empty -- the
+  // model hadn't trained on enough graded data yet those weeks (see
+  // the page's own footnote) -- rather than show a "not available"
+  // section for them.
+  const weeksToShow =
+    currentWeek == null ? [] : weeks.filter((w) => w >= FIRST_PARLAY_WEEK && w <= currentWeek).sort((a, b) => b - a);
 
   const weekParlays = await Promise.all(weeksToShow.map((w) => buildWeekParlays(activeSeason, w)));
 

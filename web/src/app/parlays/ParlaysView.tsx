@@ -145,7 +145,7 @@ export default function ParlaysView({
             parlays themselves, so the real payout is usually lower.
           </p>
           <p>
-            Weeks 1-3 of this season have no picks on record -- there wasn&apos;t yet enough graded data for the
+            Weeks 1-2 of this season have no picks on record -- there wasn&apos;t yet enough graded data for the
             model to train on when those weeks were played, not a gap in the data itself.
           </p>
         </div>
