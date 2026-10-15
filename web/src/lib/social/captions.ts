@@ -18,8 +18,11 @@ function teamDisplay(alias: string): string {
 // Insight, LLC company Page -- kept as its own utm_source rather than
 // folded into "linkedin" so GA4 can tell which LinkedIn identity is
 // actually driving traffic once both post.
-export type Platform = "facebook" | "x" | "linkedin" | "linkedin_company" | "instagram";
-export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "linkedin_company", "instagram"];
+// "tiktokmx" (not "tiktok") is SocialClaw's provider id for the
+// connected TikTok account -- given verbatim by the user, same as
+// every other utm_source value here.
+export type Platform = "facebook" | "x" | "linkedin" | "linkedin_company" | "instagram" | "tiktokmx";
+export const PLATFORMS: Platform[] = ["facebook", "x", "linkedin", "linkedin_company", "instagram", "tiktokmx"];
 
 // UTM-tagged per platform so Google Analytics (already installed --
 // see components/GoogleAnalytics.tsx) can attribute traffic reliably.
