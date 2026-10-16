@@ -36,8 +36,19 @@ export const TEAMS = [
   { alias: "WAS", name: "Commanders", market: "Washington" },
 ] as const;
 
+// .webp, not .png -- the original PNGs are 240x240 and 40-85 KiB each
+// (the single biggest "improve image delivery" Lighthouse finding, a
+// combined ~1.8 MiB across the 32-team set); resized to 160x160 (the
+// largest real on-screen use is .game-hero-team img at 84px, so this
+// still has real retina headroom) and re-encoded as WebP, that's ~233
+// KiB total, an 87% reduction with no visible quality loss. The
+// original PNGs are kept on disk, untouched -- pickCardImage.tsx and
+// lib/social/logoDataUri.ts read them directly (not through this
+// function) for Satori-rendered OG/social images, which is a
+// server-side render cost, not browser page weight, so there was no
+// reason to touch those.
 export function teamLogoPath(alias: string) {
-  return `/assets/team-logos/${alias}.png`;
+  return `/assets/team-logos/${alias}.webp`;
 }
 
 export function teamByAlias(alias: string) {

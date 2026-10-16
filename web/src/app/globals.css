@@ -1,4 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Chakra+Petch:wght@500;600;700&display=swap');
+/* Google Fonts moved to a <link rel="stylesheet"> in layout.tsx's
+   <head> -- see that file's comment. A CSS @import here forced a
+   serial fetch chain (this stylesheet -> Google's font CSS -> the
+   actual font files) that was the single biggest "render-blocking
+   requests" finding in Lighthouse. */
 @import "tailwindcss";
 
 /* Shared design system for the Matrix-themed pages (index.html,
