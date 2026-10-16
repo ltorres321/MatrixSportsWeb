@@ -176,7 +176,7 @@ export default async function HomePage() {
                     {/* eslint-disable-next-line @next/next/no-img-element -- generated route, not a static asset next/image can optimize */}
                     <img
                       className="news-card-image"
-                      src={`/game/${story.universal_game_id}/opengraph-image`}
+                      src={`/game/${story.universal_game_id}/thumbnail-image`}
                       alt=""
                     />
                     <div className="news-card-body">
@@ -367,7 +367,7 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
                       {/* eslint-disable-next-line @next/next/no-img-element -- generated route, not a static asset next/image can optimize */}
                       <img
                         className="news-card-image"
-                        src={`/game/${story.universal_game_id}/opengraph-image`}
+                        src={`/game/${story.universal_game_id}/thumbnail-image`}
                         alt=""
                       />
                       <div className="news-card-body">

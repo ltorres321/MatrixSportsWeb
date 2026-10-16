@@ -19,7 +19,7 @@ function truncateTeaser(text: string, maxChars = 200): string {
 
 export default function StoryCard({ story }: { story: Story }) {
   const href = story.universal_game_id ? `/game/${story.universal_game_id}` : `/stories/${story.id}`;
-  const image = story.universal_game_id ? `/game/${story.universal_game_id}/opengraph-image` : null;
+  const image = story.universal_game_id ? `/game/${story.universal_game_id}/thumbnail-image` : null;
   const linkLabel = story.universal_game_id ? "View Game →" : "Read More →";
 
   return (
