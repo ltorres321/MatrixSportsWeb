@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { query } from "@/lib/db";
 import type { Matchup, TeamSide } from "@/lib/matchups";
 import type { GameStat, GameStatSide } from "@/lib/gameStats";
@@ -1062,7 +1063,17 @@ function rowToGameStat(
   };
 }
 
-export async function getGameDetail(universalGameId: string): Promise<GameStat | null> {
+// Wrapped in React's cache() -- game/[id]/page.tsx calls this once in
+// generateMetadata and again in the page body itself, and this is by
+// far the heaviest function in the codebase (team records, live
+// score, prior prediction, injury report, player grades, QB matchup,
+// efficiency, pressure, team grades, lineup, and betting edge -- over
+// a dozen DB round trips). Direct Postgres calls aren't deduped by
+// Next.js the way fetch() is, so without this, every single game page
+// view was paying that full cost TWICE. cache() scopes the dedup to
+// one request/render pass, not across requests, so this never risks
+// serving one visitor another's stale data.
+export const getGameDetail = cache(async function getGameDetail(universalGameId: string): Promise<GameStat | null> {
   const rows = await query<PredictionRow>(
     `SELECT ${PREDICTION_COLUMNS} FROM latest_predictions WHERE universal_game_id = $1`,
     [universalGameId]
@@ -1126,4 +1137,4 @@ export async function getGameDetail(universalGameId: string): Promise<GameStat |
   if (bettingEdge) game.bettingEdge = bettingEdge;
 
   return game;
-}
+});
