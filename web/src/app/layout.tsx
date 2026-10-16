@@ -75,23 +75,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html lang="en" data-theme={theme}>
-      <head>
-        {/* Was a CSS @import in globals.css -- the single biggest
-            Lighthouse "render-blocking requests" finding (~2s on
-            mobile). @import forces a serial chain: parse the main
-            stylesheet, discover the import, fetch Google's font CSS,
-            parse THAT to find the actual font file URLs, then fetch
-            those -- each step waiting on the one before it. A plain
-            <link rel="stylesheet"> in <head>, with preconnect ahead of
-            it, lets the browser start the Google Fonts connection and
-            request in parallel with everything else instead. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Chakra+Petch:wght@500;600;700&display=swap"
-        />
-      </head>
       <body>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLdGraph) }} />
         {rainEnabled && <RainCanvas theme={theme} />}

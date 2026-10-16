@@ -296,8 +296,12 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
     <>
       <nav className="navbar" ref={navRef}>
         <Link className="brand" href="/" onClick={close}>
-          {/* eslint-disable-next-line @next/next/no-img-element -- fixed brand asset, next/image adds no benefit here */}
-          <img className="brand-logo" src="/assets/brand/mx-logo.png" alt="" width={32} height={32} />
+          {/* eslint-disable-next-line @next/next/no-img-element -- fixed brand asset, next/image adds no benefit here.
+              mx-logo-nav.webp (128x128, ~6 KiB) instead of the source mx-logo.png (768x768, 360 KiB) --
+              this renders on every page at 32x32 via .brand-logo, so the full-res source was Lighthouse's
+              single biggest "improve image delivery" finding. The 768x768 PNG stays untouched on disk for
+              seo.ts's Organization JSON-LD logo and the OG/social image, which want real resolution. */}
+          <img className="brand-logo" src="/assets/brand/mx-logo-nav.webp" alt="" width={32} height={32} />
           MATRIX<span>SPORTS</span>
           <span className="brand-tld">.NET</span>
         </Link>
