@@ -1,5 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Chakra+Petch:wght@500;600;700&display=swap');
 @import "tailwindcss";
+
+/* Self-hosted (public/fonts/) instead of Google's CDN -- Lighthouse
+   flagged the fonts.googleapis.com/fonts.gstatic.com round trip as a
+   render-blocking request (~780ms on mobile) on top of the DNS/TLS
+   setup for a domain we don't otherwise talk to. Only the Latin
+   subset is shipped (this site is English-only), so these 4 files
+   total ~43 KiB one-time vs. re-fetching from Google on every visit
+   with no control over its cache lifetime. Weights match what the
+   old Google Fonts URL requested: Share Tech Mono 400,
+   Chakra Petch 500/600/700. */
+@font-face {
+  font-family: 'Share Tech Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/share-tech-mono-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/chakra-petch-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/chakra-petch-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/chakra-petch-700.woff2') format('woff2');
+}
 
 /* Shared design system for the Matrix-themed pages (index.html,
    home.html, signup.html). Look-and-feel prototype -- see each page's
