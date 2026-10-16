@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { getPublishedStories, getPublishedPerformanceReviews, type Story } from "@/lib/stories";
+import { getPublishedStoriesPage, getPublishedStoryWeeks } from "@/lib/stories";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
 import { pageMetadata } from "@/lib/seo";
+import StoriesInfiniteList from "./StoriesInfiniteList";
 
 export const metadata = pageMetadata({
   title: "Game Recaps & Analysis — Matrix Sports Analytics",
@@ -12,53 +13,21 @@ export const metadata = pageMetadata({
   path: "/stories",
 });
 
-// Home-page cards truncate to a teaser (see page.tsx's truncateTeaser);
-// this archive is the same idea, just listing everything published
-// instead of the 3-6 most recent. Cuts at the last whole word rather
-// than mid-word for the same reason page.tsx's version does.
-function truncateTeaser(text: string, maxChars = 200): string {
-  if (text.length <= maxChars) return text;
-  const cut = text.slice(0, maxChars);
-  const lastSpace = cut.lastIndexOf(" ");
-  return `${cut.slice(0, lastSpace > 0 ? lastSpace : maxChars)}…`;
-}
-
-// No artificial cap -- this page's whole purpose is to be the place
-// that shows the full body of published work, not a curated slice of
-// it like the home page's rotating cards. 500 is just a sane ceiling
-// well above anything the site will publish in a season.
-const ARCHIVE_LIMIT = 500;
-
-function StoryCard({ story }: { story: Story }) {
-  const href = story.universal_game_id ? `/game/${story.universal_game_id}` : `/stories/${story.id}`;
-  const image = story.universal_game_id ? `/game/${story.universal_game_id}/opengraph-image` : null;
-  const linkLabel = story.universal_game_id ? "View Game →" : "Read More →";
-
-  return (
-    <Link className="news-card" href={href}>
-      {image ? (
-        // eslint-disable-next-line @next/next/no-img-element -- generated route, not a static asset next/image can optimize
-        <img className="news-card-image" src={image} alt="" />
-      ) : (
-        <div className="news-card-image news-card-image-fallback">📊</div>
-      )}
-      <div className="news-card-body">
-        <h3>{story.headline}</h3>
-        <p>{truncateTeaser(story.body)}</p>
-        <span className="read-more">{linkLabel}</span>
-      </div>
-    </Link>
-  );
-}
+// Server-rendered first page only (fast first paint, works without JS,
+// real content for crawlers) -- everything after this comes from
+// StoriesInfiniteList's client-side scroll-triggered fetches against
+// /api/stories. Was ARCHIVE_LIMIT=500-fetched-and-rendered-at-once
+// until 2026-10-16: every card's image is a dynamically-rendered route
+// (opengraph-image.tsx), and the list was only going to keep growing
+// (288+ games by season's end) -- rendering all of it on every visit,
+// every time, doesn't scale the way a first-page-plus-infinite-scroll
+// does.
+const PAGE_SIZE = 18;
 
 // Week filter lives in the URL (?week=), same convention as /home's
 // own ?season=&week= -- a plain server-rendered filter, not client
 // state, so a direct link to e.g. /stories?week=2 is shareable and
-// works without JS. "All" (no week param) shows everything -- fine at
-// today's ~34 entries, but the per-week view is what keeps this page
-// usable once a full season (18 weeks x 16 games = 288+) is published;
-// finding one specific game in a flat list at that size isn't
-// realistic, per the 2026-09-23 ask that added this filter.
+// works without JS.
 export default async function StoriesArchivePage({
   searchParams,
 }: {
@@ -66,18 +35,7 @@ export default async function StoriesArchivePage({
 }) {
   const params = await searchParams;
 
-  const [gameStories, performanceReviews] = await Promise.all([
-    getPublishedStories(ARCHIVE_LIMIT),
-    getPublishedPerformanceReviews(ARCHIVE_LIMIT),
-  ]);
-
-  const allEntries = [...gameStories, ...performanceReviews].sort((a, b) => {
-    const aTime = a.published_at ? new Date(a.published_at).getTime() : 0;
-    const bTime = b.published_at ? new Date(b.published_at).getTime() : 0;
-    return bTime - aTime;
-  });
-
-  const availableWeeks = [...new Set(allEntries.map((s) => s.week))].sort((a, b) => a - b);
+  const availableWeeks = await getPublishedStoryWeeks();
   // A week with zero stories yet (this week's games haven't finished)
   // is a real, meaningful filter -- not the same as a garbage value
   // (?week=abc, ?week=999). The former should show "no recaps for
@@ -86,7 +44,11 @@ export default async function StoriesArchivePage({
   const requestedWeek = params.week ? Number(params.week) : NaN;
   const activeWeek = Number.isInteger(requestedWeek) && requestedWeek >= 1 && requestedWeek <= 22 ? requestedWeek : null;
 
-  const entries = activeWeek === null ? allEntries : allEntries.filter((s) => s.week === activeWeek);
+  const { stories: entries, hasMore } = await getPublishedStoriesPage({
+    week: activeWeek ?? undefined,
+    offset: 0,
+    limit: PAGE_SIZE,
+  });
 
   return (
     <>
@@ -133,11 +95,16 @@ export default async function StoriesArchivePage({
                   nothing between them and the page's h1, skipping a
                   level. */}
               <h2 className="sr-only">{activeWeek === null ? "All Recaps" : `Week ${activeWeek} Recaps`}</h2>
-              <div className="news-grid">
-                {entries.map((story) => (
-                  <StoryCard key={story.id} story={story} />
-                ))}
-              </div>
+              {/* key forces a fresh component instance per week filter --
+                  simpler and more robust than relying on the internal
+                  reset effect alone when the week param changes via a
+                  plain Link navigation. */}
+              <StoriesInfiniteList
+                key={activeWeek ?? "all"}
+                initialStories={entries}
+                initialHasMore={hasMore}
+                week={activeWeek}
+              />
 
               <div className="mobile-ad-wrap" aria-label="Promotional space">
                 <MobileAdFrame>

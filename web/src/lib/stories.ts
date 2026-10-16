@@ -107,6 +107,51 @@ export async function getPublishedPerformanceReviews(limit = 30): Promise<Story[
   );
 }
 
+// Just the distinct weeks that have published content -- what /stories'
+// week-pill nav reads. Kept separate from getPublishedStoriesPage below
+// specifically so the nav doesn't require fetching every row (or even
+// one page of them) just to know which weeks exist.
+export async function getPublishedStoryWeeks(): Promise<number[]> {
+  const rows = await query<{ week: number }>(
+    `SELECT DISTINCT week FROM stories WHERE status = 'published' ORDER BY week`
+  );
+  return rows.map((r) => r.week);
+}
+
+// Single combined query (both per-game recaps AND performance reviews,
+// unlike the two functions above) with real SQL LIMIT/OFFSET -- what
+// the /stories archive's infinite-scroll pagination reads, both for
+// its own first page and for every subsequent batch the client fetches
+// as the reader scrolls. Fetches `limit + 1` rows and reports whether
+// that extra row existed (hasMore) rather than running a separate
+// COUNT query -- one query answers both "here's the page" and "is
+// there another page," which is the usual trick for keyset-free
+// offset pagination.
+export async function getPublishedStoriesPage({
+  week,
+  offset = 0,
+  limit = 18,
+}: {
+  week?: number;
+  offset?: number;
+  limit?: number;
+}): Promise<{ stories: Story[]; hasMore: boolean }> {
+  const whereWeek = week != null ? "AND week = $3" : "";
+  const params: unknown[] = [limit + 1, offset];
+  if (week != null) params.push(week);
+
+  const rows = await query<Story>(
+    `SELECT id, season, week, universal_game_id, headline, body, source_facts, status, created_at, published_at, featured_from, featured_until
+     FROM stories WHERE status = 'published' ${whereWeek}
+     ORDER BY published_at DESC NULLS LAST, created_at DESC
+     LIMIT $1 OFFSET $2`,
+    params
+  );
+
+  const hasMore = rows.length > limit;
+  return { stories: hasMore ? rows.slice(0, limit) : rows, hasMore };
+}
+
 // The published recap for one specific game, if one exists -- what
 // the game detail page shows under "Prediction vs. Result". A game
 // can have at most one story (stories.universal_game_id is UNIQUE),
