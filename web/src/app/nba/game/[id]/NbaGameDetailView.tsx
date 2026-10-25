@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { NbaGameDetail, NbaInjuryEntry, NbaPropEdge } from "@/lib/nbaGameDetail";
 import type { StarterGradePlayer, TeamStarterGrades } from "@/lib/nbaStarterGrades";
+import type { TeamGradeSet, TeamStatWithRank } from "@/lib/nbaTeamGrades";
+import type { TeamPer100Stats, TeamPer100StatWithRank } from "@/lib/nbaEfficiencyScoring";
 import { teamLogoPath } from "@/lib/teamsNba";
+import { teamPrimaryColorNba } from "@/lib/teamColorsNba";
 
 // Same polling interval as GameDetailView.tsx's LIVE_REFRESH_MS --
 // router.refresh() re-runs getNbaGameDetail server-side, which re-hits
@@ -420,12 +423,532 @@ function OverviewTab({ game }: { game: NbaGameDetail }) {
   return (
     <div className="page-edge-section">
       <StarterGradesSection game={game} />
-      {!game.starterGrades && (
+      <TeamGradesSection game={game} />
+      <EfficiencyScoringSection game={game} />
+      {!game.starterGrades && !game.teamGrades && !game.efficiencyScoring && (
         <p style={{ color: "var(--text-dim)" }}>
-          Deeper team-form analysis (the NFL page&apos;s PFF grade sections) has no NBA equivalent source yet —
-          see the Betting Edge tab for what IS real: {game.props.length} scored player props for this game.
+          Deeper team-form analysis isn&apos;t available yet for this matchup — see the Betting Edge tab for what
+          IS real: {game.props.length} scored player props for this game.
         </p>
       )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Team Grades (Core Four / Four Factors / Net Efficiency, computed in
+// nbaTeamGrades.ts from hoopR's real box scores) -- lives in the
+// Overview tab, under Starter Grades (NOT Matchups -- that tab is
+// still reserved, see MatchupsTab below). NBA equivalent of
+// GameDetailView.tsx's TeamGradesSection -- reuses that same page's
+// edge-row-v2/edge-value/edge-track-v2/team-grades-* CSS (globals.css
+// is shared across both sports' game-detail pages), just with
+// NBA-specific team colors/tier coloring/formatting instead of
+// gradeTierColor (there's no 0-100 PFF-style grade here).
+// ----------------------------------------------------------------------
+
+// Same ordinal-suffix formatting as GameDetailView.tsx's own ordinal()
+// -- duplicated here since it's pure display formatting, same
+// rationale as that file's own comment on why it isn't shared.
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
+// Same luminance-lift trick as GameDetailView.tsx's edgeAccentColor
+// (a team's own primary color, lifted toward white only when it's too
+// dark to read against this page's near-black background), just
+// sourced from teamColorsNba.ts instead of the NFL color table.
+function nbaEdgeAccentColor(alias: string): string {
+  const hex = teamPrimaryColorNba(alias).replace("#", "");
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  if (luminance >= 0.28) return teamPrimaryColorNba(alias);
+  const lift = 0.28 - luminance + 0.18;
+  const blend = (c: number) => Math.round(c + (255 - c) * lift);
+  return `rgb(${blend(r)}, ${blend(g)}, ${blend(b)})`;
+}
+
+type TeamGradeKey = Exclude<keyof TeamGradeSet, "alias" | "gamesPlayed">;
+
+// There's no fixed 0-100 scale for any of these (unlike PFF grades),
+// so the value box is colored by this team's RANK among the league
+// instead -- reuses the same 7-step best-to-worst palette
+// OverviewTab's STAT_TIER_COLORS already defines, just picked by rank
+// percentile rather than an absolute threshold. rank is already
+// direction-aware (1 = best) from nbaTeamGrades.ts's own ranking, so
+// this needs no separate "lower is better" handling.
+function tierColorByRank(rank: number, totalTeams: number): string {
+  const pct = (rank - 1) / Math.max(1, totalTeams - 1);
+  const index = Math.min(STAT_TIER_COLORS.length - 1, Math.floor(pct * STAT_TIER_COLORS.length));
+  return STAT_TIER_COLORS[index];
+}
+
+// efgPct/tovPct/orebPct/ftRate all arrive as raw 0.0-1.0 fractions
+// (see nbaTeamGrades.ts's own comment on why) -- formatting is the
+// one place that needs to know which of those read as a "%" (bref
+// convention) and which reads as a bare decimal (ftRate, same
+// no-leading-"%" convention as Starter Grades' WS/48).
+// 2 decimal places everywhere EXCEPT ftRate (bref's own 3-decimal,
+// no-leading-zero convention, same as Starter Grades' WS/48 -- ".325"
+// not ".33") -- pace's own comment explains why 1 decimal was the
+// original bug-lookalike (teams with genuinely different ranks
+// rounding to the exact same displayed number); the same risk exists
+// for every other stat here too once enough teams have played enough
+// games to cluster tightly, so this applies the fix everywhere
+// up front rather than waiting for the next one to get reported.
+function formatTeamStat(key: TeamGradeKey, value: number): string {
+  switch (key) {
+    case "efgPct":
+    case "tovPct":
+    case "orebPct":
+      return `${(value * 100).toFixed(2)}%`;
+    case "ftRate":
+      return value.toFixed(3).slice(1);
+    case "netRtg":
+      return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
+    default:
+      return value.toFixed(2);
+  }
+}
+
+const TEAM_GRADE_LABELS: Record<TeamGradeKey, string> = {
+  ppg: "Points",
+  rpg: "Rebounds",
+  apg: "Assists",
+  pace: "Pace",
+  efgPct: "eFG%",
+  tovPct: "TOV%",
+  orebPct: "OREB%",
+  ftRate: "FT Rate",
+  offRtg: "Off Rating",
+  defRtg: "Def Rating",
+  netRtg: "Net Rating",
+};
+
+// Same sourcing rule as Starter Grades' STAT_INFO -- pulled from
+// Basketball-Reference's own glossary (glossary_totals.md/
+// glossary_advanced.md/glossary_adj_shooting.md/glossary_per_poss.md,
+// the files SportsAnalytics' scraper copies alongside the data),
+// adapted from their player-level "while on court" phrasing to a
+// team-level one where that's all that changed. Pace and Net Rating
+// have no scraped glossary entry (Pace is a team-only stat on a page
+// this project never scrapes; Net Rating is simply Off minus Def) --
+// Pace below is basketball-reference's own standard published
+// definition, and Net Rating's description leans on the same framing
+// the user supplied when this card was first scoped. Only the 8
+// metrics asked for get an entry -- Points/Rebounds/Assists are
+// self-explanatory and were deliberately left out, same as Starter
+// Grades left PTS mostly unexplained in spirit (kept there only for
+// toggle-button symmetry).
+const TEAM_GRADE_INFO: Partial<Record<TeamGradeKey, { title: string; description: string }>> = {
+  pace: {
+    title: "Pace",
+    description: "An estimate of the number of possessions per 48 minutes by a team.",
+  },
+  efgPct: {
+    title: "Effective Field Goal Percentage",
+    description:
+      "(FG + 0.5 x 3P) / FGA. Weights a made 3 as worth 1.5 made 2s, since it's worth one more point.",
+  },
+  tovPct: {
+    title: "Turnover Percentage",
+    description: "Estimated turnovers per 100 plays.",
+  },
+  orebPct: {
+    title: "Offensive Rebound Percentage",
+    description: "Estimated percentage of available offensive rebounds grabbed.",
+  },
+  ftRate: {
+    title: "Free Throw Attempt Rate",
+    description: "FTA / FGA -- how often a team gets to the line relative to its field goal attempts.",
+  },
+  offRtg: {
+    title: "Offensive Rating",
+    description: "Points produced per 100 possessions (Dean Oliver method), team-pace-adjusted.",
+  },
+  defRtg: {
+    title: "Defensive Rating",
+    description: "Points allowed per 100 possessions (Dean Oliver method), team-pace-adjusted.",
+  },
+  netRtg: {
+    title: "Net Rating",
+    description:
+      "Offensive Rating minus Defensive Rating -- point differential per 100 possessions, the single best metric for evaluating a team's true strength.",
+  },
+};
+
+// Same pure-CSS hover popover as Starter Grades' StatToggleButton
+// (stat-toggle-info/stat-toggle-tooltip, already defined in globals.css
+// for that card) -- reused here on the row label instead of a toggle
+// button, since Team Grades has no toggle to hang it off of. A row
+// with no TEAM_GRADE_INFO entry (Points/Rebounds/Assists) renders as
+// plain text, same as before.
+function TeamGradeLabel({ statKey }: { statKey: TeamGradeKey }) {
+  const info = TEAM_GRADE_INFO[statKey];
+  const label = TEAM_GRADE_LABELS[statKey];
+  if (!info) return <div className="edge-row-label">{label}</div>;
+  return (
+    <div className="edge-row-label">
+      <span className="stat-toggle-info">
+        {label}
+        <div className="stat-toggle-tooltip">
+          <strong>{info.title}</strong>
+          <span>{info.description}</span>
+        </div>
+      </span>
+    </div>
+  );
+}
+
+// Order mirrors the reference breakdown this card was built from:
+// Core Four, then Four Factors, then Net Efficiency -- 11 rows total,
+// the same count as the NFL page's own Team Grades card.
+const TEAM_GRADE_ORDER: TeamGradeKey[] = [
+  "ppg", "rpg", "apg", "pace",
+  "efgPct", "tovPct", "orebPct", "ftRate",
+  "offRtg", "defRtg", "netRtg",
+];
+
+// netRtg is a signed differential (often negative) -- the share-of-
+// sum bar math below only means something for a genuinely
+// non-negative stat, so that row renders the same "nothing to compare"
+// flat track EdgeTrack itself falls back to when a side is missing,
+// rather than producing a nonsensical split.
+const NO_SHARE_BAR: Set<TeamGradeKey> = new Set(["netRtg"]);
+
+function TeamGradeValue({
+  stat,
+  alias,
+  align,
+  statKey,
+  totalTeams,
+}: {
+  stat: TeamStatWithRank;
+  alias: string;
+  align: "left" | "right";
+  statKey: TeamGradeKey;
+  totalTeams: number;
+}) {
+  const tier = tierColorByRank(stat.rank, totalTeams);
+  const isTop5 = stat.rank <= 5;
+  return (
+    <div className={`edge-value edge-value-${align}`}>
+      <span className="edge-value-team">{alias}</span>
+      <div
+        className={`edge-value-box ${isTop5 ? "edge-value-box-top5" : ""}`}
+        style={{ borderColor: tier, backgroundColor: `${tier}20` }}
+      >
+        {formatTeamStat(statKey, stat.value)}
+      </div>
+      <span className={`edge-value-rank ${isTop5 ? "edge-value-rank-top5" : ""}`}>
+        {stat.tied ? "T-" : ""}
+        {ordinal(stat.rank)} / {totalTeams}
+      </span>
+    </div>
+  );
+}
+
+function TeamGradeTrack({
+  statKey,
+  away,
+  home,
+  awayAlias,
+  homeAlias,
+}: {
+  statKey: TeamGradeKey;
+  away: TeamStatWithRank;
+  home: TeamStatWithRank;
+  awayAlias: string;
+  homeAlias: string;
+}) {
+  if (NO_SHARE_BAR.has(statKey)) return <div className="edge-track-v2 edge-track-v2-empty" />;
+  const lowerIsBetter = statKey === "tovPct" || statKey === "defRtg";
+  const total = away.value + home.value;
+  const leftPct = total > 0 ? (away.value / total) * 100 : 50;
+  const rightPct = 100 - leftPct;
+  const leftBehind = lowerIsBetter ? leftPct > rightPct : leftPct < rightPct;
+  const rightBehind = lowerIsBetter ? rightPct > leftPct : rightPct < leftPct;
+  return (
+    <div className="edge-track-v2">
+      <div
+        className={`edge-fill-v2 ${leftBehind ? "edge-fill-behind" : ""}`}
+        style={{ width: `${leftPct}%`, background: nbaEdgeAccentColor(awayAlias) }}
+      />
+      <div
+        className={`edge-fill-v2 ${rightBehind ? "edge-fill-behind" : ""}`}
+        style={{ width: `${rightPct}%`, background: nbaEdgeAccentColor(homeAlias) }}
+      />
+    </div>
+  );
+}
+
+function TeamGradesSection({ game }: { game: NbaGameDetail }) {
+  if (!game.teamGrades) return null;
+  const { home, away, totalTeams } = game.teamGrades;
+  const awayAlias = game.awayTeam;
+  const homeAlias = game.homeTeam;
+  const awayColor = nbaEdgeAccentColor(awayAlias);
+  const homeColor = nbaEdgeAccentColor(homeAlias);
+  return (
+    <div className="stat-section">
+      <h2>Team Grades</h2>
+      <p className="stat-sub">
+        Both teams&apos; own season-to-date production, ranked against the rest of the league -- Core Four, Four
+        Factors, and Net Efficiency, computed from real box scores (regular season only).
+      </p>
+      <div className="team-grades-card">
+        <div
+          className="team-grades-header"
+          style={{ background: `linear-gradient(135deg, ${awayColor} 0%, ${awayColor} 45%, ${homeColor} 55%, ${homeColor} 100%)` }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="team-grades-logo" src={teamLogoPath(awayAlias)} alt="" />
+          <span className="team-grades-caption">Ranked all {totalTeams} teams</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="team-grades-logo" src={teamLogoPath(homeAlias)} alt="" />
+        </div>
+        <div className="team-grades-rows">
+          {TEAM_GRADE_ORDER.map((key) => (
+            <div className="edge-row-v2" key={key}>
+              <TeamGradeValue stat={away[key]} alias={awayAlias} align="left" statKey={key} totalTeams={totalTeams} />
+              <TeamGradeLabel statKey={key} />
+              <TeamGradeValue stat={home[key]} alias={homeAlias} align="right" statKey={key} totalTeams={totalTeams} />
+              <TeamGradeTrack statKey={key} away={away[key]} home={home[key]} awayAlias={awayAlias} homeAlias={homeAlias} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Efficiency and Scoring -- Offense (this team's own shooting/
+// rebounding/ballhandling) side by side with Defense (what the
+// OPPONENT did against this team in those same games, i.e. "allowed"),
+// per 100 possessions, ranked against the league. NBA equivalent of
+// GameDetailView.tsx's EfficiencyCard/EfficiencySection -- reuses that
+// same page's eff-grid/eff-card/eff-row-v2/eff-figure CSS (globals.css
+// is shared across both sports' game-detail pages), with a plain
+// figure+rank (no color-tier box, no share bar) exactly like the NFL
+// version, since there's no PFF-style grade or signed differential
+// here to color/bar.
+// ----------------------------------------------------------------------
+
+type EffStatKey = keyof TeamPer100Stats;
+
+const EFF_LABELS: Record<EffStatKey, string> = {
+  fgPct: "FG%",
+  threeP: "3P",
+  threePA: "3PA",
+  threePct: "3P%",
+  twoP: "2P",
+  twoPA: "2PA",
+  twoPct: "2P%",
+  ft: "FT",
+  fta: "FTA",
+  ftPct: "FT%",
+  orb: "ORB",
+  drb: "DRB",
+  stl: "STL",
+  blk: "BLK",
+  tov: "TOV",
+  pf: "PF",
+};
+
+// Same order as the real Basketball-Reference "Per 100 Poss Stats"
+// page's own column order (and the order the user pasted it in) --
+// minus AST/TRB, deliberately left out (see nbaEfficiencyScoring.ts's
+// own header: both are the exact same raw total Team Grades already
+// shows, as Assists/Rebounds, just per-game instead of per-100).
+const EFF_ORDER: EffStatKey[] = [
+  "fgPct", "threeP", "threePA", "threePct", "twoP", "twoPA", "twoPct",
+  "ft", "fta", "ftPct", "orb", "drb", "stl", "blk", "tov", "pf",
+];
+
+const PCT_STATS: Set<EffStatKey> = new Set(["fgPct", "threePct", "twoPct", "ftPct"]);
+
+function formatEffStat(key: EffStatKey, value: number): string {
+  return PCT_STATS.has(key) ? `${(value * 100).toFixed(2)}%` : value.toFixed(2);
+}
+
+// Verbatim labels from Basketball-Reference's own "Per 100 Poss
+// Stats" glossary (the user's pasted glossary block) -- description
+// adds the one piece of real context their own terse "label --
+// expansion" glossary doesn't spell out: the formula for a percentage
+// stat, or that a counting stat here is scaled to per-100-possessions
+// rather than a per-game total.
+const EFF_INFO: Record<EffStatKey, { title: string; description: string }> = {
+  fgPct: { title: "Field Goal Percentage", description: "Field Goals made / Field Goal Attempts." },
+  threeP: { title: "3-Point Field Goals", description: "Per 100 possessions." },
+  threePA: { title: "3-Point Field Goal Attempts", description: "Per 100 possessions." },
+  threePct: { title: "3-Point Field Goal Percentage", description: "3-Point Field Goals made / 3-Point Field Goal Attempts." },
+  twoP: { title: "2-Point Field Goals", description: "Per 100 possessions." },
+  twoPA: { title: "2-Point Field Goal Attempts", description: "Per 100 possessions." },
+  twoPct: { title: "2-Point Field Goal Percentage", description: "2-Point Field Goals made / 2-Point Field Goal Attempts." },
+  ft: { title: "Free Throws", description: "Per 100 possessions." },
+  fta: { title: "Free Throw Attempts", description: "Per 100 possessions." },
+  ftPct: { title: "Free Throw Percentage", description: "Free Throws made / Free Throw Attempts." },
+  orb: { title: "Offensive Rebounds", description: "Per 100 possessions." },
+  drb: { title: "Defensive Rebounds", description: "Per 100 possessions." },
+  stl: { title: "Steals", description: "Per 100 possessions." },
+  blk: { title: "Blocks", description: "Per 100 possessions." },
+  tov: { title: "Turnovers", description: "Per 100 possessions." },
+  pf: { title: "Personal Fouls", description: "Per 100 possessions." },
+};
+
+// Same pure-CSS hover popover as Starter Grades/Team Grades (reuses
+// stat-toggle-info/stat-toggle-tooltip, already in globals.css).
+function EffRowLabel({ statKey }: { statKey: EffStatKey }) {
+  const info = EFF_INFO[statKey];
+  return (
+    <span className="eff-row-label">
+      <span className="stat-toggle-info">
+        {EFF_LABELS[statKey]}
+        <div className="stat-toggle-tooltip">
+          <strong>{info.title}</strong>
+          <span>{info.description}</span>
+        </div>
+      </span>
+    </span>
+  );
+}
+
+function EffFigure({
+  stat,
+  statKey,
+  totalTeams,
+  align,
+}: {
+  stat: TeamPer100StatWithRank;
+  statKey: EffStatKey;
+  totalTeams: number;
+  align: "left" | "right";
+}) {
+  const isTop5 = stat.rank <= 5;
+  // Bottom-5-in-the-league callout, the red counterpart to isTop5's
+  // gold -- totalTeams - 5 is always >= 25 at a real 30-team league
+  // size, so this and isTop5 can never both be true.
+  const isBottom5 = stat.rank > totalTeams - 5;
+  const tierClass = isTop5 ? "top5" : isBottom5 ? "bottom5" : "";
+  return (
+    <div className={`eff-figure-block eff-figure-block-${align}`}>
+      <span className={`eff-figure ${tierClass ? `eff-figure-${tierClass}` : ""}`}>
+        {formatEffStat(statKey, stat.value)}
+      </span>
+      <span className={`eff-rank ${tierClass ? `eff-rank-${tierClass}` : ""}`}>
+        {stat.tied ? "T-" : ""}
+        {ordinal(stat.rank)}/{totalTeams}
+      </span>
+    </div>
+  );
+}
+
+function EffStatRow({
+  statKey,
+  away,
+  home,
+  totalTeams,
+}: {
+  statKey: EffStatKey;
+  away: TeamPer100StatWithRank;
+  home: TeamPer100StatWithRank;
+  totalTeams: number;
+}) {
+  return (
+    <div className="eff-row-v2">
+      <EffFigure stat={away} statKey={statKey} totalTeams={totalTeams} align="left" />
+      <EffRowLabel statKey={statKey} />
+      <EffFigure stat={home} statKey={statKey} totalTeams={totalTeams} align="right" />
+    </div>
+  );
+}
+
+function EfficiencyCard({
+  title,
+  awayAlias,
+  homeAlias,
+  awayStats,
+  homeStats,
+  totalTeams,
+}: {
+  title: string;
+  awayAlias: string;
+  homeAlias: string;
+  awayStats: TeamPer100Stats;
+  homeStats: TeamPer100Stats;
+  totalTeams: number;
+}) {
+  const awayColor = nbaEdgeAccentColor(awayAlias);
+  const homeColor = nbaEdgeAccentColor(homeAlias);
+  return (
+    <div className="eff-card">
+      <div
+        className="eff-card-header"
+        style={{ background: `linear-gradient(135deg, ${awayColor} 0%, ${awayColor} 45%, ${homeColor} 55%, ${homeColor} 100%)` }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="eff-card-logo" src={teamLogoPath(awayAlias)} alt="" />
+        <span className="eff-card-title">{title}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="eff-card-logo" src={teamLogoPath(homeAlias)} alt="" />
+      </div>
+      <div className="eff-card-rows">
+        {EFF_ORDER.map((key) => (
+          <EffStatRow key={key} statKey={key} away={awayStats[key]} home={homeStats[key]} totalTeams={totalTeams} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EfficiencyScoringSection({ game }: { game: NbaGameDetail }) {
+  if (!game.efficiencyScoring) return null;
+  const { homeOffense, awayOffense, homeDefense, awayDefense, totalTeams } = game.efficiencyScoring;
+  const awayAlias = game.awayTeam;
+  const homeAlias = game.homeTeam;
+  return (
+    <div className="stat-section">
+      <h2>Efficiency and Scoring per 100 possessions</h2>
+      <p className="stat-sub">Season-to-date shooting, rebounding, and ballhandling per 100 possessions.</p>
+      <p className="stat-sub eff-scoring-subtitle">
+        Offense is each team&apos;s own production,
+        <br />
+        Defense is what their opponents did against them,
+        <br />
+        both ranked against all {totalTeams} teams.
+      </p>
+      <div className="eff-grid nba-eff-grid">
+        <EfficiencyCard
+          title="Offense"
+          awayAlias={awayAlias}
+          homeAlias={homeAlias}
+          awayStats={awayOffense}
+          homeStats={homeOffense}
+          totalTeams={totalTeams}
+        />
+        <EfficiencyCard
+          title="Defense"
+          awayAlias={awayAlias}
+          homeAlias={homeAlias}
+          awayStats={awayDefense}
+          homeStats={homeDefense}
+          totalTeams={totalTeams}
+        />
+      </div>
     </div>
   );
 }

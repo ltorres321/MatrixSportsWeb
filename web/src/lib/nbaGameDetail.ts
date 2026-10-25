@@ -3,6 +3,8 @@ import { cache } from "react";
 import { query } from "@/lib/db";
 import { getNbaScheduledGame, getNbaTeamRecords, etDateKey } from "@/lib/nbaSchedule";
 import { getGameStarterGrades, type GameStarterGrades } from "@/lib/nbaStarterGrades";
+import { getGameTeamGrades, type GameTeamGrades } from "@/lib/nbaTeamGrades";
+import { getGameEfficiencyScoring, type GameEfficiencyScoring } from "@/lib/nbaEfficiencyScoring";
 
 // NBA equivalent of predictions.ts's getGameDetail(), scoped to just
 // what src4 actually produces: the matchup (nba_predictions), real
@@ -110,6 +112,11 @@ export interface NbaGameDetail {
   // null only if nba.bbr_advanced/nba.bbr_per_game have no rows yet
   // for this game's two teams (season) -- see getGameStarterGrades.
   starterGrades: GameStarterGrades | null;
+  // null only if nba.team_box_scores has no completed games yet for
+  // this game's two teams (season) -- see getGameTeamGrades.
+  teamGrades: GameTeamGrades | null;
+  // Same null condition as teamGrades -- see getGameEfficiencyScoring.
+  efficiencyScoring: GameEfficiencyScoring | null;
 }
 
 interface GameRow {
@@ -218,7 +225,11 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
   const records = await getNbaTeamRecords(game.season, etDateKey(new Date(game.game_date)));
 
   const gameDate = new Date(game.game_date);
-  const starterGrades = await getGameStarterGrades(game.season, gameDate, game.home_team, game.away_team);
+  const [starterGrades, teamGrades, efficiencyScoring] = await Promise.all([
+    getGameStarterGrades(game.season, gameDate, game.home_team, game.away_team),
+    getGameTeamGrades(game.season, gameDate, game.home_team, game.away_team),
+    getGameEfficiencyScoring(game.season, gameDate, game.home_team, game.away_team),
+  ]);
 
   const kickoff =
     new Intl.DateTimeFormat("en-US", {
@@ -315,5 +326,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
       edge: r.edge,
     })),
     starterGrades,
+    teamGrades,
+    efficiencyScoring,
   };
 });

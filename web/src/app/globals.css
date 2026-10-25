@@ -2248,6 +2248,29 @@ h1.glow span {
   background: rgba(234, 241, 250, 0.95);
 }
 
+/* Efficiency and Scoring's own Offense/Defense explainer
+   (NbaGameDetailView.tsx) -- same gold-on-solid-backdrop treatment as
+   .parlay-week-subtitle just above (this page's RainCanvas background
+   animation makes a plain var(--text-dim) line hard to read), same
+   reason for going one class-selector deeper than a plain
+   .eff-scoring-subtitle would need. One size up from
+   .parlay-week-subtitle's own bump too (0.95rem, not 0.92rem) and
+   line-height loosened for its own <br />-separated 3-line layout. */
+.stat-section .stat-sub.eff-scoring-subtitle {
+  color: var(--gold);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  display: inline-block;
+  background: var(--panel-solid);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+:root[data-theme="light"] .stat-section .stat-sub.eff-scoring-subtitle {
+  color: var(--green);
+  background: rgba(234, 241, 250, 0.95);
+}
+
 .bucket-list {
   display: flex;
   flex-direction: column;
@@ -3883,6 +3906,65 @@ h1.glow span {
 
 :root[data-theme="light"] .eff-figure-top5 {
   color: var(--green);
+}
+
+/* NBA's own Efficiency and Scoring card (NbaGameDetailView.tsx) --
+   scoped overrides under .nba-eff-grid rather than editing the
+   .eff-* rules directly above, since those are shared with the NFL
+   page's own Efficiency and Scoring card (GameDetailView.tsx) and
+   must stay exactly as they were. The NBA card has 16 rows per side
+   (vs. the NFL card's 7), so this trims row padding to read as a
+   denser list without needing to scroll as much -- but drops the
+   .eff-card-teams team-code row entirely (JSX, not CSS -- the logo
+   already says which team is which) and sizes the logo larger than
+   the NFL card's own (first tried matching it exactly, still read as
+   too small once the team-code row was gone), trading that row's
+   space for a larger logo and a larger, more readable .eff-figure
+   than a first pass at this made room for. */
+.nba-eff-grid .eff-card-header {
+  padding: 0.6rem 0.9rem;
+}
+
+.nba-eff-grid .eff-card-logo {
+  width: 52px;
+  height: 52px;
+}
+
+.nba-eff-grid .eff-card-title {
+  font-size: 0.74rem;
+}
+
+.nba-eff-grid .eff-card-rows {
+  padding: 0.3rem 0.9rem 0.6rem;
+}
+
+.nba-eff-grid .eff-row-v2 {
+  padding: 0.3rem 0;
+}
+
+.nba-eff-grid .eff-figure {
+  font-size: 1rem;
+}
+
+.nba-eff-grid .eff-row-label {
+  font-size: 0.72rem;
+}
+
+.nba-eff-grid .eff-rank {
+  font-size: 0.74rem;
+}
+
+/* Bottom-5-in-the-league callout, the red counterpart to .eff-figure-
+   top5/.eff-rank-top5's gold -- var(--red) already adapts per theme
+   (see its own definition near the top of this file), so this needs
+   no separate light-theme override the way the gold top5 classes do. */
+.nba-eff-grid .eff-figure-bottom5 {
+  color: var(--red);
+}
+
+.nba-eff-grid .eff-rank-bottom5 {
+  color: var(--red);
+  font-weight: 700;
 }
 
 /* Pressure Matchup */
