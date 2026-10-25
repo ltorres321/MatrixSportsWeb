@@ -228,7 +228,7 @@ export default async function HomePage() {
                 ))}
               </div>
               <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
-                <Link className="btn btn-ghost" href="/stories">
+                <Link className="btn btn-primary" href="/stories">
                   Browse All Recaps →
                 </Link>
               </div>
