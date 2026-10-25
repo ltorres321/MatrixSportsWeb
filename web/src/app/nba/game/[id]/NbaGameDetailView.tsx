@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { NbaGameDetail, NbaInjuryEntry, NbaPropEdge } from "@/lib/nbaGameDetail";
+import type { StarterGradePlayer, TeamStarterGrades } from "@/lib/nbaStarterGrades";
 import { teamLogoPath } from "@/lib/teamsNba";
 
 // Same polling interval as GameDetailView.tsx's LIVE_REFRESH_MS --
@@ -256,13 +257,175 @@ function PageTabStrip({ active, onChange }: { active: PageTab; onChange: (tab: P
   );
 }
 
+// Same palette basketball-reference.com/PFF both land on for a "how
+// good is this value" color scale -- reused verbatim from
+// GameDetailView.tsx's GRADE_TIER_COLORS (NFL's PFF grade bands) for
+// visual consistency across both sports' game-detail pages, just
+// re-thresholded per basketball stat below since none of these three
+// are a 0-100 PFF grade.
+const STAT_TIER_COLORS = ["#0c5ea0", "#0287a5", "#00936e", "#18a33a", "#5eb90f", "#f1cf00", "#fd9700"];
+
+// Rough real-world bands for each stat (season-to-date, starters
+// only) -- PTS and PER both run roughly 0-35 for a starter, WS/48
+// clusters tightly around a .100 league average (Basketball-Reference
+// glossary), hence the much narrower breakpoints there.
+const STAT_TIER_THRESHOLDS: Record<StarterStat, number[]> = {
+  pts: [28, 23, 18, 14, 10, 6],
+  per: [27, 23, 19, 15, 12, 8],
+  wsPer48: [0.22, 0.18, 0.14, 0.1, 0.07, 0.04],
+};
+
+function statTierColor(stat: StarterStat, value: number): string {
+  const thresholds = STAT_TIER_THRESHOLDS[stat];
+  for (let i = 0; i < thresholds.length; i++) {
+    if (value >= thresholds[i]) return STAT_TIER_COLORS[i];
+  }
+  return STAT_TIER_COLORS[STAT_TIER_COLORS.length - 1];
+}
+
+function formatStat(stat: StarterStat, value: number): string {
+  if (stat === "wsPer48") {
+    // Basketball-Reference's own convention: no leading zero
+    // ("-.038", ".178"), 3 decimal places.
+    const fixed = value.toFixed(3);
+    return value < 0 ? `-${fixed.slice(2)}` : fixed.slice(1);
+  }
+  return value.toFixed(1);
+}
+
+type StarterStat = "pts" | "per" | "wsPer48";
+
+// Same CDN/path convention as GameDetailView.tsx's espnHeadshotUrl,
+// just the "nba" leaf instead of "nfl" -- confirmed live against a
+// handful of real nba.rosters athlete_ids (nbaStarterGrades.ts's
+// buildEspnIdByName) that this resolves to a real player photo.
+function nbaEspnHeadshotUrl(espnId: string): string {
+  return `https://a.espncdn.com/i/headshots/nba/players/full/${espnId}.png`;
+}
+
+// Same "photo if we have an id, else this player's own team logo"
+// fallback as GameDetailView.tsx's PlayerHeadshot -- espnId here comes
+// from a name-matched lookup against nba.rosters rather than a real
+// player-id crosswalk (see buildEspnIdByName's header), so it's null
+// for the minority of starters that table hasn't picked up yet.
+function StarterGradeRow({ player, alias, stat }: { player: StarterGradePlayer; alias: string; stat: StarterStat }) {
+  const value = player[stat];
+  const tier = statTierColor(stat, value);
+  return (
+    <div className="report-player-row">
+      {player.espnId ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="player-headshot" src={nbaEspnHeadshotUrl(player.espnId)} alt="" />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="player-headshot player-headshot-fallback" src={teamLogoPath(alias)} alt="" />
+      )}
+      <div className="report-player-info">
+        <span className="report-player-name">{player.name}</span>
+        {player.position && <span className="report-player-position">{player.position}</span>}
+      </div>
+      <div className="report-player-grade" style={{ borderColor: tier, backgroundColor: `${tier}20` }}>
+        {formatStat(stat, value)}
+      </div>
+    </div>
+  );
+}
+
+// Verbatim from Basketball-Reference's own glossary (the same
+// glossary_advanced.md/glossary_per_game.md files SportsAnalytics'
+// scraper copies into each season's advancemetrics/ folder) -- not
+// paraphrased, so this stays the same explanation a reader would get
+// hovering the equivalent column on basketball-reference.com itself.
+const STAT_INFO: Record<StarterStat, { title: string; description: string }> = {
+  pts: { title: "Points Per Game", description: "Points scored per game." },
+  per: {
+    title: "Player Efficiency Rating",
+    description:
+      "Player Efficiency Rating (John Hollinger) -- a per-minute rating summing a player's positive contributions and subtracting the negative, league-adjusted so 15.0 = average.",
+  },
+  wsPer48: {
+    title: "Win Shares Per 48 Minutes",
+    description:
+      "An estimate of the number of wins contributed by a player per 48 minutes (league average is approximately .100).",
+  },
+};
+
+const STAT_LABELS: Record<StarterStat, string> = { pts: "PTS", per: "PER", wsPer48: "WS/48" };
+
+// Pure-CSS hover tooltip (no portal) -- unlike GameDetailView.tsx's
+// click-triggered InfoTooltip, this card isn't inside a horizontally-
+// scrolling wrapper, so a plain absolutely-positioned popover doesn't
+// get clipped and hover is a closer match to how basketball-reference
+// itself shows these definitions (see the screenshot that prompted
+// this -- a hover popover on the WS/48 column header).
+function StatToggleButton({ stat, active, onClick }: { stat: StarterStat; active: boolean; onClick: () => void }) {
+  const info = STAT_INFO[stat];
+  return (
+    <span className="stat-toggle-info">
+      <button type="button" className={active ? "active" : ""} onClick={onClick}>
+        {STAT_LABELS[stat]}
+      </button>
+      <div className="stat-toggle-tooltip">
+        <strong>{info.title}</strong>
+        <span>{info.description}</span>
+      </div>
+    </span>
+  );
+}
+
+function StarterGradesCard({ alias, team }: { alias: string; team: TeamStarterGrades }) {
+  const [stat, setStat] = useState<StarterStat>("pts");
+  const players = stat === "pts" ? team.byPts : stat === "per" ? team.byPer : team.byWs48;
+  return (
+    <div className="report-players-card">
+      <div className="report-players-header">
+        <span className="report-players-team">{alias}</span>
+        <div className="report-toggle">
+          <StatToggleButton stat="pts" active={stat === "pts"} onClick={() => setStat("pts")} />
+          <StatToggleButton stat="per" active={stat === "per"} onClick={() => setStat("per")} />
+          <StatToggleButton stat="wsPer48" active={stat === "wsPer48"} onClick={() => setStat("wsPer48")} />
+        </div>
+      </div>
+      {players.length === 0 ? (
+        <div className="report-players-empty">No qualifying players.</div>
+      ) : (
+        <div className="report-players-list">
+          {players.map((player) => (
+            <StarterGradeRow player={player} alias={alias} stat={stat} key={player.playerId} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StarterGradesSection({ game }: { game: NbaGameDetail }) {
+  if (!game.starterGrades) return null;
+  return (
+    <div className="stat-section">
+      <h2>Starter Grades</h2>
+      <p className="stat-sub">
+        Season-to-date Basketball-Reference stats for each team&apos;s starters, minimum 25% of that team&apos;s
+        games started.
+      </p>
+      <div className="report-players-grid">
+        <StarterGradesCard alias={game.awayTeam} team={game.starterGrades.away} />
+        <StarterGradesCard alias={game.homeTeam} team={game.starterGrades.home} />
+      </div>
+    </div>
+  );
+}
+
 function OverviewTab({ game }: { game: NbaGameDetail }) {
   return (
     <div className="page-edge-section">
-      <p style={{ color: "var(--text-dim)" }}>
-        Deeper team-form analysis (the NFL page&apos;s PFF grade sections) has no NBA equivalent source yet —
-        see the Betting Edge tab for what IS real: {game.props.length} scored player props for this game.
-      </p>
+      <StarterGradesSection game={game} />
+      {!game.starterGrades && (
+        <p style={{ color: "var(--text-dim)" }}>
+          Deeper team-form analysis (the NFL page&apos;s PFF grade sections) has no NBA equivalent source yet —
+          see the Betting Edge tab for what IS real: {game.props.length} scored player props for this game.
+        </p>
+      )}
     </div>
   );
 }

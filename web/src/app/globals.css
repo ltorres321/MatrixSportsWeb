@@ -3544,6 +3544,56 @@ h1.glow span {
   color: var(--text-strong);
 }
 
+/* Starter Grades stat toggle (PTS/PER/WS-48) hover definitions --
+   same panel/shadow styling as .betting-info-popover elsewhere on
+   this page, but a plain hover popover rather than a portaled click
+   popover: this card isn't inside a horizontally-scrolling wrapper,
+   so nothing clips it, and hover matches basketball-reference's own
+   column-header tooltip behavior. */
+.stat-toggle-info {
+  position: relative;
+  display: inline-flex;
+}
+
+.stat-toggle-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 220px;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* Above .page-tab-strip's sticky z-index: 40 -- a tall popover (PER's
+     description wraps to several lines) opens high enough to tuck
+     under the sticky Overview/Matchups tab strip when this card sits
+     near the top of the scrolled viewport, and without this the strip's
+     own opaque background painted over the popover's title line. */
+  z-index: 45;
+  pointer-events: none;
+}
+
+.stat-toggle-tooltip strong {
+  color: var(--text-strong);
+  font-size: 0.78rem;
+  font-family: 'Chakra Petch', monospace;
+}
+
+.stat-toggle-tooltip span {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.stat-toggle-info:hover .stat-toggle-tooltip {
+  display: flex;
+}
+
 .report-players-empty {
   color: var(--text-dim);
   font-size: 0.82rem;

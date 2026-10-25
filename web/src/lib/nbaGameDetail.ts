@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { query } from "@/lib/db";
 import { getNbaScheduledGame, getNbaTeamRecords, etDateKey } from "@/lib/nbaSchedule";
+import { getGameStarterGrades, type GameStarterGrades } from "@/lib/nbaStarterGrades";
 
 // NBA equivalent of predictions.ts's getGameDetail(), scoped to just
 // what src4 actually produces: the matchup (nba_predictions), real
@@ -106,6 +107,9 @@ export interface NbaGameDetail {
   injuriesHome: NbaInjuryEntry[];
   injuriesAway: NbaInjuryEntry[];
   props: NbaPropEdge[];
+  // null only if nba.bbr_advanced/nba.bbr_per_game have no rows yet
+  // for this game's two teams (season) -- see getGameStarterGrades.
+  starterGrades: GameStarterGrades | null;
 }
 
 interface GameRow {
@@ -214,6 +218,8 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
   const records = await getNbaTeamRecords(game.season, etDateKey(new Date(game.game_date)));
 
   const gameDate = new Date(game.game_date);
+  const starterGrades = await getGameStarterGrades(game.season, gameDate, game.home_team, game.away_team);
+
   const kickoff =
     new Intl.DateTimeFormat("en-US", {
       weekday: "short", hour: "numeric", minute: "2-digit", timeZone: "America/New_York",
@@ -308,5 +314,6 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
       coverProbability: r.cover_probability,
       edge: r.edge,
     })),
+    starterGrades,
   };
 });
