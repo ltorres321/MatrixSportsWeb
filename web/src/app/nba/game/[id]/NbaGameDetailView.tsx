@@ -736,16 +736,23 @@ function TeamGradesSection({ game }: { game: NbaGameDetail }) {
 }
 
 // ----------------------------------------------------------------------
-// Efficiency and Scoring -- Offense (this team's own shooting/
-// rebounding/ballhandling) side by side with Defense (what the
-// OPPONENT did against this team in those same games, i.e. "allowed"),
-// per 100 possessions, ranked against the league. NBA equivalent of
-// GameDetailView.tsx's EfficiencyCard/EfficiencySection -- reuses that
-// same page's eff-grid/eff-card/eff-row-v2/eff-figure CSS (globals.css
-// is shared across both sports' game-detail pages), with a plain
-// figure+rank (no color-tier box, no share bar) exactly like the NFL
-// version, since there's no PFF-style grade or signed differential
-// here to color/bar.
+// Efficiency and Scoring -- "Team" (this team's own shooting/
+// rebounding/ballhandling) side by side with "Opponent" (what the
+// teams THIS team played did against them in those same games, i.e.
+// "allowed"), per 100 possessions, ranked against the league. Titled
+// "Team"/"Opponent" rather than "Offense"/"Defense" -- bref's own
+// neutral naming, adopted here after "Defense" read as implying every
+// row was a measure of this team's OWN defense, which isn't true for
+// steals/blocks/rebounds (those are the opponent's own hustle stats
+// against this team, not this team's defensive production at all; see
+// this section's own explainer text below, and the comment on
+// DEFENSE_LOWER_IS_BETTER in nbaEfficiencyScoring.ts). NBA equivalent
+// of GameDetailView.tsx's EfficiencyCard/EfficiencySection -- reuses
+// that same page's eff-grid/eff-card/eff-row-v2/eff-figure CSS
+// (globals.css is shared across both sports' game-detail pages), with
+// a plain figure+rank (no color-tier box, no share bar) exactly like
+// the NFL version, since there's no PFF-style grade or signed
+// differential here to color/bar.
 // ----------------------------------------------------------------------
 
 type EffStatKey = keyof TeamPer100Stats;
@@ -925,15 +932,12 @@ function EfficiencyScoringSection({ game }: { game: NbaGameDetail }) {
       <h2>Efficiency and Scoring per 100 possessions</h2>
       <p className="stat-sub">Season-to-date shooting, rebounding, and ballhandling per 100 possessions.</p>
       <p className="stat-sub eff-scoring-subtitle">
-        Offense is each team&apos;s own production,
-        <br />
-        Defense is what their opponents did against them,
-        <br />
-        both ranked against all {totalTeams} teams.
+        &quot;Team&quot; is each team&apos;s own production. &quot;Opponent&quot; is what they allowed their opponent
+        to average. Both ranked against all {totalTeams} teams.
       </p>
       <div className="eff-grid nba-eff-grid">
         <EfficiencyCard
-          title="Offense"
+          title="Team"
           awayAlias={awayAlias}
           homeAlias={homeAlias}
           awayStats={awayOffense}
@@ -941,7 +945,7 @@ function EfficiencyScoringSection({ game }: { game: NbaGameDetail }) {
           totalTeams={totalTeams}
         />
         <EfficiencyCard
-          title="Defense"
+          title="Opponent"
           awayAlias={awayAlias}
           homeAlias={homeAlias}
           awayStats={awayDefense}
