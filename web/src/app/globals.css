@@ -1106,6 +1106,21 @@ h1.glow span {
   box-shadow: 0 0 6px var(--gold);
 }
 
+/* Light theme only (request 2026-10-25): FREE DURING BETA switches
+   from gold to the same blue as the Featured NBA Game ribbon
+   (.premier-ribbon's plain, non-gold look -- var(--green) is blue in
+   light theme). Dark theme is untouched, still gold. */
+:root[data-theme="light"] .hero-eyebrow {
+  color: var(--green);
+  border-color: var(--panel-border);
+  background: var(--green-faint);
+}
+
+:root[data-theme="light"] .hero-eyebrow .dot {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
 .hero-title {
   font-family: 'Chakra Petch', monospace;
   font-weight: 700;
@@ -1888,6 +1903,16 @@ h1.glow span {
   color: var(--gold);
   border: 1px solid rgba(var(--gold-rgb), 0.5);
   background: rgba(var(--gold-rgb), 0.1);
+}
+
+/* Light theme only (request 2026-10-25): LOCK OF THE WEEK switches
+   from gold to the same blue as the plain .premier-ribbon look used
+   by the Featured NBA Game badge. Dark theme is untouched, still
+   gold. */
+:root[data-theme="light"] .premier-ribbon.gold {
+  color: var(--green);
+  border-color: var(--panel-border);
+  background: var(--green-faint);
 }
 
 .premier-card {
