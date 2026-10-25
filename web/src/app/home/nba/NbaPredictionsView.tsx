@@ -10,14 +10,22 @@ import Link from "next/link";
 import type { Matchup } from "@/lib/matchups";
 import { formatNbaDateLabel, formatNbaMonthLabel } from "@/lib/matchups";
 import NbaMatchupCard from "@/components/NbaMatchupCard";
+import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
 
 // NBA equivalent of PredictionsView.tsx, deliberately smaller: no ad
-// frames or member-preview paywall yet (those are orthogonal to "show
-// win probabilities," not part of this first slice -- see
-// src4/FINDINGS.md), no premier-game highlight. Same league-chips row
-// as PredictionsView, now actually functional (NFL/NBA are both real
-// links) instead of the commented-out "COMING SOON" placeholder it
-// replaces.
+// frames (orthogonal to "show win probabilities," not part of this
+// first slice -- see src4/FINDINGS.md), no premier-game highlight.
+// Same league-chips row as PredictionsView, now actually functional
+// (NFL/NBA are both real links) instead of the commented-out "COMING
+// SOON" placeholder it replaces.
+//
+// Member-preview paywall added 2026-10-25 (request: signed-out
+// visitors could see every NBA game here, unlike the NFL slate where
+// only the premier game is free) -- same .locked-section/.unlock-panel
+// treatment as PredictionsView.tsx, just with no premier game to
+// carve out of the locked set: NBA has no premier-game concept yet
+// (see nbaPredictions.ts's module header), so every game on this page
+// is locked for a non-member, full stop.
 //
 // LIVE-SCORE POLLING now mirrors PredictionsView.tsx (NFL) too --
 // nbaPredictions.ts/nbaSchedule.ts already support a real "live"
@@ -44,8 +52,10 @@ export default function NbaPredictionsView({
   activeDate: string | null;
   matchups: Matchup[];
 }) {
+  const { isMember, toggle } = useMemberPreview();
   const router = useRouter();
   const hasLiveGame = matchups.some((m) => m.status === "live");
+  const locked = !isMember;
 
   useEffect(() => {
     if (!hasLiveGame) return;
@@ -153,10 +163,35 @@ export default function NbaPredictionsView({
             No NBA games predicted for this date.
           </p>
         ) : (
-          <div className="matchup-grid">
-            {matchups.map((m) => (
-              <NbaMatchupCard key={m.id} matchup={m} />
-            ))}
+          <div className={`locked-section ${locked ? "is-locked" : ""}`}>
+            <div className="matchup-grid">
+              {matchups.map((m) => (
+                <NbaMatchupCard key={m.id} matchup={m} />
+              ))}
+            </div>
+            {locked && (
+              <div className="unlock-panel">
+                <div className="unlock-card">
+                  <span className="lock-icon">🔒</span>
+                  <h2>Unlock the Full Slate</h2>
+                  <p>
+                    Create a free account to see win probabilities for every
+                    NBA game — no credit card required.
+                  </p>
+                  <Link className="btn btn-primary btn-block" href="/signup">
+                    Sign Up Free
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {SHOW_MEMBER_PREVIEW_TOGGLE && (
+          <div className="dev-toggle">
+            <button type="button" onClick={toggle}>
+              testing: toggle member view
+            </button>
           </div>
         )}
       </main>
