@@ -125,14 +125,11 @@ export default function PredictionsView({
         <button className="league-chip active" type="button">
           NFL
         </button>
-        {/* NBA/MLB chips hidden here while that data/content gets built
-            out -- restore these two buttons once there's something real
-            behind them, rather than showing "Coming Soon" on a site
-            that's trying to read as a complete product:
-            <button className="league-chip" type="button" disabled>
-              NBA
-              <span className="soon-tag">COMING SOON</span>
-            </button>
+        <Link href="/home/nba" className="league-chip">
+          NBA
+        </Link>
+        {/* MLB stays hidden -- no data/model behind it yet, unlike NBA
+            (src4/26_predict_upcoming_games.py, exposed 2026-10-24):
             <button className="league-chip" type="button" disabled>
               MLB
               <span className="soon-tag">COMING SOON</span>

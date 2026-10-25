@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 // Real auth is resolved server-side by the root layout on every
 // request (see layout.tsx) and passed down as a plain prop -- this
@@ -32,7 +33,20 @@ const RAIL_SCROLL_FALLBACK_THRESHOLD = 900;
 function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmin: boolean; onNavigate: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const close = () => setOpen(false);
+
+  // Same pattern as profile/page.tsx's handleSignOut -- duplicated
+  // rather than imported from there since that file isn't a shared
+  // lib, and this is the only other place sign-out needs to happen.
+  async function handleSignOut() {
+    close();
+    onNavigate();
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -90,15 +104,20 @@ function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmi
           Contact Us
         </Link>
         {signedIn ? (
-          <Link
-            href="/profile"
-            onClick={() => {
-              close();
-              onNavigate();
-            }}
-          >
-            My Profile
-          </Link>
+          <>
+            <Link
+              href="/profile"
+              onClick={() => {
+                close();
+                onNavigate();
+              }}
+            >
+              My Profile
+            </Link>
+            <button type="button" className="nav-more-signout" onClick={handleSignOut}>
+              Sign Out
+            </button>
+          </>
         ) : (
           <Link
             href="/login"
@@ -142,6 +161,77 @@ function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmi
             </Link>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// "Predictions" needs 2 destinations now (NFL/NBA) instead of 1, so it
+// gets the exact same open/close/outside-click/Escape flyout pattern
+// as MoreMenu above -- reuses MoreMenu's own CSS classes
+// (nav-more/nav-more-trigger/nav-more-panel) rather than inventing new
+// ones, so it's already theme-aware (light/dark) and already handles
+// both the top-bar and the mobile accordion layout for free.
+function PredictionsMenu({ onNavigate }: { onNavigate: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = () => setOpen(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className={`nav-more ${open ? "open" : ""}`} ref={ref}>
+      <button
+        type="button"
+        className="nav-more-trigger"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="Predictions"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="nav-more-trigger-icon">
+          <PredictionsIcon />
+        </span>
+        <span className="nav-more-trigger-label">
+          Predictions
+          <span className="nav-more-caret" aria-hidden="true">
+            &#9662;
+          </span>
+        </span>
+      </button>
+      <div className="nav-more-panel">
+        <Link
+          href="/home"
+          onClick={() => {
+            close();
+            onNavigate();
+          }}
+        >
+          NFL
+        </Link>
+        <Link
+          href="/home/nba"
+          onClick={() => {
+            close();
+            onNavigate();
+          }}
+        >
+          NBA
+        </Link>
       </div>
     </div>
   );
@@ -208,10 +298,7 @@ function SideRail({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }
         <HomeIcon />
         <span>Home</span>
       </Link>
-      <Link href="/home">
-        <PredictionsIcon />
-        <span>Predictions</span>
-      </Link>
+      <PredictionsMenu onNavigate={() => {}} />
       <Link href="/parlays">
         <ParlaysIcon />
         <span>Parlays</span>
@@ -322,9 +409,7 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
           <Link href="/" onClick={close}>
             Home
           </Link>
-          <Link href="/home" onClick={close}>
-            Predictions
-          </Link>
+          <PredictionsMenu onNavigate={close} />
           <Link href="/parlays" onClick={close}>
             Parlays
           </Link>

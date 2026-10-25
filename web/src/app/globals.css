@@ -662,13 +662,32 @@ a {
   display: flex;
 }
 
-.nav-more-panel a {
+.nav-more-panel a,
+.nav-more-panel button {
   padding: 0.6rem 0.75rem;
   border-radius: 6px;
   font-size: 0.95rem;
 }
 
-.nav-more-panel a:hover {
+/* Sign Out needs to be an actual <button> (it runs JS, not a
+   navigation), so it loses every link/button default the panel's
+   other items get for free -- reset them here rather than wherever
+   this gets used, matching .nav-more-panel a's own box model exactly
+   (display: block, since Link renders as a block-level anchor inside
+   this flex column and a bare <button> would otherwise stay inline-
+   width-to-content). */
+.nav-more-panel button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.nav-more-panel a:hover,
+.nav-more-panel button:hover {
   background: var(--green-faint);
 }
 
@@ -815,7 +834,8 @@ a {
 :root:not([data-theme="light"]) .navbar .nav-more-trigger,
 :root:not([data-theme="light"]) .side-rail > a,
 :root:not([data-theme="light"]) .side-rail .nav-more-trigger,
-:root:not([data-theme="light"]) .nav-more-panel a {
+:root:not([data-theme="light"]) .nav-more-panel a,
+:root:not([data-theme="light"]) .nav-more-panel button {
   color: #ffd60a;
   text-shadow: 0 0 8px rgba(255, 214, 10, 0.45);
 }
@@ -826,7 +846,8 @@ a {
 :root:not([data-theme="light"]) .side-rail > a:hover,
 :root:not([data-theme="light"]) .side-rail .nav-more-trigger:hover,
 :root:not([data-theme="light"]) .side-rail .nav-more.open .nav-more-trigger,
-:root:not([data-theme="light"]) .nav-more-panel a:hover {
+:root:not([data-theme="light"]) .nav-more-panel a:hover,
+:root:not([data-theme="light"]) .nav-more-panel button:hover {
   color: #ffe55c;
   text-shadow: 0 0 14px rgba(255, 214, 10, 0.85);
 }
@@ -834,7 +855,8 @@ a {
 :root:not([data-theme="light"]) .side-rail > a:hover,
 :root:not([data-theme="light"]) .side-rail .nav-more-trigger:hover,
 :root:not([data-theme="light"]) .side-rail .nav-more.open .nav-more-trigger,
-:root:not([data-theme="light"]) .nav-more-panel a:hover {
+:root:not([data-theme="light"]) .nav-more-panel a:hover,
+:root:not([data-theme="light"]) .nav-more-panel button:hover {
   background: rgba(255, 214, 10, 0.12);
 }
 
@@ -848,7 +870,8 @@ a {
 :root[data-theme="light"] .navbar .nav-more-trigger,
 :root[data-theme="light"] .side-rail > a,
 :root[data-theme="light"] .side-rail .nav-more-trigger,
-:root[data-theme="light"] .nav-more-panel a {
+:root[data-theme="light"] .nav-more-panel a,
+:root[data-theme="light"] .nav-more-panel button {
   color: var(--green-dim);
   font-weight: 600;
 }
@@ -859,7 +882,8 @@ a {
 :root[data-theme="light"] .side-rail > a:hover,
 :root[data-theme="light"] .side-rail .nav-more-trigger:hover,
 :root[data-theme="light"] .side-rail .nav-more.open .nav-more-trigger,
-:root[data-theme="light"] .nav-more-panel a:hover {
+:root[data-theme="light"] .nav-more-panel a:hover,
+:root[data-theme="light"] .nav-more-panel button:hover {
   color: var(--green);
 }
 
@@ -1255,6 +1279,18 @@ h1.glow span {
 .season-rail {
   display: flex;
   justify-content: center;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Same shape as .season-rail, not .week-rail's horizontal scroll --
+   at most 9 months (Oct-Jun), small and bounded like a season list,
+   not the ~180-entry day list .week-rail has to scroll through. */
+.month-rail {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.25rem;
   margin-bottom: 0.75rem;
@@ -2985,6 +3021,33 @@ h1.glow span {
   margin-top: 3rem;
 }
 
+/* NBA game-detail page's Betting Edge / Injury Report tables
+   (NbaGameDetailView.tsx) -- a plain, readable data table in the
+   site's existing dark-panel style, not a new design system. */
+.prop-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.prop-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.prop-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.prop-table tr:hover td {
+  background: var(--green-faint);
+}
+
 /* Sits below every page's own footer/content (rendered in the root
    layout, not per-page) so a Follow Us row + Privacy Policy link exist
    site-wide without every page needing its own copy of them. */
@@ -3207,13 +3270,15 @@ h1.glow span {
     box-shadow: none;
   }
 
-  .nav-more-panel a {
+  .nav-more-panel a,
+  .nav-more-panel button {
     padding: 0.85rem 0;
     border-radius: 0;
     border-bottom: 1px solid var(--panel-border);
   }
 
-  .nav-more-panel a:last-child {
+  .nav-more-panel a:last-child,
+  .nav-more-panel button:last-child {
     border-bottom: none;
   }
 
@@ -3528,6 +3593,20 @@ h1.glow span {
   letter-spacing: 0.08em;
   font-weight: 400;
   opacity: 0.85;
+}
+
+.qb-matchup-injury-badge {
+  display: inline-block;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  text-transform: uppercase;
+  width: fit-content;
 }
 
 .qb-matchup-header-vs {

@@ -1120,7 +1120,7 @@ export const getGameDetail = cache(async function getGameDetail(universalGameId:
     await Promise.all([
       getGameInjuryReport(row.season, row.week, row.home_team, row.away_team),
       getGamePlayerGrades(row.season, row.home_team, row.away_team),
-      getGameQbMatchup(row.season, row.home_team, row.away_team),
+      getGameQbMatchup(row.season, row.week, row.home_team, row.away_team),
       getGameEfficiency(row.season, row.home_team, row.away_team),
       getGameTeamPressure(row.season, row.home_team, row.away_team),
       getGameTeamGrades(row.season, row.home_team, row.away_team),
