@@ -945,16 +945,17 @@ a {
   color: var(--green);
 }
 
-/* Yellow accent variant -- dark theme only, scoped to just View All
-   Picks For This Week / Claim Your Spot (request 2026-10-25: a
-   specific #ecf007 yellow, not the site's --gold). Get Early Access
-   — Free and the two "View Full ... Slate" links went back to the
-   plain .btn-ghost green hover above -- this used to also cover
-   those as a gold ghost variant, reverted on request. Light theme's
-   accent is already blue (see --green's light-theme override), which
-   the user wants left as-is, so this stays dark-theme-only and the
-   light-theme override below just falls back to the normal
-   var(--green) look. */
+/* Yellow accent variant -- dark theme, scoped to just View All Picks
+   For This Week / Claim Your Spot (request 2026-10-25: a specific
+   #ecf007 yellow, not the site's --gold). Get Early Access — Free and
+   the two "View Full ... Slate" links went back to the plain
+   .btn-ghost green hover above -- this used to also cover those as a
+   gold ghost variant, reverted on request.
+   Light theme instead goes red, same var(--red) as .brand-tld's
+   ".NET" (per the user's own reference) -- that's the one element
+   that already breaks from "everything flips green-to-blue in light
+   theme," so these 2 buttons follow .NET's choice instead of the
+   usual accent swap. */
 .btn-primary.btn-gold {
   background: #ecf007;
   box-shadow: 0 0 18px rgba(236, 240, 7, 0.35);
@@ -965,7 +966,7 @@ a {
 }
 
 :root[data-theme="light"] .btn-primary.btn-gold {
-  background: var(--green);
+  background: var(--red);
 }
 
 .btn-block {
