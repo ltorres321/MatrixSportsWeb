@@ -33,6 +33,10 @@ import { NBA_TEAMS, teamLogoPath } from "@/lib/teamsNba";
 // "UPCOMING" with a pregame win probability instead of its real score
 // -- confirmed live: Nuggets/Pelicans was in overtime, 136-134, while
 // this card still said "UPCOMING."
+//
+// `premier` added for the home page's featured-game slot -- sizing
+// only (the shared .premier-card CSS), no gold lock-of-week variant:
+// there's no NBA equivalent of lockOfWeek/premierLabel yet.
 
 function StatusTag({ status }: { status: Matchup["status"] }) {
   if (status === "final") {
@@ -116,10 +120,16 @@ function TeamRow({
   );
 }
 
-export default function NbaMatchupCard({ matchup }: { matchup: Matchup }) {
+export default function NbaMatchupCard({
+  matchup,
+  premier,
+}: {
+  matchup: Matchup;
+  premier?: boolean;
+}) {
   return (
     <Link className="matchup-card-link" href={`/nba/game/${matchup.id}`}>
-    <div className="matchup-card">
+    <div className={`matchup-card ${premier ? "premier-card" : ""}`}>
       <div className="matchup-status">
         <StatusTag status={matchup.status} />
         <span className="game-meta">{matchup.kickoff}</span>

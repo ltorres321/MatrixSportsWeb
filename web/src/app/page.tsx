@@ -159,7 +159,7 @@ export default async function HomePage() {
           {featuredNbaGame && (
             <div className="premier-wrap">
               <div className="premier-ribbon">🏀 FEATURED NBA GAME</div>
-              <NbaMatchupCard matchup={featuredNbaGame} />
+              <NbaMatchupCard matchup={featuredNbaGame} premier />
             </div>
           )}
 
@@ -367,7 +367,7 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
           {featuredNbaGame && (
             <div className="premier-wrap">
               <div className="premier-ribbon">🏀 FEATURED NBA GAME</div>
-              <NbaMatchupCard matchup={featuredNbaGame} />
+              <NbaMatchupCard matchup={featuredNbaGame} premier />
               <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
                 <Link className="btn btn-ghost" href="/home/nba">
                   View Full NBA Slate →
