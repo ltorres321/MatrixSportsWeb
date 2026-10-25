@@ -85,11 +85,12 @@ export default async function HomePage() {
   const season = seasons.includes(fallbackSeason) ? fallbackSeason : seasons[0];
 
   let premier: Matchup | undefined;
+  let currentWeek: number | null = null;
   if (season !== undefined) {
-    const week = await getDefaultWeek(season);
-    if (week !== null) {
-      const premierGame = await getPremierGame(season, week);
-      const matchups = await getMatchupsForSeasonWeek(season, week, premierGame);
+    currentWeek = await getDefaultWeek(season);
+    if (currentWeek !== null) {
+      const premierGame = await getPremierGame(season, currentWeek);
+      const matchups = await getMatchupsForSeasonWeek(season, currentWeek, premierGame);
       premier = matchups.find((m) => m.premier);
     }
   }
@@ -137,10 +138,10 @@ export default async function HomePage() {
               model picks for early users, every week.
             </p>
             <div className="hero-actions">
-              <Link className="btn btn-primary" href="/home">
+              <Link className="btn btn-primary btn-gold" href="/home">
                 View All Picks For This Week
               </Link>
-              <Link className="btn btn-ghost" href="/signup">
+              <Link className="btn btn-primary" href="/signup">
                 Get Early Access — Free
               </Link>
             </div>
@@ -153,6 +154,11 @@ export default async function HomePage() {
                 {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
               </div>
               <MatchupCard matchup={premier} premier />
+              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                <Link className="btn btn-primary" href="/signup">
+                  View Full Week {currentWeek} Slate →
+                </Link>
+              </div>
             </div>
           )}
 
@@ -160,6 +166,11 @@ export default async function HomePage() {
             <div className="premier-wrap">
               <div className="premier-ribbon">🏀 FEATURED NBA GAME</div>
               <NbaMatchupCard matchup={featuredNbaGame} premier />
+              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                <Link className="btn btn-primary" href="/signup">
+                  View Full NBA Slate →
+                </Link>
+              </div>
             </div>
           )}
 
@@ -236,7 +247,7 @@ export default async function HomePage() {
               🔒 Early subscribers get <strong>preferential pricing</strong> — sign up free
               during beta to lock in your rate before paid tiers launch.
             </span>
-            <Link className="btn btn-primary" href="/signup">
+            <Link className="btn btn-primary btn-gold" href="/signup">
               Claim Your Spot
             </Link>
           </div>

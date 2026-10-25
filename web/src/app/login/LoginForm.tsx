@@ -50,7 +50,7 @@ export default function LoginForm() {
                 </button>
               </div>
 
-              <p className="form-footer-note">
+              <p className="form-footer-note form-footer-note-lg">
                 Don&apos;t have an account?{" "}
                 <Link href="/signup" className="gold-cta-link">
                   Sign up free

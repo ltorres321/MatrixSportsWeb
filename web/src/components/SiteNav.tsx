@@ -30,7 +30,19 @@ const RAIL_SCROLL_FALLBACK_THRESHOLD = 900;
 // open state, own outside-click ref) since only one is ever visible
 // at a time (CSS hides whichever bar isn't active), so there's no
 // need to share state between them.
-function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmin: boolean; onNavigate: () => void }) {
+function MoreMenu({
+  signedIn,
+  isAdmin,
+  theme,
+  userId,
+  onNavigate,
+}: {
+  signedIn: boolean;
+  isAdmin: boolean;
+  theme: "dark" | "light";
+  userId?: string;
+  onNavigate: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -45,6 +57,32 @@ function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmi
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");
+    router.refresh();
+  }
+
+  // Lets any visitor -- signed in or not -- flip the site's theme
+  // right from the nav, instead of it being reachable only via the
+  // Profile page (which needs an account; request 2026-10-25: "no
+  // sign-ups in 2 months," and a theme that only an account can
+  // change is one more friction point for everyone browsing signed
+  // out). Signed-in: persists to the same profiles.theme column the
+  // Profile page writes (mirrors handleAppearanceChange there,
+  // including forcing rain off on light). Signed-out: no profiles row
+  // to write to, so this sets a plain "theme" cookie instead -- see
+  // layout.tsx's getAppearance, which reads it back as the anonymous
+  // fallback.
+  async function handleThemeToggle() {
+    close();
+    onNavigate();
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    if (signedIn && userId) {
+      const supabase = createClient();
+      const updates =
+        nextTheme === "light" ? { theme: "light", matrix_rain_enabled: false } : { theme: "dark" };
+      await supabase.from("profiles").update(updates).eq("id", userId);
+    } else {
+      document.cookie = `theme=${nextTheme}; path=/; max-age=31536000; samesite=lax`;
+    }
     router.refresh();
   }
 
@@ -103,6 +141,9 @@ function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmi
         >
           Contact Us
         </Link>
+        <button type="button" className="nav-more-theme" onClick={handleThemeToggle}>
+          {theme === "dark" ? "☀️ Light Theme" : "🌙 Dark Theme"}
+        </button>
         {signedIn ? (
           <>
             <Link
@@ -291,7 +332,17 @@ function MenuDotsIcon() {
 // .side-rail.visible): the top bar's replacement once you've scrolled
 // past the hero -- see RAIL_SCROLL_THRESHOLD. Phones never show this;
 // .navbar there is untouched regardless of scroll position.
-function SideRail({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
+function SideRail({
+  signedIn,
+  isAdmin,
+  theme,
+  userId,
+}: {
+  signedIn: boolean;
+  isAdmin: boolean;
+  theme: "dark" | "light";
+  userId?: string;
+}) {
   return (
     <nav className="side-rail" aria-label="Quick navigation">
       <Link href="/">
@@ -307,12 +358,22 @@ function SideRail({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }
         <RecapsIcon />
         <span>Recaps</span>
       </Link>
-      <MoreMenu signedIn={signedIn} isAdmin={isAdmin} onNavigate={() => {}} />
+      <MoreMenu signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} onNavigate={() => {}} />
     </nav>
   );
 }
 
-export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
+export default function SiteNav({
+  signedIn,
+  isAdmin,
+  theme,
+  userId,
+}: {
+  signedIn: boolean;
+  isAdmin: boolean;
+  theme: "dark" | "light";
+  userId?: string;
+}) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const navRef = useRef<HTMLElement>(null);
@@ -416,11 +477,11 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
           <Link href="/stories" onClick={close}>
             Recaps
           </Link>
-          <MoreMenu signedIn={signedIn} isAdmin={isAdmin} onNavigate={close} />
+          <MoreMenu signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} onNavigate={close} />
         </div>
       </nav>
 
-      <SideRail signedIn={signedIn} isAdmin={isAdmin} />
+      <SideRail signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} />
     </>
   );
 }
