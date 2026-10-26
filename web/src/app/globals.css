@@ -5234,6 +5234,40 @@ h1.glow span {
   margin: 0.08rem 0;
 }
 
+/* Analysis -- "+/-##.##% Above/Below [baseline] Average" per zone.
+   More text than the Eff/Cnt labels it replaces, so it wraps onto two
+   lines inside a wider pill rather than forcing one long line. */
+/* The Analysis second line -- added underneath Zone Eff's %/Zone
+   Cnt's fraction (never replacing it, per the explicit ask), so this
+   is a child of .nba-zoneeff-label/.nba-zonecnt-label, not its own
+   positioned element: it inherits their pill, their position, and
+   their existing flip handling. Its own white-space: normal lets it
+   wrap onto two lines inside that pill (the Eff/Cnt values above it
+   stay single-line) instead of forcing the whole pill wide enough for
+   "+30.39% Below Season Average" on one line, which would overflow
+   badly in the narrow corner zones. */
+.nba-zoneanalysis-subline {
+  display: block;
+  width: 100%;
+  max-width: 6.5em;
+  margin: 0.15rem auto 0;
+  padding-top: 0.15rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.18);
+  font-size: calc(0.56rem + 1px);
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: normal;
+  text-align: center;
+}
+
+/* Disabled per the explicit ask (not hidden) when this half's
+   Lookback/Chart Type combination can't support a %-based comparison
+   -- see isAnalysisAvailable's own comment. */
+.nba-shotchart-control select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Player boxes bigger than the shared NFL default (that 92px sizing
    reads fine against a wide field, but this court is deliberately
    much narrower -- see .nba-lineup-court-wrap above -- so the same

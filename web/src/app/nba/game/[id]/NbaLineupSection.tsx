@@ -185,19 +185,77 @@ function matchesQuarter(period: number | null, filter: QuarterFilter): boolean {
 // to ShotMarker.gameId === the matchup's own GameShotChart.currentGameId
 // (a client-side filter, not a second server fetch: the season-to-date
 // query this page already loads already contains this game's own
-// shots as a subset). "Season to Date" is the unfiltered existing
+// shots as a subset). "L5"/"L10" are the team's own 5/10 most recent
+// games (including the current one), same client-side approach --
+// see lastNGameIds below. "Season to Date" is the unfiltered existing
 // behavior.
-type Lookback = "currentGame" | "seasonToDate";
+type Lookback = "currentGame" | "l5" | "l10" | "seasonToDate";
 
 const LOOKBACK_OPTIONS: { value: Lookback; label: string }[] = [
   { value: "currentGame", label: "Current Game" },
+  { value: "l5", label: "L5" },
+  { value: "l10", label: "L10" },
   { value: "seasonToDate", label: "Season to Date" },
 ];
 
+// bref's own game_id convention (YYYYMMDD + "0" + home team code,
+// already relied on elsewhere -- see nbaShotChart.ts's own comment)
+// means the game's date is just its own first 8 characters, no lookup
+// needed.
+function gameIdDateKey(gameId: string): string {
+  return gameId.slice(0, 8);
+}
+
+// The N most recent distinct games present in `shots` (by date, ties
+// broken by game_id), as of whatever date this page's shots already
+// stop at -- there's nothing newer than "today" in the loaded data,
+// so "most recent" here already means "most recent as of the current
+// game." Computed from the full, unfiltered shot list (not whatever
+// Players/Quarter filter happens to be active), so the N-game window
+// itself never shrinks just because a filter excludes every shot from
+// one of those games.
+function lastNGameIds(shots: ShotMarker[], n: number): Set<string> {
+  const dateByGame = new Map<string, string>();
+  for (const s of shots) {
+    if (!dateByGame.has(s.gameId)) dateByGame.set(s.gameId, gameIdDateKey(s.gameId));
+  }
+  const sorted = [...dateByGame.entries()].sort((a, b) => (a[1] < b[1] ? 1 : a[1] > b[1] ? -1 : 0));
+  return new Set(sorted.slice(0, n).map(([gameId]) => gameId));
+}
+
 // Shared by both chart types below -- a shot that didn't survive the
-// Lookback/Players/Quarter filters, filtered once by the parent so the
-// active overlay (dot markers or zone percentages/counts) never has
-// to re-derive it.
+// Players/Quarter filters plus whichever specific set of games is in
+// scope, filtered once by the parent so the active overlay (dot
+// markers, zone percentages/counts, or the Analysis diff) never has
+// to re-derive it. `gameIds === null` means no game-window
+// restriction at all (Season to Date).
+function filterShotsByGames(
+  shots: ShotMarker[],
+  selectedPlayerIds: Set<string> | null,
+  quarterFilter: QuarterFilter,
+  gameIds: Set<string> | null
+): ShotMarker[] {
+  return shots.filter(
+    (s) =>
+      (selectedPlayerIds === null || selectedPlayerIds.has(s.playerId)) &&
+      matchesQuarter(s.period, quarterFilter) &&
+      (gameIds === null || gameIds.has(s.gameId))
+  );
+}
+
+function lookbackGameIds(shots: ShotMarker[], lookback: Lookback, currentGameId: string): Set<string> | null {
+  switch (lookback) {
+    case "currentGame":
+      return new Set([currentGameId]);
+    case "l5":
+      return lastNGameIds(shots, 5);
+    case "l10":
+      return lastNGameIds(shots, 10);
+    case "seasonToDate":
+      return null;
+  }
+}
+
 function filterShots(
   shots: ShotMarker[],
   selectedPlayerIds: Set<string> | null,
@@ -205,12 +263,7 @@ function filterShots(
   lookback: Lookback,
   currentGameId: string
 ): ShotMarker[] {
-  return shots.filter(
-    (s) =>
-      (selectedPlayerIds === null || selectedPlayerIds.has(s.playerId)) &&
-      matchesQuarter(s.period, quarterFilter) &&
-      (lookback === "seasonToDate" || s.gameId === currentGameId)
-  );
+  return filterShotsByGames(shots, selectedPlayerIds, quarterFilter, lookbackGameIds(shots, lookback, currentGameId));
 }
 
 // Two or more real shots can land on the exact same recorded pixel --
@@ -329,12 +382,90 @@ function aggregateZoneShots(shots: ShotMarker[]): { makes: Partial<Record<number
   return { makes, attempts };
 }
 
+// How many distinct games a shot list actually spans -- used to turn
+// a baseline's total zone attempts into a PER-GAME average (see
+// AnalysisInput's own comment on why Zone Cnt's analysis needs this
+// and Zone Eff's doesn't).
+function distinctGameCount(shots: ShotMarker[]): number {
+  return new Set(shots.map((s) => s.gameId)).size;
+}
+
+// The 5th per-half dropdown -- compares this ONE game's own per-zone
+// numbers against a baseline (season/L5/L10), always using the
+// literal current game as one side regardless of whatever the
+// Lookback dropdown itself is set to (Lookback controls the primary
+// %/fraction shown on the court; Analysis adds a second line
+// underneath it, it never replaces what's already there -- see
+// AnalysisInput). Disabled by explicit ask whenever Lookback is
+// already "Season to Date" (comparing the season to itself) or Chart
+// Type is "Shot Selection" (nothing to attach a per-zone comparison
+// to on a raw dot chart).
+type Analysis = "none" | "vsSeason" | "vsL5" | "vsL10";
+
+const ANALYSIS_OPTIONS: { value: Analysis; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "vsSeason", label: "Current Game % vs Season %" },
+  { value: "vsL5", label: "Current Game % vs L5" },
+  { value: "vsL10", label: "Current Game % vs L10" },
+];
+
+function isAnalysisAvailable(lookback: Lookback, chartType: ChartType): boolean {
+  return lookback !== "seasonToDate" && chartType !== "shotSelection";
+}
+
+function analysisBaselineLabel(analysis: Analysis): string {
+  switch (analysis) {
+    case "vsSeason":
+      return "Season Average";
+    case "vsL5":
+      return "L5 Average";
+    case "vsL10":
+      return "L10 Average";
+    case "none":
+      return "";
+  }
+}
+
+// What ZoneEfficiencyOverlay/ZoneCountOverlay need to add their own
+// extra Analysis line -- the literal current game's own shots and the
+// selected baseline's shots, each independent of whatever Lookback is
+// driving the card's normal %/fraction display.
+interface AnalysisInput {
+  currentGameShots: ShotMarker[];
+  baselineShots: ShotMarker[];
+  baselineLabel: string;
+}
+
+// Strong red/dark green, not the site's own pale-green theme text
+// color the subline was silently inheriting before (confirmed from a
+// real screenshot: unreadable against the light pill background it
+// sits on, which is light regardless of site theme). Direction-coded
+// rather than a single neutral color -- "below" and "above" read at
+// a glance this way, and it still can't be confused with
+// zoneEffColor's own red/black/blue (an absolute FG% scale, nothing
+// to do with this diff's sign).
+const ANALYSIS_BELOW_COLOR = "#c41e1e";
+const ANALYSIS_ABOVE_COLOR = "#0a6b2d";
+const ANALYSIS_EVEN_COLOR = "#333333";
+
+function analysisDiffColor(diff: number, isEven: boolean): string {
+  if (isEven) return ANALYSIS_EVEN_COLOR;
+  return diff >= 0 ? ANALYSIS_ABOVE_COLOR : ANALYSIS_BELOW_COLOR;
+}
+
 // "Shots By Zone Eff" -- each zone's own season-to-date FG% (from
 // whatever Players/Quarter/Lookback filter is active), not per-shot
 // markers. Zones with zero attempts show nothing rather than a
-// misleading 0%.
-function ZoneEfficiencyOverlay({ shots, flipped }: { shots: ShotMarker[]; flipped: boolean }) {
+// misleading 0%. When Analysis is active, a second, smaller line
+// underneath adds "+/-##.##% Above/Below [baseline] Average" --
+// Current Game % minus the baseline's own %, never replacing the
+// primary value above it. A zone needs real attempts on both sides to
+// compare a percentage; one with zero on either side just omits the
+// extra line (the primary % above it still shows as normal).
+function ZoneEfficiencyOverlay({ shots, flipped, analysis }: { shots: ShotMarker[]; flipped: boolean; analysis: AnalysisInput | null }) {
   const { makes, attempts } = aggregateZoneShots(shots);
+  const curAgg = analysis ? aggregateZoneShots(analysis.currentGameShots) : null;
+  const baseAgg = analysis ? aggregateZoneShots(analysis.baselineShots) : null;
   return (
     <div className={`nba-shotchart-overlay ${flipped ? "nba-shotchart-overlay-flipped" : ""}`}>
       {ZONE_NUMBERS.map((zone) => {
@@ -342,6 +473,25 @@ function ZoneEfficiencyOverlay({ shots, flipped }: { shots: ShotMarker[]; flippe
         if (att === 0) return null;
         const pct = ((makes[zone] ?? 0) / att) * 100;
         const pos = ZONE_LABEL_POSITION[zone];
+
+        let analysisLine: { text: string; color: string } | null = null;
+        if (analysis && curAgg && baseAgg) {
+          const curAtt = curAgg.attempts[zone] ?? 0;
+          const baseAtt = baseAgg.attempts[zone] ?? 0;
+          if (curAtt > 0 && baseAtt > 0) {
+            const curPct = ((curAgg.makes[zone] ?? 0) / curAtt) * 100;
+            const basePct = ((baseAgg.makes[zone] ?? 0) / baseAtt) * 100;
+            const diff = curPct - basePct;
+            const isEven = Math.abs(diff) < 0.005;
+            analysisLine = {
+              text: isEven
+                ? `Even with ${analysis.baselineLabel}`
+                : `${diff >= 0 ? "+" : "-"}${Math.abs(diff).toFixed(2)}% ${diff >= 0 ? "Above" : "Below"} ${analysis.baselineLabel}`,
+              color: analysisDiffColor(diff, isEven),
+            };
+          }
+        }
+
         return (
           <span
             key={zone}
@@ -349,6 +499,11 @@ function ZoneEfficiencyOverlay({ shots, flipped }: { shots: ShotMarker[]; flippe
             style={{ left: `${pos.x}%`, top: `${pos.y}%`, color: zoneEffColor(pct) }}
           >
             {Math.round(pct)}%
+            {analysisLine && (
+              <span className="nba-zoneanalysis-subline" style={{ color: analysisLine.color }}>
+                {analysisLine.text}
+              </span>
+            )}
           </span>
         );
       })}
@@ -360,20 +515,54 @@ function ZoneEfficiencyOverlay({ shots, flipped }: { shots: ShotMarker[]; flippe
 // a stacked fraction (made on top, a rule, attempts below) rather
 // than a percentage or side-by-side "12/34" -- the user's own ask,
 // specifically so it still reads in the narrow corner/baseline zones
-// where horizontal room is tightest.
-function ZoneCountOverlay({ shots, flipped }: { shots: ShotMarker[]; flipped: boolean }) {
+// where horizontal room is tightest. When Analysis is active, a
+// second line underneath shows how many MORE or FEWER shots were
+// taken from this zone tonight than the baseline's own per-game
+// average there -- a raw count difference, not a percentage (that's
+// Zone Eff's job): Current Game attempts minus (baseline's total
+// attempts / the number of games the baseline actually spans).
+// Shown as a whole number ("+/-##"), not Zone Eff's two decimals.
+// Unlike Zone Eff, a baseline average of zero (never shot from there
+// in that window) is itself a valid, meaningful comparison point, so
+// this only skips the line when the baseline has no games at all to
+// average over.
+function ZoneCountOverlay({ shots, flipped, analysis }: { shots: ShotMarker[]; flipped: boolean; analysis: AnalysisInput | null }) {
   const { makes, attempts } = aggregateZoneShots(shots);
+  const curAgg = analysis ? aggregateZoneShots(analysis.currentGameShots) : null;
+  const baseAgg = analysis ? aggregateZoneShots(analysis.baselineShots) : null;
+  const baseGameCount = analysis ? distinctGameCount(analysis.baselineShots) : 0;
   return (
     <div className={`nba-shotchart-overlay ${flipped ? "nba-shotchart-overlay-flipped" : ""}`}>
       {ZONE_NUMBERS.map((zone) => {
         const att = attempts[zone] ?? 0;
         if (att === 0) return null;
         const pos = ZONE_LABEL_POSITION[zone];
+
+        let analysisLine: { text: string; color: string } | null = null;
+        if (analysis && curAgg && baseAgg && baseGameCount > 0) {
+          const curAtt = curAgg.attempts[zone] ?? 0;
+          const baseAvg = (baseAgg.attempts[zone] ?? 0) / baseGameCount;
+          const diff = curAtt - baseAvg;
+          const rounded = Math.round(Math.abs(diff));
+          const isEven = rounded === 0;
+          analysisLine = {
+            text: isEven
+              ? `Even with ${analysis.baselineLabel}`
+              : `${diff >= 0 ? "+" : "-"}${rounded} ${diff >= 0 ? "Above" : "Below"} ${analysis.baselineLabel}`,
+            color: analysisDiffColor(diff, isEven),
+          };
+        }
+
         return (
           <span key={zone} className="nba-zonecnt-label" style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>
             <span className="nba-zonecnt-made">{makes[zone] ?? 0}</span>
             <span className="nba-zonecnt-rule" />
             <span className="nba-zonecnt-attempts">{att}</span>
+            {analysisLine && (
+              <span className="nba-zoneanalysis-subline" style={{ color: analysisLine.color }}>
+                {analysisLine.text}
+              </span>
+            )}
           </span>
         );
       })}
@@ -512,6 +701,34 @@ function QuarterSelect({ id, value, onChange }: { id: string; value: QuarterFilt
   );
 }
 
+// The 5th per-half dropdown, under Quarter -- disabled (not hidden,
+// per the explicit ask) whenever isAnalysisAvailable says this half's
+// current Lookback/Chart Type combination can't support it.
+function AnalysisSelect({
+  id,
+  value,
+  onChange,
+  available,
+}: {
+  id: string;
+  value: Analysis;
+  onChange: (next: Analysis) => void;
+  available: boolean;
+}) {
+  return (
+    <div className="nba-shotchart-control">
+      <label htmlFor={id}>Analysis</label>
+      <select id={id} value={value} disabled={!available} onChange={(e) => onChange(e.target.value as Analysis)}>
+        {ANALYSIS_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 // "on the left side of the board" -- a Lookback + Chart Type + Players
 // + Quarter dropdown quartet for EACH court half, laid out in a 2-row
 // grid (.nba-shotchart-controls) that matches the court's own
@@ -540,6 +757,10 @@ function ShotChartControls({
   onAwayLookbackChange,
   homeLookback,
   onHomeLookbackChange,
+  awayAnalysis,
+  onAwayAnalysisChange,
+  homeAnalysis,
+  onHomeAnalysisChange,
 }: {
   awayAlias: string;
   homeAlias: string;
@@ -561,6 +782,10 @@ function ShotChartControls({
   onAwayLookbackChange: (next: Lookback) => void;
   homeLookback: Lookback;
   onHomeLookbackChange: (next: Lookback) => void;
+  awayAnalysis: Analysis;
+  onAwayAnalysisChange: (next: Analysis) => void;
+  homeAnalysis: Analysis;
+  onHomeAnalysisChange: (next: Analysis) => void;
 }) {
   return (
     <div className="nba-shotchart-controls">
@@ -569,12 +794,24 @@ function ShotChartControls({
         <ChartTypeSelect id="nba-shotchart-type-away" value={awayChartType} onChange={onAwayChartTypeChange} />
         <TeamPlayerDropdown alias={awayAlias} players={awayPlayers} selected={awaySelected} onChange={onAwayChange} />
         <QuarterSelect id="nba-shotchart-quarter-away" value={awayQuarter} onChange={onAwayQuarterChange} />
+        <AnalysisSelect
+          id="nba-shotchart-analysis-away"
+          value={awayAnalysis}
+          onChange={onAwayAnalysisChange}
+          available={isAnalysisAvailable(awayLookback, awayChartType)}
+        />
       </div>
       <div className="nba-shotchart-controls-bottom">
         <LookbackSelect id="nba-shotchart-lookback-home" value={homeLookback} onChange={onHomeLookbackChange} />
         <ChartTypeSelect id="nba-shotchart-type-home" value={homeChartType} onChange={onHomeChartTypeChange} />
         <TeamPlayerDropdown alias={homeAlias} players={homePlayers} selected={homeSelected} onChange={onHomeChange} />
         <QuarterSelect id="nba-shotchart-quarter-home" value={homeQuarter} onChange={onHomeQuarterChange} />
+        <AnalysisSelect
+          id="nba-shotchart-analysis-home"
+          value={homeAnalysis}
+          onChange={onHomeAnalysisChange}
+          available={isAnalysisAvailable(homeLookback, homeChartType)}
+        />
       </div>
     </div>
   );
@@ -611,6 +848,8 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
   const [homeChartType, setHomeChartType] = useState<ChartType>("shotSelection");
   const [awayLookback, setAwayLookback] = useState<Lookback>("currentGame");
   const [homeLookback, setHomeLookback] = useState<Lookback>("currentGame");
+  const [awayAnalysis, setAwayAnalysis] = useState<Analysis>("none");
+  const [homeAnalysis, setHomeAnalysis] = useState<Analysis>("none");
 
   if (!game.lineup) {
     return (
@@ -634,6 +873,43 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
   const homeFilteredShots = game.shotChart
     ? filterShots(game.shotChart.home.shots, homeSelectedPlayerIds, homeQuarter, homeLookback, game.shotChart.currentGameId)
     : [];
+
+  // Analysis always compares the literal current game against a
+  // baseline, independent of whatever the Lookback dropdown above is
+  // set to -- so this is computed straight from the full shot list,
+  // not from awayFilteredShots/homeFilteredShots.
+  const awayAnalysisActive = isAnalysisAvailable(awayLookback, awayChartType) && awayAnalysis !== "none";
+  const homeAnalysisActive = isAnalysisAvailable(homeLookback, homeChartType) && homeAnalysis !== "none";
+  const awayAnalysisBaselineGameIds =
+    awayAnalysisActive && game.shotChart
+      ? awayAnalysis === "vsSeason"
+        ? null
+        : lastNGameIds(game.shotChart.away.shots, awayAnalysis === "vsL5" ? 5 : 10)
+      : null;
+  const homeAnalysisBaselineGameIds =
+    homeAnalysisActive && game.shotChart
+      ? homeAnalysis === "vsSeason"
+        ? null
+        : lastNGameIds(game.shotChart.home.shots, homeAnalysis === "vsL5" ? 5 : 10)
+      : null;
+  const awayCurrentGameShots = game.shotChart
+    ? filterShotsByGames(game.shotChart.away.shots, awaySelectedPlayerIds, awayQuarter, new Set([game.shotChart.currentGameId]))
+    : [];
+  const homeCurrentGameShots = game.shotChart
+    ? filterShotsByGames(game.shotChart.home.shots, homeSelectedPlayerIds, homeQuarter, new Set([game.shotChart.currentGameId]))
+    : [];
+  const awayAnalysisBaselineShots = game.shotChart
+    ? filterShotsByGames(game.shotChart.away.shots, awaySelectedPlayerIds, awayQuarter, awayAnalysisBaselineGameIds)
+    : [];
+  const homeAnalysisBaselineShots = game.shotChart
+    ? filterShotsByGames(game.shotChart.home.shots, homeSelectedPlayerIds, homeQuarter, homeAnalysisBaselineGameIds)
+    : [];
+  const awayAnalysisInput: AnalysisInput | null = awayAnalysisActive
+    ? { currentGameShots: awayCurrentGameShots, baselineShots: awayAnalysisBaselineShots, baselineLabel: analysisBaselineLabel(awayAnalysis) }
+    : null;
+  const homeAnalysisInput: AnalysisInput | null = homeAnalysisActive
+    ? { currentGameShots: homeCurrentGameShots, baselineShots: homeAnalysisBaselineShots, baselineLabel: analysisBaselineLabel(homeAnalysis) }
+    : null;
 
   return (
     <div className="stat-section">
@@ -671,6 +947,10 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
                 onAwayLookbackChange={setAwayLookback}
                 homeLookback={homeLookback}
                 onHomeLookbackChange={setHomeLookback}
+                awayAnalysis={awayAnalysis}
+                onAwayAnalysisChange={setAwayAnalysis}
+                homeAnalysis={homeAnalysis}
+                onHomeAnalysisChange={setHomeAnalysis}
               />
             )}
             <div className={`nba-lineup-court-wrap ${mode === "shotChart" ? "nba-lineup-court-wrap-wide" : ""}`}>
@@ -713,16 +993,16 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
                   game.shotChart ? (
                     <>
                       {awayChartType === "zoneEff" ? (
-                        <ZoneEfficiencyOverlay shots={awayFilteredShots} flipped={false} />
+                        <ZoneEfficiencyOverlay shots={awayFilteredShots} flipped={false} analysis={awayAnalysisInput} />
                       ) : awayChartType === "zoneCnt" ? (
-                        <ZoneCountOverlay shots={awayFilteredShots} flipped={false} />
+                        <ZoneCountOverlay shots={awayFilteredShots} flipped={false} analysis={awayAnalysisInput} />
                       ) : (
                         <ShotChartOverlay shots={awayFilteredShots} flipped={false} />
                       )}
                       {homeChartType === "zoneEff" ? (
-                        <ZoneEfficiencyOverlay shots={homeFilteredShots} flipped />
+                        <ZoneEfficiencyOverlay shots={homeFilteredShots} flipped analysis={homeAnalysisInput} />
                       ) : homeChartType === "zoneCnt" ? (
-                        <ZoneCountOverlay shots={homeFilteredShots} flipped />
+                        <ZoneCountOverlay shots={homeFilteredShots} flipped analysis={homeAnalysisInput} />
                       ) : (
                         <ShotChartOverlay shots={homeFilteredShots} flipped />
                       )}
