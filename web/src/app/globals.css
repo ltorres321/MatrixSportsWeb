@@ -5029,7 +5029,7 @@ h1.glow span {
    cascade so the plain class-order rule (same specificity) wins
    without needing !important. */
 .nba-lineup-court-wrap-wide {
-  width: 62%;
+  width: 55.8%; /* 62% - 10% relative, so both courts fit on screen together */
 }
 
 .nba-lineup-court {
