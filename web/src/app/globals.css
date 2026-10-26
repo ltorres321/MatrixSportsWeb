@@ -4862,6 +4862,434 @@ h1.glow span {
   }
 }
 
+/* NBA's own Matchups/Lineup card (NbaLineupSection.tsx) -- reuses the
+   .lineup-* card/box anatomy above (same card shape, same mobile
+   shrink rules) but swaps the NFL field for a real two-basket court
+   image instead of the CSS-tiled field (that one's own comment calls
+   real field art "out of scope"; this one has real art to use). Scoped
+   under .nba-lineup-field so none of this touches the shared .lineup-*
+   rules the NFL page still depends on. */
+.nba-lineup-field {
+  background: none;
+  padding: 0;
+}
+
+/* Wraps the Shot Chart mode's left-side controls (ShotChartControls)
+   alongside the court -- a plain flex row with one child (the court)
+   outside Shot Chart mode behaves exactly like the old always-centered
+   layout, so this adds no visual change there. */
+.nba-lineup-shotchart-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+/* Stretched (align-items: stretch above) to match the court's own
+   rendered height, then a 2-row grid split exactly in half so the top
+   row's content (Chart Type + Players, .nba-shotchart-controls-top)
+   starts level with the away half's own top, and the bottom row's
+   content (.nba-shotchart-controls-bottom) starts right at the
+   half-court line -- the top of the home half, not bottom-pinned to
+   the very end of the card where it sat unreachable below the home
+   basket. Left padding so the dropdowns clear the card's own left
+   edge instead of sitting flush against it. */
+.nba-shotchart-controls {
+  flex: 0 0 170px;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  padding: 0.5rem 0 0.5rem 1rem;
+}
+
+.nba-shotchart-controls-top,
+.nba-shotchart-controls-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.nba-shotchart-control {
+  position: relative;
+}
+
+.nba-shotchart-control label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin-bottom: 0.3rem;
+}
+
+/* Explicit <option> colors -- a native <select>'s closed box honors
+   `color`/`background` fine, but its OWN opened popup list is
+   browser/OS-rendered chrome that otherwise ignores inherited color
+   and defaults to near-black option text, landing on this dark card's
+   own dark background as barely-there low-contrast text (confirmed:
+   that's what made the Quarter dropdown's open list unreadable while
+   the closed box read fine). --panel-solid/--text so this still works
+   correctly in light theme, not just the dark theme it was tested in. */
+.nba-shotchart-control select {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  padding: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.nba-shotchart-control select option {
+  background: var(--panel-solid);
+  color: var(--text);
+}
+
+/* The player filter's closed state -- styled to read as a dropdown
+   (summary text + caret), not a checkbox list, even though what opens
+   underneath it is checkboxes rather than a native <select>'s own
+   option list (see TeamPlayerDropdown's own comment on why). */
+.nba-shotchart-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nba-shotchart-dropdown-toggle[aria-expanded="true"] {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.nba-shotchart-dropdown-caret {
+  opacity: 0.6;
+  margin-left: 0.4rem;
+}
+
+/* Floats over the court (not in normal flow) so opening it never
+   shifts the dropdown column's own space-between layout or the
+   court's width. */
+.nba-shotchart-dropdown-panel {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  width: max(100%, 180px);
+  max-height: 600px;
+  overflow-y: auto;
+  background: var(--panel-solid);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  padding: 0.3rem;
+}
+
+.nba-shotchart-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.78rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.nba-shotchart-checklist-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nba-shotchart-checklist-all {
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.45rem;
+}
+
+.nba-lineup-court-wrap {
+  position: relative;
+  width: 50%;
+  margin: 0 auto;
+}
+
+/* Some real shots (deep corner/baseline, half-court heaves) sit right
+   at or past bref's own 500x469.78 canvas edge -- ShotMarker.xPct/yPct
+   are clamped to stay on the floor, but a 50%-wide court still left
+   those edge shots cramped right against the frame. Wider in Shot
+   Chart mode only -- the player-lineup card's own 50% stays exactly
+   as tuned (see .nba-lineup-field-half's own comment on why that
+   sizing matters there). Comes after .nba-lineup-court-wrap in the
+   cascade so the plain class-order rule (same specificity) wins
+   without needing !important. */
+.nba-lineup-court-wrap-wide {
+  width: 62%;
+}
+
+.nba-lineup-court {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Home team's own logo at center court, same "painted on the floor"
+   real-court detail every NBA arena has -- only one watermark, not one
+   per half like the NFL field's two team-colored duotones, per what
+   was asked for ("court display the logo for the home team"). */
+.nba-lineup-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18%;
+  height: 18%;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Overrides .lineup-field-half's fixed 500px NFL height -- this one's
+   height comes from the court image's own natural aspect ratio
+   (3103x5803), stretched to fill .nba-lineup-court-wrap exactly so
+   LineupPlayerCard's (x%, y%) coordinates land on the real court
+   features they're meant to (rim, key, half-court line) regardless of
+   viewport width. */
+.nba-lineup-field-half {
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
+
+/* Shot Chart mode: every real shot (ShotMarker.xPct/yPct, straight
+   from bref's own top_px/left_px) plotted over exactly one half of
+   the SAME court art/sizing the player cards use -- no separate,
+   larger court per what was asked ("use the same court dimensions as
+   the current court"). bref records every team's shot chart in one
+   fixed half-court orientation (baseline at top), so the away team's
+   overlay sits as-is in the top half; the home team's is the
+   identical set of points rotated 180deg into the bottom half,
+   reusing the exact transform trick LineupPlayerCard already relies
+   on for its own home/away mirroring. */
+.nba-shotchart-overlay {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  top: 0;
+}
+
+.nba-shotchart-overlay-flipped {
+  top: 50%;
+  transform: rotate(180deg);
+}
+
+/* One shot. basketball-reference's own make/miss convention: a solid
+   green dot for a make, a red "x" for a miss -- no percentages or
+   other numbers anywhere, just where the shot was and whether it
+   went in. */
+.nba-shotchart-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.nba-shotchart-make {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2ecc40;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.nba-shotchart-miss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  color: #ff4136;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Shot Chart mode's own team identification -- each half's shots have
+   no other team label (unlike the player cards' own namebar), so each
+   team's logo is painted large and faint across its own half, same
+   "big faint team branding" look the NFL field's own watermark uses
+   (.lineup-field-watermark: 69% size, 0.4 opacity) rather than this
+   card's small 18%/0.3 center-court logo (.nba-lineup-watermark,
+   which stays as-is for Starters/Second Team mode and is hidden here
+   instead of overlapping these two). Rendered as plain upright <img>s
+   (siblings of the rotated .nba-shotchart-overlay, not inside it) so
+   neither logo ends up upside down. */
+.nba-shotchart-watermark {
+  position: absolute;
+  top: 25%;
+  left: 50%;
+  width: 46%;
+  height: 46%;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.nba-shotchart-watermark-home {
+  top: 75%;
+}
+
+/* Shots By Zone Eff: the zone-boundary reference court
+   (Fullcourt-nba-bbr_SectionsBlueNum2Blnk.png -- same numbered zone
+   chart nbaShotChart.ts's masks come from, minus the digits) painted
+   over the plain court, visible only on whichever half(s) currently
+   show zone efficiency -- each half's own Chart Type dropdown picks
+   independently, so a clip-path per half (not swapping the whole
+   court image) lets one half show zone lines while the other keeps
+   the plain court underneath. */
+.nba-zoneeff-court-half {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.nba-zoneeff-court-half-away {
+  clip-path: inset(0 0 50% 0);
+}
+
+.nba-zoneeff-court-half-home {
+  clip-path: inset(50% 0 0 0);
+}
+
+/* One zone's season-to-date FG%, positioned at that zone's own true
+   pixel centroid (NbaLineupSection.tsx's ZONE_LABEL_POSITION). A
+   light pill behind the text keeps it legible over the wood-grain
+   court regardless of exactly which red/black/blue color it's drawn
+   in (the court itself is light, so black reads fine here -- this is
+   just contrast insurance against the grain's own shading). */
+.nba-zoneeff-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  font-size: calc(0.78rem + 7px);
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The home half's whole overlay is rotated 180deg (see
+   .nba-shotchart-overlay-flipped's own comment) so each label lands
+   at the right mirrored spot -- fine for a symmetric dot/x marker,
+   but it would leave percentage TEXT upside down. Counter-rotating
+   just the label keeps its position but renders it upright again. */
+.nba-shotchart-overlay-flipped .nba-zoneeff-label {
+  transform: translate(-50%, -50%) rotate(180deg);
+}
+
+/* "Shot By Zone Cnt" -- made/attempted as a stacked fraction (made on
+   top, a rule, attempts below), not a percentage or side-by-side
+   "12/34" -- explicitly asked for so it still fits the narrow
+   corner/baseline zones. Same light pill + position/counter-rotation
+   treatment as .nba-zoneeff-label. */
+.nba-zonecnt-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 6px;
+  padding: 0.1rem 0.4rem;
+  line-height: 1.1;
+  pointer-events: none;
+}
+
+.nba-shotchart-overlay-flipped .nba-zonecnt-label {
+  transform: translate(-50%, -50%) rotate(180deg);
+}
+
+.nba-zonecnt-made,
+.nba-zonecnt-attempts {
+  color: #111111;
+  font-size: calc(0.78rem + 7px);
+  font-weight: 700;
+}
+
+.nba-zonecnt-rule {
+  width: 100%;
+  min-width: 0.9em;
+  height: 0;
+  border-top: 2px solid #111111;
+  margin: 0.08rem 0;
+}
+
+/* Player boxes bigger than the shared NFL default (that 92px sizing
+   reads fine against a wide field, but this court is deliberately
+   much narrower -- see .nba-lineup-court-wrap above -- so the same
+   fixed box size would look tiny against it). Scoped to a min-width
+   so phone-width viewports keep the existing, already-tuned mobile
+   .lineup-box rules (@media max-width:480px above) instead of
+   colliding with a second, untested breakpoint. */
+@media (min-width: 481px) {
+  /* Narrower than the first few passes at this -- compared directly
+     against the NFL lineup card's own 92px box, which reads as much
+     slimmer relative to its height. 115px splits the difference:
+     noticeably narrower than this card's own earlier 153px, still
+     wide enough for the extra "PER" label line NFL's grade box
+     doesn't have. */
+  .nba-lineup-field-half .lineup-box {
+    width: 115px;
+  }
+
+  .nba-lineup-field-half .lineup-box-position {
+    font-size: 0.68rem;
+    padding: 0.08rem 0.5rem;
+  }
+
+  .nba-lineup-field-half .lineup-box-namebar {
+    font-size: 0.72rem;
+    padding: 0.3rem 0.3rem;
+  }
+
+  .nba-lineup-field-half .lineup-box-grade {
+    font-size: 0.68rem;
+    margin-top: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    min-width: 2.6rem;
+  }
+}
+
+/* PER alone means nothing to a reader without context -- same reason
+   Starter Grades' own PTS/PER/WS-48 toggle carries a hover definition
+   (reused verbatim here, see StatToggleButton's STAT_INFO in
+   NbaGameDetailView.tsx) -- but this box is too small to show a title
+   + a full sentence inline, so only a small "PER" label sits above
+   the number, itself wrapped in the same stat-toggle-info hover
+   popover as everywhere else on this page. */
+.lineup-box-grade-label {
+  display: block;
+  font-size: 0.55em;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  margin-bottom: 0.1em;
+}
+
+.lineup-box-grade-value {
+  display: block;
+}
+
 /* ------------------------------------------------------------------
    Betting Edge tab -- Game Lines, First Touchdown, Key Insights,
    Player Props. Reuses .stat-section/.stat-sub for section chrome

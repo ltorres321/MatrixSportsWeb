@@ -5,6 +5,8 @@ import { getNbaScheduledGame, getNbaTeamRecords, etDateKey } from "@/lib/nbaSche
 import { getGameStarterGrades, type GameStarterGrades } from "@/lib/nbaStarterGrades";
 import { getGameTeamGrades, type GameTeamGrades } from "@/lib/nbaTeamGrades";
 import { getGameEfficiencyScoring, type GameEfficiencyScoring } from "@/lib/nbaEfficiencyScoring";
+import { getGameLineup, type GameLineup } from "@/lib/nbaLineup";
+import { getGameShotChart, type GameShotChart } from "@/lib/nbaShotChart";
 
 // NBA equivalent of predictions.ts's getGameDetail(), scoped to just
 // what src4 actually produces: the matchup (nba_predictions), real
@@ -117,6 +119,12 @@ export interface NbaGameDetail {
   teamGrades: GameTeamGrades | null;
   // Same null condition as teamGrades -- see getGameEfficiencyScoring.
   efficiencyScoring: GameEfficiencyScoring | null;
+  // null only if nba.bbr_advanced has no rows yet for this game's two
+  // teams (season) -- see getGameLineup.
+  lineup: GameLineup | null;
+  // null only if nba.bbr_shot_chart has no rows yet for this game's
+  // two teams (season) -- see getGameShotChart.
+  shotChart: GameShotChart | null;
 }
 
 interface GameRow {
@@ -225,10 +233,12 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
   const records = await getNbaTeamRecords(game.season, etDateKey(new Date(game.game_date)));
 
   const gameDate = new Date(game.game_date);
-  const [starterGrades, teamGrades, efficiencyScoring] = await Promise.all([
+  const [starterGrades, teamGrades, efficiencyScoring, lineup, shotChart] = await Promise.all([
     getGameStarterGrades(game.season, gameDate, game.home_team, game.away_team),
     getGameTeamGrades(game.season, gameDate, game.home_team, game.away_team),
     getGameEfficiencyScoring(game.season, gameDate, game.home_team, game.away_team),
+    getGameLineup(game.season, gameDate, game.home_team, game.away_team),
+    getGameShotChart(game.season, gameDate, game.home_team, game.away_team),
   ]);
 
   const kickoff =
@@ -328,5 +338,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
     starterGrades,
     teamGrades,
     efficiencyScoring,
+    lineup,
+    shotChart,
   };
 });

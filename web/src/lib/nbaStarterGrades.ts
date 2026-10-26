@@ -1,6 +1,7 @@
 import "server-only";
 import { query } from "@/lib/db";
 import { etDateKey } from "@/lib/nbaSchedule";
+import { toBrefAlias, normalizePlayerName, buildRosterCrosswalkByName } from "@/lib/nbaBrefCrosswalk";
 
 // NBA equivalent of pffGameReport.ts's "Highest Graded Players"
 // section ("Starter Grades" here) -- same shape as every other data
@@ -17,31 +18,9 @@ import { etDateKey } from "@/lib/nbaSchedule";
 // netlify.toml), whose serverless functions have no access to this
 // machine's filesystem, so that approach came back empty in
 // production. Querying Postgres instead fixes that, the same way
-// every other section on this page already works.
-
-// bref's own team_name_abbr values differ from this app's own alias
-// scheme (teamsNba.ts, which matches hoopR/src4) for exactly the
-// franchises with a historically-ambiguous short code -- confirmed
-// against the real nba.bbr_advanced rows (BRK/CHO/GSW/NOP/NYK/PHO/
-// SAS/UTA/WAS all appear; every other code already matches).
-const BREF_ALIAS_TO_APP_ALIAS: Record<string, string> = {
-  BRK: "BKN",
-  CHO: "CHA",
-  GSW: "GS",
-  NOP: "NO",
-  NYK: "NY",
-  PHO: "PHX",
-  SAS: "SA",
-  UTA: "UTAH",
-  WAS: "WSH",
-};
-const APP_ALIAS_TO_BREF_ALIAS: Record<string, string> = Object.fromEntries(
-  Object.entries(BREF_ALIAS_TO_APP_ALIAS).map(([bref, app]) => [app, bref])
-);
-
-function toBrefAlias(appAlias: string): string {
-  return APP_ALIAS_TO_BREF_ALIAS[appAlias] ?? appAlias;
-}
+// every other section on this page already works. toBrefAlias/
+// normalizePlayerName/buildRosterCrosswalkByName now live in
+// nbaBrefCrosswalk.ts, shared with nbaLineup.ts.
 
 export interface StarterGradePlayer {
   playerId: string;
@@ -53,10 +32,11 @@ export interface StarterGradePlayer {
   per: number;
   wsPer48: number;
   // ESPN's own numeric athlete id, when a real-photo lookup found one
-  // -- see buildEspnIdByName's header for where this comes from and
-  // why it's name-matched rather than a real player-id join. null
-  // means "no match," not "no photo exists" -- PlayerHeadshot-style
-  // components should fall back to a team logo, same as the NFL page.
+  // -- see nbaBrefCrosswalk.ts's buildRosterCrosswalkByName for where
+  // this comes from and why it's name-matched rather than a real
+  // player-id join. null means "no match," not "no photo exists" --
+  // PlayerHeadshot-style components should fall back to a team logo,
+  // same as the NFL page.
   espnId: string | null;
 }
 
@@ -81,56 +61,6 @@ interface StarterGradeRow {
   per: string | number;
   ws_per_48: string | number;
   pts_per_g: string | number;
-}
-
-interface RosterRow {
-  athlete_id: string;
-  full_name: string;
-}
-
-function normalizePlayerName(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // strip accents: bref's "Luka Dončić" vs hoopR's "Luka Doncic"
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, "")
-    .trim();
-}
-
-// There's no NBA player-id crosswalk table yet (the NFL page's
-// headshots key off a real PFF->ESPN id crosswalk --
-// etl.espn_player_crosswalk, sql/014 -- that has no basketball
-// equivalent). The only other ESPN-id-bearing table in this DB is
-// nba.rosters (hoopR, athlete_id IS ESPN's own numeric id -- confirmed
-// live against https://a.espncdn.com/i/headshots/nba/players/full/
-// {athlete_id}.png, which returns a real photo), so this matches by
-// normalized full name instead of a real id join. Confirmed against
-// the real 2027 data: zero normalized-name collisions across all 548
-// rostered players, and name-only matching covers ~96% of starters
-// (the rest are mostly players nba.rosters hasn't picked up yet --
-// recent trades/call-ups -- not a bad match, a missing one; those
-// just fall back to a team logo like the NFL page's own espnId==null
-// case). No season/team filter on purpose: nba.rosters only ever
-// holds the CURRENT season's roster (it's a "who's on this team right
-// now" snapshot, not historical -- see sql/004_nba_schema.sql's own
-// comment), so a player from a past-season historical game is matched
-// by name against today's roster, which is the best photo source
-// available for them regardless of which team they were on back then.
-async function buildEspnIdByName(): Promise<Map<string, string>> {
-  const rows = await query<RosterRow>(`SELECT athlete_id, full_name FROM nba.rosters`);
-  const map = new Map<string, string>();
-  const seenCollision = new Set<string>();
-  for (const row of rows) {
-    const key = normalizePlayerName(row.full_name);
-    if (seenCollision.has(key)) continue;
-    if (map.has(key) && map.get(key) !== row.athlete_id) {
-      map.delete(key);
-      seenCollision.add(key);
-      continue;
-    }
-    map.set(key, row.athlete_id);
-  }
-  return map;
 }
 
 const TOP_N = 5;
@@ -170,7 +100,7 @@ export async function getGameStarterGrades(
   // team) -- sql/021_bbr_league_leaders.sql), so this as-of lookup
   // works for as long as that history is kept.
   const asOfEtDate = etDateKey(gameDate);
-  const [rows, espnIdByName] = await Promise.all([
+  const [rows, rosterCrosswalk] = await Promise.all([
     query<StarterGradeRow>(
       `WITH resolved AS (
          SELECT COALESCE(
@@ -189,7 +119,7 @@ export async function getGameStarterGrades(
          AND a.team_name_abbr IN ($3, $4)`,
       [season, asOfEtDate, brefHome, brefAway]
     ),
-    buildEspnIdByName(),
+    buildRosterCrosswalkByName(),
   ]);
   if (rows.length === 0) return null;
 
@@ -206,7 +136,7 @@ export async function getGameStarterGrades(
         pts: Number(r.pts_per_g),
         per: Number(r.per),
         wsPer48: Number(r.ws_per_48),
-        espnId: espnIdByName.get(normalizePlayerName(r.name_display)) ?? null,
+        espnId: rosterCrosswalk.get(normalizePlayerName(r.name_display))?.espnId ?? null,
       }));
 
     const topBy = (key: "pts" | "per" | "wsPer48") =>

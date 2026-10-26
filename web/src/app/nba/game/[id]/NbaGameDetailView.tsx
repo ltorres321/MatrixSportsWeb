@@ -9,6 +9,7 @@ import type { TeamGradeSet, TeamStatWithRank } from "@/lib/nbaTeamGrades";
 import type { TeamPer100Stats, TeamPer100StatWithRank } from "@/lib/nbaEfficiencyScoring";
 import { teamLogoPath } from "@/lib/teamsNba";
 import { teamPrimaryColorNba } from "@/lib/teamColorsNba";
+import NbaLineupSection from "./NbaLineupSection";
 
 // Same polling interval as GameDetailView.tsx's LIVE_REFRESH_MS --
 // router.refresh() re-runs getNbaGameDetail server-side, which re-hits
@@ -957,12 +958,10 @@ function EfficiencyScoringSection({ game }: { game: NbaGameDetail }) {
   );
 }
 
-function MatchupsTab() {
+function MatchupsTab({ game }: { game: NbaGameDetail }) {
   return (
     <div className="page-edge-section">
-      <p style={{ color: "var(--text-dim)" }}>
-        Team-vs-team form comparison — structure reserved, not built yet.
-      </p>
+      <NbaLineupSection game={game} />
     </div>
   );
 }
@@ -1095,7 +1094,7 @@ export default function NbaGameDetailView({ game }: { game: NbaGameDetail }) {
       {activeTab === "overview" ? (
         <OverviewTab game={game} />
       ) : activeTab === "matchups" ? (
-        <MatchupsTab />
+        <MatchupsTab game={game} />
       ) : activeTab === "bettingEdge" ? (
         <BettingEdgeTab game={game} />
       ) : (
