@@ -402,11 +402,17 @@ function distinctGameCount(shots: ShotMarker[]): number {
 // to on a raw dot chart).
 type Analysis = "none" | "vsSeason" | "vsL5" | "vsL10";
 
+// Short enough to actually fit the closed select box at this card's
+// own control width (confirmed live: the original full "Current Game
+// % vs Season %"-style labels overflowed and got clipped, leaving the
+// chosen value unreadable) -- the "Analysis" label above already
+// supplies "current game vs," so the option itself only needs to name
+// the baseline.
 const ANALYSIS_OPTIONS: { value: Analysis; label: string }[] = [
   { value: "none", label: "None" },
-  { value: "vsSeason", label: "Current Game % vs Season %" },
-  { value: "vsL5", label: "Current Game % vs L5" },
-  { value: "vsL10", label: "Current Game % vs L10" },
+  { value: "vsSeason", label: "vs Season %" },
+  { value: "vsL5", label: "vs L5 %" },
+  { value: "vsL10", label: "vs L10 %" },
 ];
 
 function isAnalysisAvailable(lookback: Lookback, chartType: ChartType): boolean {
