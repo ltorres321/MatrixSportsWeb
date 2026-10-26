@@ -95,6 +95,39 @@ export interface GameShotChart {
 const BREF_CANVAS_WIDTH = 500;
 const BREF_CANVAS_HEIGHT = (500 * 855) / 910;
 
+// bref's raw top_px isn't quite where the zones9 masks (built from the
+// user's own Fullcourt-nba-bbr_SectionsBlueNum2 asset) place real
+// court features -- confirmed by measuring the real 2PT/3PT split
+// (shot_value, ground truth) against top_px directly: at court center
+// the real arc sits at top_px~268 while the mask's own zone 7/9
+// boundary sits at top_px~293 (a 26px gap); on the left wing the real
+// arc sits at top_px~215 against the mask's zone 2/6 boundary at
+// top_px~247 (a 31px gap). That's what was silently reclassifying a
+// large share of real 3PT attempts as zone 7 (an inside-the-arc zone)
+// instead of zone 9 -- the "borderline 3's become 2's" bug.
+//
+// That ~26-31px gap is real near the arc, but it isn't a uniform
+// translation across the whole court -- applying the full averaged
+// value (29px) to shots near the rim overshot badly (confirmed live:
+// a real shot at top_px=42 rendered ~28px past the backboard line
+// when it should sit just off it, same visual-gap scale as the
+// arc-region measurement). Rather than a distance-scaled correction
+// (ruled out -- only a flat Y shift was asked for), this is cut to a
+// third of the measured arc-region gap: enough to meaningfully help
+// the arc-area misclassification without the rim-area shots visibly
+// overshooting their own line.
+const Y_OFFSET_PX = 10;
+
+// Same kind of gap as Y_OFFSET_PX, on the other axis -- confirmed via
+// a real corner-area shot sitting right on the left sideline when it
+// should read clearly in-bounds. Much smaller than the Y gap (the
+// user's own read of the annotated screenshots, and consistent with
+// "x translation is minimal" from the very first pass at this). Added
+// to every shot's left_px, pushing everything slightly right, the
+// same flat-shift treatment Y_OFFSET_PX already gets rather than a
+// per-side mirrored correction.
+const X_OFFSET_PX = 5;
+
 const ZONE_COUNT = 9;
 
 interface ZoneMasks {
@@ -167,8 +200,8 @@ function zoneAt(mx: number, my: number, masks: ZoneMasks): number {
 // staying far short of a runaway scan (this only runs the full search
 // at all for the rare shot the direct pixel misses).
 function classify(topPx: number, leftPx: number, masks: ZoneMasks): number {
-  const xFrac = leftPx / BREF_CANVAS_WIDTH;
-  const yFrac = topPx / BREF_CANVAS_HEIGHT;
+  const xFrac = (leftPx + X_OFFSET_PX) / BREF_CANVAS_WIDTH;
+  const yFrac = (topPx + Y_OFFSET_PX) / BREF_CANVAS_HEIGHT;
   const mx = Math.round(xFrac * masks.width);
   const my = Math.round(yFrac * masks.height);
 
@@ -270,8 +303,8 @@ export async function getGameShotChart(
     const playerId = r.player_code ?? "";
     const zoneIdx = classify(r.top_px, r.left_px, masks);
     entry.shots.push({
-      xPct: clampPct((r.left_px / BREF_CANVAS_WIDTH) * 100),
-      yPct: clampPct((r.top_px / BREF_CANVAS_HEIGHT) * 100),
+      xPct: clampPct(((r.left_px + X_OFFSET_PX) / BREF_CANVAS_WIDTH) * 100),
+      yPct: clampPct(((r.top_px + Y_OFFSET_PX) / BREF_CANVAS_HEIGHT) * 100),
       made: r.result === "make",
       playerId,
       period: r.period,
