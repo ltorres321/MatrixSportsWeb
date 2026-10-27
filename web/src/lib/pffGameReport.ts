@@ -208,6 +208,14 @@ export interface QbMatchupStat {
   turnoverWorthyPct: StatWithRank | null;
   avgTimeToThrow: StatWithRank | null;
   avgDepthOfTarget: StatWithRank | null;
+  // Cross-checked against etl.injury_reports (this week, refreshed
+  // 3x/day) at READ time -- separate from and more current than the
+  // PFF roster snapshot this row itself was built from, which can go
+  // weeks between refreshes (see poll_game_report.py's annual
+  // 200-call API budget). Non-null means the official report has this
+  // player Out/Doubtful for the week this game is being viewed for,
+  // even though PFF's own depth chart may not have caught up yet.
+  injuryStatus: string | null;
 }
 
 export interface GameQbMatchup {
@@ -235,6 +243,7 @@ interface QbMatchupRow {
   avg_time_to_throw_rank: number | null;
   avg_depth_of_target: number | null;
   avg_depth_of_target_rank: number | null;
+  injury_status: string | null;
 }
 
 function rowToQbStat(row: QbMatchupRow): QbMatchupStat {
@@ -250,23 +259,44 @@ function rowToQbStat(row: QbMatchupRow): QbMatchupStat {
     turnoverWorthyPct: statOrNull(row.turnover_worthy_pct, row.turnover_worthy_rank),
     avgTimeToThrow: statOrNull(row.avg_time_to_throw, row.avg_time_to_throw_rank),
     avgDepthOfTarget: statOrNull(row.avg_depth_of_target, row.avg_depth_of_target_rank),
+    injuryStatus: row.injury_status,
   };
 }
 
 export async function getGameQbMatchup(
   season: number,
+  week: number,
   homeTeam: string,
   awayTeam: string
 ): Promise<GameQbMatchup | null> {
+  // LEFT JOINs etl.injury_reports (nflverse_injuries/poll_injuries.py,
+  // refreshed 3x/day, free) onto etl.pff_qb_matchup_stats (PFF
+  // Developer API, refreshed only occasionally -- that API's plan caps
+  // at 200 calls/YEAR total and this report alone costs 34 calls per
+  // run, so it can go weeks between refreshes). Without this join, a
+  // mid-week injury can leave this card showing a player as the
+  // starter for weeks after they're actually out -- confirmed in
+  // practice (Lamar Jackson/BAL still showing as starter 3 weeks after
+  // a real injury, because the PFF-side poller hadn't been rerun).
+  // This join makes the card correct on every page load regardless of
+  // how stale the expensive PFF data is, by cross-checking the cheap,
+  // current one.
   const rows = await query<QbMatchupRow>(
-    `SELECT team, pff_player_id, player_name, espn_id, qualifying_qb_count,
-            overall_grade, overall_rank, clean_pocket_grade, clean_pocket_rank,
-            pressure_grade, pressure_rank, big_time_throw_pct, big_time_throw_rank,
-            turnover_worthy_pct, turnover_worthy_rank, avg_time_to_throw, avg_time_to_throw_rank,
-            avg_depth_of_target, avg_depth_of_target_rank
-     FROM etl.pff_qb_matchup_stats
-     WHERE season = $1 AND team IN ($2, $3)`,
-    [season, homeTeam, awayTeam]
+    `SELECT m.team, m.pff_player_id, m.player_name, m.espn_id, m.qualifying_qb_count,
+            m.overall_grade, m.overall_rank, m.clean_pocket_grade, m.clean_pocket_rank,
+            m.pressure_grade, m.pressure_rank, m.big_time_throw_pct, m.big_time_throw_rank,
+            m.turnover_worthy_pct, m.turnover_worthy_rank, m.avg_time_to_throw, m.avg_time_to_throw_rank,
+            m.avg_depth_of_target, m.avg_depth_of_target_rank,
+            ir.report_status AS injury_status
+     FROM etl.pff_qb_matchup_stats m
+     LEFT JOIN etl.injury_reports ir
+       ON ir.season = m.season
+      AND ir.week = $4
+      AND ir.team = m.team
+      AND lower(ir.player) = lower(m.player_name)
+      AND ir.report_status IN ('Out', 'Doubtful')
+     WHERE m.season = $1 AND m.team IN ($2, $3)`,
+    [season, homeTeam, awayTeam, week]
   );
   const home = rows.find((r) => r.team === homeTeam);
   const away = rows.find((r) => r.team === awayTeam);

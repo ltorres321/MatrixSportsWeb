@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import "./globals.css";
 import RainCanvas from "@/components/RainCanvas";
 import SiteNav from "@/components/SiteNav";
@@ -35,11 +36,19 @@ export const metadata: Metadata = {
 // the very first HTML sent -- doing this client-side instead would
 // flash the default look before switching, since it'd have to wait
 // for a browser round trip to Supabase first.
+//
+// Signed-out visitors have no profiles row to store a preference in,
+// so SiteNav's theme toggle writes a plain "theme" cookie for them
+// instead (see MoreMenu's handleThemeToggle) -- read that cookie here
+// as the anonymous fallback, same "dark unless told otherwise" default
+// as before when the cookie's never been set.
 async function getAppearance(
   userId: string | undefined
 ): Promise<{ theme: "dark" | "light"; rainEnabled: boolean }> {
   if (!userId) {
-    return { theme: "dark", rainEnabled: true };
+    const cookieStore = await cookies();
+    const theme = cookieStore.get("theme")?.value === "light" ? "light" : "dark";
+    return { theme, rainEnabled: theme === "light" ? false : true };
   }
 
   const supabase = await createClient();
@@ -74,7 +83,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const isAdmin = !!(await getCurrentAdminUserId());
 
   return (
-    <html lang="en" data-theme={theme}>
+    // suppressHydrationWarning: a browser extension (e.g. one that
+    // stamps data-qb-installed) injects attributes onto <html> before
+    // React hydrates -- real mismatch, but of an attribute this app
+    // never renders, so it's safe to ignore per Next's own hydration
+    // docs rather than a real SSR/client divergence in our own markup.
+    <html lang="en" data-theme={theme} suppressHydrationWarning>
       <body>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLdGraph) }} />
         {rainEnabled && <RainCanvas theme={theme} />}
@@ -82,7 +96,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <AhrefsAnalytics />
         <AdSenseScript />
         <div className="page">
-          <SiteNav signedIn={!!userData.user} isAdmin={isAdmin} />
+          <SiteNav signedIn={!!userData.user} isAdmin={isAdmin} theme={theme} userId={userData.user?.id} />
           {children}
           <FollowUsLinks />
           <div className="legal-footer">

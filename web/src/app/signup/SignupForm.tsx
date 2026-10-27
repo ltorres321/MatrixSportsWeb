@@ -102,9 +102,9 @@ export default function SignupForm() {
                 </button>
               </div>
 
-              <p className="form-footer-note">
+              <p className="form-footer-note form-footer-note-lg">
                 Already have an account?{" "}
-                <Link href="/login" style={{ color: "var(--green)" }}>
+                <Link href="/login" className="gold-cta-link">
                   Log in
                 </Link>
               </p>

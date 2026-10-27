@@ -27,6 +27,27 @@ const nextConfig: NextConfig = {
   // button) silently fails.
   allowedDevOrigins: ["192.168.1.101"],
   htmlLimitedBots: HTML_LIMITED_BOTS,
+  // Found live: clicking a date tab on /home/nba (or /home) after
+  // switching season/week landed back on today's/the current week's
+  // data instead of the one just picked. Confirmed it wasn't a page
+  // logic bug -- curling the exact same URL server-side always
+  // returned the correct page; only actual <Link> navigation in the
+  // browser showed the stale one. That's the client Router Cache:
+  // App Router caches a dynamically-rendered page's RSC payload
+  // per-URL across client-side navigations, and both predictions
+  // pages read searchParams on every request (season/week/month/date
+  // can all change what's shown), so the cached response for a URL
+  // visited minutes ago is wrong by the time it's revisited. Setting
+  // this to 0 makes every client-side navigation to a dynamic page
+  // re-fetch instead of reusing a stale cached entry -- exactly what
+  // a live-scores/predictions site needs; the caching this disables
+  // was never appropriate for pages whose whole content is "which
+  // games for which date," which changes on every param.
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+    },
+  },
   async headers() {
     return [
       {

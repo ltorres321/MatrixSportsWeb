@@ -11,6 +11,8 @@ import {
 import type { Matchup } from "@/lib/matchups";
 import { teamLogoPath, TEAMS } from "@/lib/teams";
 import MatchupCard from "@/components/MatchupCard";
+import { getAvailableNbaSeasons, getDefaultNbaDate, getMatchupsForNbaDate } from "@/lib/nbaPredictions";
+import NbaMatchupCard from "@/components/NbaMatchupCard";
 import { getEspnNflNews } from "@/lib/espnNews";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
@@ -49,6 +51,24 @@ function truncateTeaser(text: string, maxChars = 160): string {
   return `${cut.slice(0, lastSpace > 0 ? lastSpace : maxChars)}…`;
 }
 
+// No premier/featured-game concept exists for NBA yet (see
+// nbaPredictions.ts's module header), so this just takes the first
+// game of the default slate's date -- same "today, or the next date
+// with games" rule home/nba/page.tsx already uses. Shown on the home
+// page unconditionally, same as the NFL premier game: NBA has no
+// member-preview paywall at all yet (see NbaPredictionsView.tsx), so
+// there's no "locked" counterpart for this card to be a free preview
+// of.
+async function getFeaturedNbaGame(): Promise<Matchup | undefined> {
+  const nbaSeasons = await getAvailableNbaSeasons();
+  const nbaSeason = nbaSeasons[0];
+  if (nbaSeason === undefined) return undefined;
+  const nbaDate = await getDefaultNbaDate(nbaSeason);
+  if (!nbaDate) return undefined;
+  const nbaMatchups = await getMatchupsForNbaDate(nbaSeason, nbaDate);
+  return nbaMatchups[0];
+}
+
 // Signed-out visitors get the marketing pitch below. Signed-in users
 // get a real dashboard instead -- see SignedInDashboard.
 export default async function HomePage() {
@@ -65,14 +85,17 @@ export default async function HomePage() {
   const season = seasons.includes(fallbackSeason) ? fallbackSeason : seasons[0];
 
   let premier: Matchup | undefined;
+  let currentWeek: number | null = null;
   if (season !== undefined) {
-    const week = await getDefaultWeek(season);
-    if (week !== null) {
-      const premierGame = await getPremierGame(season, week);
-      const matchups = await getMatchupsForSeasonWeek(season, week, premierGame);
+    currentWeek = await getDefaultWeek(season);
+    if (currentWeek !== null) {
+      const premierGame = await getPremierGame(season, currentWeek);
+      const matchups = await getMatchupsForSeasonWeek(season, currentWeek, premierGame);
       premier = matchups.find((m) => m.premier);
     }
   }
+
+  const featuredNbaGame = await getFeaturedNbaGame();
 
   // Signed-out visitors previously had zero links to any of the
   // site's actual written content (every recap lived one login away,
@@ -115,10 +138,10 @@ export default async function HomePage() {
               model picks for early users, every week.
             </p>
             <div className="hero-actions">
-              <Link className="btn btn-primary" href="/home">
+              <Link className="btn btn-primary btn-gold" href="/home">
                 View All Picks For This Week
               </Link>
-              <Link className="btn btn-ghost" href="/signup">
+              <Link className="btn btn-primary" href="/signup">
                 Get Early Access — Free
               </Link>
             </div>
@@ -131,6 +154,23 @@ export default async function HomePage() {
                 {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
               </div>
               <MatchupCard matchup={premier} premier />
+              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                <Link className="btn btn-primary" href="/signup">
+                  View Full Week {currentWeek} Slate →
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {featuredNbaGame && (
+            <div className="premier-wrap">
+              <div className="premier-ribbon">🏀 FEATURED NBA GAME</div>
+              <NbaMatchupCard matchup={featuredNbaGame} premier />
+              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                <Link className="btn btn-primary" href="/signup">
+                  View Full NBA Slate →
+                </Link>
+              </div>
             </div>
           )}
 
@@ -188,7 +228,7 @@ export default async function HomePage() {
                 ))}
               </div>
               <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
-                <Link className="btn btn-ghost" href="/stories">
+                <Link className="btn btn-primary" href="/stories">
                   Browse All Recaps →
                 </Link>
               </div>
@@ -207,7 +247,7 @@ export default async function HomePage() {
               🔒 Early subscribers get <strong>preferential pricing</strong> — sign up free
               during beta to lock in your rate before paid tiers launch.
             </span>
-            <Link className="btn btn-primary" href="/signup">
+            <Link className="btn btn-primary btn-gold" href="/signup">
               Claim Your Spot
             </Link>
           </div>
@@ -258,6 +298,8 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
       premier = matchups.find((m) => m.premier);
     }
   }
+
+  const featuredNbaGame = await getFeaturedNbaGame();
 
   const logoStrip = TEAMS.slice(0, 12);
 
@@ -328,6 +370,18 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
               <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
                 <Link className="btn btn-ghost" href="/home">
                   View Full Week {currentWeek} Slate →
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {featuredNbaGame && (
+            <div className="premier-wrap">
+              <div className="premier-ribbon">🏀 FEATURED NBA GAME</div>
+              <NbaMatchupCard matchup={featuredNbaGame} premier />
+              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                <Link className="btn btn-ghost" href="/home/nba">
+                  View Full NBA Slate →
                 </Link>
               </div>
             </div>

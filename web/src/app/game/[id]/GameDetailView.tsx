@@ -574,6 +574,7 @@ function QbMatchupHeader({ game }: { game: GameStat }) {
         <div className="qb-matchup-header-name">
           <span className="qb-matchup-header-team">{game.teamA.alias}</span>
           {away.name}
+          {away.injuryStatus && <span className="qb-matchup-injury-badge">{away.injuryStatus}</span>}
         </div>
       </div>
       <div className="qb-matchup-header-vs">VS</div>
@@ -581,6 +582,7 @@ function QbMatchupHeader({ game }: { game: GameStat }) {
         <div className="qb-matchup-header-name">
           <span className="qb-matchup-header-team">{game.teamB.alias}</span>
           {home.name}
+          {home.injuryStatus && <span className="qb-matchup-injury-badge">{home.injuryStatus}</span>}
         </div>
         <PlayerHeadshot espnId={home.espnId} alias={game.teamB.alias} size={64} />
       </div>

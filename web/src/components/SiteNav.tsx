@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 // Real auth is resolved server-side by the root layout on every
 // request (see layout.tsx) and passed down as a plain prop -- this
@@ -29,10 +30,61 @@ const RAIL_SCROLL_FALLBACK_THRESHOLD = 900;
 // open state, own outside-click ref) since only one is ever visible
 // at a time (CSS hides whichever bar isn't active), so there's no
 // need to share state between them.
-function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmin: boolean; onNavigate: () => void }) {
+function MoreMenu({
+  signedIn,
+  isAdmin,
+  theme,
+  userId,
+  onNavigate,
+}: {
+  signedIn: boolean;
+  isAdmin: boolean;
+  theme: "dark" | "light";
+  userId?: string;
+  onNavigate: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const close = () => setOpen(false);
+
+  // Same pattern as profile/page.tsx's handleSignOut -- duplicated
+  // rather than imported from there since that file isn't a shared
+  // lib, and this is the only other place sign-out needs to happen.
+  async function handleSignOut() {
+    close();
+    onNavigate();
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
+
+  // Lets any visitor -- signed in or not -- flip the site's theme
+  // right from the nav, instead of it being reachable only via the
+  // Profile page (which needs an account; request 2026-10-25: "no
+  // sign-ups in 2 months," and a theme that only an account can
+  // change is one more friction point for everyone browsing signed
+  // out). Signed-in: persists to the same profiles.theme column the
+  // Profile page writes (mirrors handleAppearanceChange there,
+  // including forcing rain off on light). Signed-out: no profiles row
+  // to write to, so this sets a plain "theme" cookie instead -- see
+  // layout.tsx's getAppearance, which reads it back as the anonymous
+  // fallback.
+  async function handleThemeToggle() {
+    close();
+    onNavigate();
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    if (signedIn && userId) {
+      const supabase = createClient();
+      const updates =
+        nextTheme === "light" ? { theme: "light", matrix_rain_enabled: false } : { theme: "dark" };
+      await supabase.from("profiles").update(updates).eq("id", userId);
+    } else {
+      document.cookie = `theme=${nextTheme}; path=/; max-age=31536000; samesite=lax`;
+    }
+    router.refresh();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -89,16 +141,24 @@ function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmi
         >
           Contact Us
         </Link>
+        <button type="button" className="nav-more-theme" onClick={handleThemeToggle}>
+          {theme === "dark" ? "☀️ Light Theme" : "🌙 Dark Theme"}
+        </button>
         {signedIn ? (
-          <Link
-            href="/profile"
-            onClick={() => {
-              close();
-              onNavigate();
-            }}
-          >
-            My Profile
-          </Link>
+          <>
+            <Link
+              href="/profile"
+              onClick={() => {
+                close();
+                onNavigate();
+              }}
+            >
+              My Profile
+            </Link>
+            <button type="button" className="nav-more-signout" onClick={handleSignOut}>
+              Sign Out
+            </button>
+          </>
         ) : (
           <Link
             href="/login"
@@ -142,6 +202,77 @@ function MoreMenu({ signedIn, isAdmin, onNavigate }: { signedIn: boolean; isAdmi
             </Link>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// "Predictions" needs 2 destinations now (NFL/NBA) instead of 1, so it
+// gets the exact same open/close/outside-click/Escape flyout pattern
+// as MoreMenu above -- reuses MoreMenu's own CSS classes
+// (nav-more/nav-more-trigger/nav-more-panel) rather than inventing new
+// ones, so it's already theme-aware (light/dark) and already handles
+// both the top-bar and the mobile accordion layout for free.
+function PredictionsMenu({ onNavigate }: { onNavigate: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = () => setOpen(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className={`nav-more ${open ? "open" : ""}`} ref={ref}>
+      <button
+        type="button"
+        className="nav-more-trigger"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="Predictions"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="nav-more-trigger-icon">
+          <PredictionsIcon />
+        </span>
+        <span className="nav-more-trigger-label">
+          Predictions
+          <span className="nav-more-caret" aria-hidden="true">
+            &#9662;
+          </span>
+        </span>
+      </button>
+      <div className="nav-more-panel">
+        <Link
+          href="/home"
+          onClick={() => {
+            close();
+            onNavigate();
+          }}
+        >
+          NFL
+        </Link>
+        <Link
+          href="/home/nba"
+          onClick={() => {
+            close();
+            onNavigate();
+          }}
+        >
+          NBA
+        </Link>
       </div>
     </div>
   );
@@ -201,17 +332,24 @@ function MenuDotsIcon() {
 // .side-rail.visible): the top bar's replacement once you've scrolled
 // past the hero -- see RAIL_SCROLL_THRESHOLD. Phones never show this;
 // .navbar there is untouched regardless of scroll position.
-function SideRail({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
+function SideRail({
+  signedIn,
+  isAdmin,
+  theme,
+  userId,
+}: {
+  signedIn: boolean;
+  isAdmin: boolean;
+  theme: "dark" | "light";
+  userId?: string;
+}) {
   return (
     <nav className="side-rail" aria-label="Quick navigation">
       <Link href="/">
         <HomeIcon />
         <span>Home</span>
       </Link>
-      <Link href="/home">
-        <PredictionsIcon />
-        <span>Predictions</span>
-      </Link>
+      <PredictionsMenu onNavigate={() => {}} />
       <Link href="/parlays">
         <ParlaysIcon />
         <span>Parlays</span>
@@ -220,12 +358,22 @@ function SideRail({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }
         <RecapsIcon />
         <span>Recaps</span>
       </Link>
-      <MoreMenu signedIn={signedIn} isAdmin={isAdmin} onNavigate={() => {}} />
+      <MoreMenu signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} onNavigate={() => {}} />
     </nav>
   );
 }
 
-export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
+export default function SiteNav({
+  signedIn,
+  isAdmin,
+  theme,
+  userId,
+}: {
+  signedIn: boolean;
+  isAdmin: boolean;
+  theme: "dark" | "light";
+  userId?: string;
+}) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const navRef = useRef<HTMLElement>(null);
@@ -322,20 +470,18 @@ export default function SiteNav({ signedIn, isAdmin }: { signedIn: boolean; isAd
           <Link href="/" onClick={close}>
             Home
           </Link>
-          <Link href="/home" onClick={close}>
-            Predictions
-          </Link>
+          <PredictionsMenu onNavigate={close} />
           <Link href="/parlays" onClick={close}>
             Parlays
           </Link>
           <Link href="/stories" onClick={close}>
             Recaps
           </Link>
-          <MoreMenu signedIn={signedIn} isAdmin={isAdmin} onNavigate={close} />
+          <MoreMenu signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} onNavigate={close} />
         </div>
       </nav>
 
-      <SideRail signedIn={signedIn} isAdmin={isAdmin} />
+      <SideRail signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} />
     </>
   );
 }
