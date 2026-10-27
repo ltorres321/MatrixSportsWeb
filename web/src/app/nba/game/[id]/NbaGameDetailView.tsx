@@ -236,14 +236,19 @@ function TotalsSection({ game }: { game: NbaGameDetail }) {
   );
 }
 
-type PageTab = "overview" | "matchups" | "bettingEdge" | "parlayHelper";
+// "bettingEdge" | "parlayHelper" removed from the tab strip 2026-10-27
+// at the user's request: neither is trustworthy/concise enough yet
+// for NBA (see BettingEdgeTab/ParlayHelperTab below, kept but
+// unreached -- their real-money-adjacent math needs a redesign
+// before this project is comfortable showing it, not just NBA's
+// current data gaps). Re-add "bettingEdge" | "parlayHelper" to
+// PageTab and to the tabs array below once that redesign lands.
+type PageTab = "overview" | "matchups";
 
 function PageTabStrip({ active, onChange }: { active: PageTab; onChange: (tab: PageTab) => void }) {
   const tabs: { key: PageTab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "matchups", label: "Matchups" },
-    { key: "bettingEdge", label: "Betting Edge" },
-    { key: "parlayHelper", label: "Parlay Helper" },
   ];
   return (
     <nav className="page-tab-strip" aria-label="Game detail sections">
@@ -1093,12 +1098,8 @@ export default function NbaGameDetailView({ game }: { game: NbaGameDetail }) {
       <PageTabStrip active={activeTab} onChange={setActiveTab} />
       {activeTab === "overview" ? (
         <OverviewTab game={game} />
-      ) : activeTab === "matchups" ? (
-        <MatchupsTab game={game} />
-      ) : activeTab === "bettingEdge" ? (
-        <BettingEdgeTab game={game} />
       ) : (
-        <ParlayHelperTab game={game} />
+        <MatchupsTab game={game} />
       )}
     </>
   );
