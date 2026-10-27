@@ -7,6 +7,7 @@ import { getGameTeamGrades, type GameTeamGrades } from "@/lib/nbaTeamGrades";
 import { getGameEfficiencyScoring, type GameEfficiencyScoring } from "@/lib/nbaEfficiencyScoring";
 import { getGameLineup, type GameLineup } from "@/lib/nbaLineup";
 import { getGameShotChart, type GameShotChart } from "@/lib/nbaShotChart";
+import { americanToDecimal } from "@/lib/parlayHelper";
 
 // NBA equivalent of predictions.ts's getGameDetail(), scoped to just
 // what src4 actually produces: the matchup (nba_predictions), real
@@ -45,6 +46,41 @@ export interface NbaInjuryEntry {
 // without changing src4/26's TOTAL_THRESHOLDS would silently break
 // the mapping below.
 export const NBA_TOTAL_LINES = [210, 220, 230, 240, 250, 260];
+
+// Standard normal CDF via the Abramowitz-Stegun erf approximation
+// (max error ~1.5e-7) -- good enough for a presentational edge%, same
+// spirit as src4/33_predict_live_player_props.py's Normal(projection,
+// std) cover-probability formula, just evaluated here in TS since the
+// game-lines edge below is computed at read time, not written by any
+// Python job.
+function normalCdf(z: number): number {
+  const sign = z < 0 ? -1 : 1;
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const y =
+    1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return 0.5 * (1 + sign * y);
+}
+
+// Game Lines -- the NBA equivalent of pffBettingEdge.ts's Best Game
+// Bets table, computed here rather than read from a pre-computed PFF
+// column: there is no NBA PFF export to read edge_pct from (PFF has
+// no basketball coverage at all), so edge is derived from the SAME
+// margin/total Monte Carlo already centered on the real market line
+// (src4/26) plus the real current best price for that exact point
+// from etl.nba_market_lines_current -- same "real price, not a flat
+// assumed vig" principle as the player-props formula. Spread/total
+// only (no moneyline): PropLine's NBA market poller only returns
+// spread/totals markets, see poll_propline_nba_market_lines.py.
+export interface NbaGameLineEdge {
+  market: "spread" | "total";
+  side: string; // 'home' | 'away' (spread) or 'over' | 'under' (total)
+  point: number;
+  bookmaker: string;
+  price: number;
+  coverProbability: number;
+  edge: number;
+}
 
 export interface NbaPropEdge {
   playerName: string;
@@ -111,6 +147,11 @@ export interface NbaGameDetail {
   injuriesHome: NbaInjuryEntry[];
   injuriesAway: NbaInjuryEntry[];
   props: NbaPropEdge[];
+  // Empty when oddsSource isn't 'propline_market' for this game (no
+  // real market line yet) or no book in etl.nba_market_lines_current
+  // currently quotes a price at that point -- not an error, same
+  // "props post late" timing gap player props already have.
+  gameLines: NbaGameLineEdge[];
   // null only if nba.bbr_advanced/nba.bbr_per_game have no rows yet
   // for this game's two teams (season) -- see getGameStarterGrades.
   starterGrades: GameStarterGrades | null;
@@ -141,6 +182,12 @@ interface GameRow {
   market_spread_line_current: number | null;
   market_total_line_current: number | null;
   odds_source: string | null;
+  margin_residual_std: number | null;
+  total_residual_std: number | null;
+  model_expected_margin: number | null;
+  model_expected_total: number | null;
+  model_margin_residual_std: number | null;
+  model_total_residual_std: number | null;
   margin_bucket_lost_or_tied: number | null;
   margin_bucket_won_1_3: number | null;
   margin_bucket_won_4_7: number | null;
@@ -189,6 +236,9 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
             away_team, away_team_name, game_date, home_win_probability,
             expected_home_score, expected_away_score,
             market_spread_line_current, market_total_line_current, odds_source,
+            margin_residual_std, total_residual_std,
+            model_expected_margin, model_expected_total,
+            model_margin_residual_std, model_total_residual_std,
             margin_bucket_lost_or_tied, margin_bucket_won_1_3, margin_bucket_won_4_7,
             margin_bucket_won_8_14, margin_bucket_won_15_21, margin_bucket_won_21_plus,
             total_over_210, total_over_220, total_over_230, total_over_240,
@@ -219,6 +269,31 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
      ORDER BY edge DESC`,
     [gameId]
   );
+
+  // Best current price per side, straight from the real polled lines
+  // (etl.nba_market_lines_current) -- only meaningful when src4/26
+  // actually centered this game's simulation on a real market line
+  // (odds_source === 'propline_market'); otherwise there's no real
+  // price to grade against at all, same gap player props have before
+  // their own lines post.
+  const marketLineRows =
+    game.odds_source === "propline_market"
+      ? await query<{ market: string; side: string; point: number; bookmaker: string; price: number }>(
+          `SELECT market, side, point, bookmaker, price
+           FROM etl.nba_market_lines_current
+           WHERE universal_game_id = $1 AND market IN ('spread', 'total')
+             -- Same exchange/prediction-market exclusion as
+             -- src4/26_predict_upcoming_games.py's EXCHANGE_BOOKS --
+             -- these don't price a standard two-sided line, so
+             -- "best price" among them is meaningless (e.g. +2400 on
+             -- a deep alt-line strike, not a real retail quote).
+             AND bookmaker NOT IN (
+               'novig', 'prophetx', 'kalshi', 'polymarket', 'polymarket_us',
+               'betfair_ex', 'matchbook', 'smarkets', 'sxbet', 'pick6'
+             )`,
+          [gameId]
+        )
+      : [];
 
   const scheduled = await getNbaScheduledGame(game.home_team, game.away_team, new Date(game.game_date));
   const isFinal = Boolean(
@@ -292,6 +367,84 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
     return { line, over: pctOf(over), under: pctOf(under), isMarketLine: line === closestLine };
   });
 
+  // Picks, among rows at the closest point to the model's own
+  // consensus point (books can quote several alt lines at once -- see
+  // sql/020's own header), the highest (best) American-odds price --
+  // same tie-break rule pffBettingEdge.ts's matchingLine join uses.
+  function bestLine(market: string, side: string, targetPoint: number) {
+    const candidates = marketLineRows.filter((r) => r.market === market && r.side === side);
+    if (candidates.length === 0) return null;
+    const minDist = Math.min(...candidates.map((r) => Math.abs(r.point - targetPoint)));
+    const closest = candidates.filter((r) => Math.abs(r.point - targetPoint) === minDist);
+    return closest.reduce((best, r) => (r.price > best.price ? r : best), closest[0]);
+  }
+
+  const gameLines: NbaGameLineEdge[] = [];
+  // The model's OWN, independent margin/total (sql/012) -- NOT
+  // expected_margin/expected_total, which get overwritten with the
+  // market line itself whenever one exists (sql/011) and would make
+  // cover probability ~50% by construction against that same line.
+  // See sql/012's own header.
+  const modelMargin = game.model_expected_margin;
+  const modelTotal = game.model_expected_total;
+
+  if (
+    game.odds_source === "propline_market" &&
+    game.market_spread_line_current !== null &&
+    modelMargin !== null &&
+    game.model_margin_residual_std
+  ) {
+    const x = game.market_spread_line_current; // project convention: positive favors home
+    const homeCoverProb = normalCdf((modelMargin - x) / game.model_margin_residual_std);
+    // Raw book convention is the mirror of this project's: negative
+    // favors home (sql/020's own header) -- so the home side's own
+    // quoted point is -x, the away side's is +x.
+    const homeLine = bestLine("spread", "home", -x);
+    const awayLine = bestLine("spread", "away", x);
+    if (homeLine) {
+      gameLines.push({
+        market: "spread", side: "home", point: homeLine.point, bookmaker: homeLine.bookmaker,
+        price: homeLine.price, coverProbability: homeCoverProb,
+        edge: homeCoverProb * americanToDecimal(homeLine.price) - 1,
+      });
+    }
+    if (awayLine) {
+      const awayCoverProb = 1 - homeCoverProb;
+      gameLines.push({
+        market: "spread", side: "away", point: awayLine.point, bookmaker: awayLine.bookmaker,
+        price: awayLine.price, coverProbability: awayCoverProb,
+        edge: awayCoverProb * americanToDecimal(awayLine.price) - 1,
+      });
+    }
+  }
+
+  if (
+    game.odds_source === "propline_market" &&
+    game.market_total_line_current !== null &&
+    modelTotal !== null &&
+    game.model_total_residual_std
+  ) {
+    const t = game.market_total_line_current;
+    const overProb = normalCdf((modelTotal - t) / game.model_total_residual_std);
+    const overLine = bestLine("total", "over", t);
+    const underLine = bestLine("total", "under", t);
+    if (overLine) {
+      gameLines.push({
+        market: "total", side: "over", point: overLine.point, bookmaker: overLine.bookmaker,
+        price: overLine.price, coverProbability: overProb,
+        edge: overProb * americanToDecimal(overLine.price) - 1,
+      });
+    }
+    if (underLine) {
+      const underProb = 1 - overProb;
+      gameLines.push({
+        market: "total", side: "under", point: underLine.point, bookmaker: underLine.bookmaker,
+        price: underLine.price, coverProbability: underProb,
+        edge: underProb * americanToDecimal(underLine.price) - 1,
+      });
+    }
+  }
+
   return {
     id: game.universal_game_id,
     season: game.season,
@@ -335,6 +488,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
       coverProbability: r.cover_probability,
       edge: r.edge,
     })),
+    gameLines,
     starterGrades,
     teamGrades,
     efficiencyScoring,

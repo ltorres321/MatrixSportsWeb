@@ -966,10 +966,59 @@ function MatchupsTab({ game }: { game: NbaGameDetail }) {
   );
 }
 
+function GameLinesSection({ game }: { game: NbaGameDetail }) {
+  if (game.gameLines.length === 0) {
+    return (
+      <div className="page-edge-section">
+        <h3>Game Lines</h3>
+        <p style={{ color: "var(--text-dim)" }}>
+          No real sportsbook spread/total line for this game yet — lines post closer to tipoff.
+        </p>
+      </div>
+    );
+  }
+  const labelFor = (l: NbaGameDetail["gameLines"][number]) =>
+    l.market === "spread"
+      ? `${l.side === "home" ? game.homeTeamName : game.awayTeamName} ${l.point >= 0 ? "+" : ""}${l.point.toFixed(1)}`
+      : `${l.side === "over" ? "Over" : "Under"} ${l.point.toFixed(1)}`;
+  return (
+    <div className="page-edge-section">
+      <h3>Game Lines</h3>
+      <table className="prop-table">
+        <thead>
+          <tr>
+            <th>Market</th>
+            <th>Pick</th>
+            <th>Model Prob</th>
+            <th>Edge</th>
+            <th>Book</th>
+          </tr>
+        </thead>
+        <tbody>
+          {game.gameLines.map((l, i) => (
+            <tr key={i}>
+              <td style={{ textTransform: "capitalize" }}>{l.market}</td>
+              <td>{labelFor(l)}</td>
+              <td>{(l.coverProbability * 100).toFixed(0)}%</td>
+              <td style={{ color: l.edge > 0 ? "var(--green)" : "var(--red)" }}>
+                {l.edge >= 0 ? "+" : ""}{(l.edge * 100).toFixed(0)}%
+              </td>
+              <td style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
+                {l.bookmaker} {l.price > 0 ? "+" : ""}{l.price}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
   if (game.props.length === 0) {
     return (
       <div className="page-edge-section">
+        <GameLinesSection game={game} />
         <p style={{ color: "var(--text-dim)" }}>
           No player props scored for this game yet — props post closer to tipoff.
         </p>
@@ -978,6 +1027,7 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
   }
   return (
     <div className="page-edge-section">
+      <GameLinesSection game={game} />
       <h3>Player Props</h3>
       <table className="prop-table">
         <thead>
