@@ -880,6 +880,19 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
     ? filterShots(game.shotChart.home.shots, homeSelectedPlayerIds, homeQuarter, homeLookback, game.shotChart.currentGameId)
     : [];
 
+  // game.shotChart itself only means "this TEAM has shots on record
+  // somewhere this season" -- it stays truthy for a game that hasn't
+  // tipped off yet, so Current Game lookback silently rendered an
+  // empty court with no explanation. True "not played yet" is: no
+  // shot anywhere in either team's full season list is tagged with
+  // this specific currentGameId.
+  const currentGamePlayed = game.shotChart
+    ? game.shotChart.away.shots.some((s) => s.gameId === game.shotChart!.currentGameId)
+      || game.shotChart.home.shots.some((s) => s.gameId === game.shotChart!.currentGameId)
+    : false;
+  const awayPendingTipoff = awayLookback === "currentGame" && !currentGamePlayed;
+  const homePendingTipoff = homeLookback === "currentGame" && !currentGamePlayed;
+
   // Analysis always compares the literal current game against a
   // baseline, independent of whatever the Lookback dropdown above is
   // set to -- so this is computed straight from the full shot list,
@@ -998,14 +1011,20 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
                 {mode === "shotChart" ? (
                   game.shotChart ? (
                     <>
-                      {awayChartType === "zoneEff" ? (
+                      {awayPendingTipoff ? (
+                        <div className="nba-shotchart-pending">Shot chart will be available after the game is completed.</div>
+                      ) : awayChartType === "zoneEff" ? (
                         <ZoneEfficiencyOverlay shots={awayFilteredShots} flipped={false} analysis={awayAnalysisInput} />
                       ) : awayChartType === "zoneCnt" ? (
                         <ZoneCountOverlay shots={awayFilteredShots} flipped={false} analysis={awayAnalysisInput} />
                       ) : (
                         <ShotChartOverlay shots={awayFilteredShots} flipped={false} />
                       )}
-                      {homeChartType === "zoneEff" ? (
+                      {homePendingTipoff ? (
+                        <div className="nba-shotchart-pending nba-shotchart-pending-home">
+                          Shot chart will be available after the game is completed.
+                        </div>
+                      ) : homeChartType === "zoneEff" ? (
                         <ZoneEfficiencyOverlay shots={homeFilteredShots} flipped analysis={homeAnalysisInput} />
                       ) : homeChartType === "zoneCnt" ? (
                         <ZoneCountOverlay shots={homeFilteredShots} flipped analysis={homeAnalysisInput} />
