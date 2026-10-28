@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoryById } from "@/lib/stories";
 import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
-import { SITE_URL, organizationRef, metaDescription } from "@/lib/seo";
+import { SITE_URL, organizationRef, metaDescription, ORGANIZATION_NAME, TWITTER_SITE } from "@/lib/seo";
 
 // Standalone article page for a story with no universal_game_id (a
 // weekly performance review, not a per-game recap -- see
@@ -33,12 +33,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     description,
     alternates: { canonical: url },
     openGraph: {
+      type: "article" as const,
+      siteName: ORGANIZATION_NAME,
       title,
       description,
       url,
       images: image ? [{ url: image, width: 1774, height: 887 }] : undefined,
     },
-    twitter: { card: "summary_large_image" as const, title, description, images: image ? [image] : undefined },
+    twitter: { card: "summary_large_image" as const, site: TWITTER_SITE, title, description, images: image ? [image] : undefined },
   };
 }
 

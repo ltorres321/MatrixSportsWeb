@@ -4,7 +4,7 @@ import { getScheduledGame } from "@/lib/schedule";
 import { getStoryForGame } from "@/lib/stories";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import GameDetailView from "./GameDetailView";
-import { SITE_URL, organizationRef } from "@/lib/seo";
+import { SITE_URL, organizationRef, ORGANIZATION_NAME, TWITTER_SITE } from "@/lib/seo";
 
 function teamDisplay(alias: string): string {
   const team = teamByAlias(alias);
@@ -41,8 +41,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url },
-    twitter: { card: "summary_large_image" as const, title, description },
+    openGraph: { type: "website" as const, siteName: ORGANIZATION_NAME, title, description, url },
+    twitter: { card: "summary_large_image" as const, site: TWITTER_SITE, title, description },
   };
 }
 

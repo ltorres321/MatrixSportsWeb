@@ -10,13 +10,14 @@ import AhrefsAnalytics from "@/components/AhrefsAnalytics";
 import AdSenseScript from "@/components/AdSenseScript";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAdminUserId } from "@/lib/admin";
-import { siteJsonLdGraph } from "@/lib/seo";
+import { siteJsonLdGraph, TWITTER_SITE } from "@/lib/seo";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://matrixsports.net"),
   title: "Matrix Sports Analytics",
   description: "AI-simulated NFL win probabilities.",
   openGraph: {
+    type: "website",
     siteName: "Matrix Sports Analytics",
     title: "Matrix Sports Analytics",
     description: "AI-simulated NFL win probabilities.",
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: TWITTER_SITE,
     title: "Matrix Sports Analytics",
     description: "AI-simulated NFL win probabilities.",
     images: ["/assets/brand/og-image.png"],
