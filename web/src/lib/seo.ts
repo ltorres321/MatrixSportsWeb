@@ -8,6 +8,7 @@ export const SITE_URL = "https://matrixsports.net";
 export const ORGANIZATION_ID = `${SITE_URL}/#organization`;
 export const WEBSITE_ID = `${SITE_URL}/#website`;
 export const ORGANIZATION_NAME = "Matrix Sports Analytics";
+export const TWITTER_SITE = "@NeoMatrixSports";
 
 export const SOCIAL_LINKS = [
   "https://www.instagram.com/neomatrixsports/",
@@ -86,9 +87,10 @@ export function pageMetadata({
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, images: [DEFAULT_OG_IMAGE] },
+    openGraph: { type: "website" as const, siteName: ORGANIZATION_NAME, title, description, url, images: [DEFAULT_OG_IMAGE] },
     twitter: {
       card: "summary_large_image" as const,
+      site: TWITTER_SITE,
       title,
       description,
       images: [DEFAULT_OG_IMAGE.url],
