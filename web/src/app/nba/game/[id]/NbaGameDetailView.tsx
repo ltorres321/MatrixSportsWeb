@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { NbaGameDetail, NbaInjuryEntry, NbaPropEdge } from "@/lib/nbaGameDetail";
@@ -9,6 +10,7 @@ import type { TeamGradeSet, TeamStatWithRank } from "@/lib/nbaTeamGrades";
 import type { TeamPer100Stats, TeamPer100StatWithRank } from "@/lib/nbaEfficiencyScoring";
 import { teamLogoPath } from "@/lib/teamsNba";
 import { teamPrimaryColorNba } from "@/lib/teamColorsNba";
+import { SportsbookLink } from "@/components/ParlayCard";
 import NbaLineupSection from "./NbaLineupSection";
 
 // Same polling interval as GameDetailView.tsx's LIVE_REFRESH_MS --
@@ -236,19 +238,20 @@ function TotalsSection({ game }: { game: NbaGameDetail }) {
   );
 }
 
-// "bettingEdge" | "parlayHelper" removed from the tab strip 2026-10-27
-// at the user's request: neither is trustworthy/concise enough yet
-// for NBA (see BettingEdgeTab/ParlayHelperTab below, kept but
-// unreached -- their real-money-adjacent math needs a redesign
-// before this project is comfortable showing it, not just NBA's
-// current data gaps). Re-add "bettingEdge" | "parlayHelper" to
-// PageTab and to the tabs array below once that redesign lands.
-type PageTab = "overview" | "matchups";
+// "bettingEdge" was pulled from the tab strip 2026-10-27, then
+// re-added the same day once projections v1 (src4/33) replaced the
+// flat-average formula with the real rate x minutes x matchup model
+// -- see src4/33's own module header and this repo's NBA Betting Edge
+// memory for the full history. "parlayHelper" stays out: it still
+// needs its own correlation-guardrail pass (same spec, later step)
+// before this project is comfortable showing it.
+type PageTab = "overview" | "matchups" | "bettingEdge";
 
 function PageTabStrip({ active, onChange }: { active: PageTab; onChange: (tab: PageTab) => void }) {
   const tabs: { key: PageTab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "matchups", label: "Matchups" },
+    { key: "bettingEdge", label: "Betting Edge" },
   ];
   return (
     <nav className="page-tab-strip" aria-label="Game detail sections">
@@ -971,6 +974,68 @@ function MatchupsTab({ game }: { game: NbaGameDetail }) {
   );
 }
 
+// Raw DB stat values -> display label. "pra" especially needs this --
+// see PLAYER_PROP_COLUMN_INFO.pra below for the tooltip explaining it.
+const STAT_DISPLAY_LABEL: Record<string, string> = {
+  points: "Points", rebounds: "Rebounds", assists: "Assists",
+  threes: "Threes", blocks: "Blocks", steals: "Steals",
+  turnovers: "Turnovers", pra: "PRA",
+};
+
+// Mirrors GameDetailView.tsx's own PLAYER_PROP_COLUMN_INFO pattern
+// (same InfoTooltip component, duplicated locally rather than shared
+// across sport pages -- see this file's own module header for why NBA
+// keeps parallel-but-separate implementations from NFL throughout).
+const PLAYER_PROP_COLUMN_INFO = {
+  pra: "PRA = Points + Rebounds + Assists added together for one game -- a single combo stat some books post their own line for.",
+  l5: "This player's average for this exact stat over their last 5 games played.",
+  l10: "This player's average for this exact stat over their last 10 games played.",
+  hitRate: "How many of the player's last 5 games would have covered THIS line and side (e.g. 3/5). Fewer than 5 means fewer than 5 games are available yet (a recent call-up, early-season rookie).",
+  h2h: "How many of the player's last meetings against THIS opponent (up to 5, whatever history exists) would have covered this line and side. 0 attempts means no prior meetings on record.",
+};
+
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  function toggle() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const popoverWidth = 260;
+      setPos({
+        top: rect.bottom + 6,
+        left: Math.max(12, Math.min(rect.left, window.innerWidth - popoverWidth - 12)),
+      });
+    }
+    setOpen((o) => !o);
+  }
+
+  return (
+    <span className="betting-info-wrap">
+      <button type="button" ref={buttonRef} className="betting-info-icon" aria-label="More info" onClick={toggle}>
+        i
+      </button>
+      {open &&
+        pos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div className="betting-info-backdrop" onClick={() => setOpen(false)} />
+            <div className="betting-info-popover" style={{ top: pos.top, left: pos.left }}>
+              {text}
+            </div>
+          </>,
+          document.body
+        )}
+    </span>
+  );
+}
+
+function hitRateText(hits: number | null, attempts: number) {
+  return attempts > 0 ? `${hits ?? 0}/${attempts}` : "—";
+}
+
 function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
   if (game.props.length === 0) {
     return (
@@ -981,39 +1046,73 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
       </div>
     );
   }
+  // Reuses NFL's .betting-table/-wrap/-sticky-col/-fade classes
+  // (globals.css ~L5665-5748) instead of the plain .prop-table -- same
+  // sticky Player column with an explicit solid background ("backdrop
+  // cover") so scrolled content can't show through it, same
+  // right-edge scroll-fade cue. Deliberately NOT using
+  // .betting-table-outer's width-breakout (the mechanism implicated in
+  // the ad-rail collision reported on NFL) -- this wrapper is plain
+  // `position: relative` instead, so NBA doesn't inherit that bug
+  // while it's still unresolved on NFL's side.
+  //
+  // Props already arrive ORDER BY edge DESC from nbaGameDetail.ts (and
+  // already floored at MIN_DISPLAYED_EDGE there) -- the # column below
+  // is just making that existing rank visible, not a new sort.
   return (
     <div className="page-edge-section">
-      <h3>Player Props</h3>
-      <table className="prop-table">
-        <thead>
-          <tr>
-            <th>Player</th>
-            <th>Prop</th>
-            <th>Pick</th>
-            <th>Proj</th>
-            <th>Cover Prob</th>
-            <th>Edge</th>
-            <th>Book</th>
-          </tr>
-        </thead>
-        <tbody>
-          {game.props.map((p, i) => (
-            <tr key={i}>
-              <td>{p.playerName}</td>
-              <td>{p.stat}</td>
-              <td style={{ textTransform: "capitalize" }}>{p.side} {p.line}</td>
-              <td>{p.projection.toFixed(1)}</td>
-              <td>{(p.coverProbability * 100).toFixed(0)}%</td>
-              <td style={{ color: p.edge > 0 ? "var(--green)" : "var(--red)" }}>
-                {p.edge >= 0 ? "+" : ""}{(p.edge * 100).toFixed(0)}%
-              </td>
-              <td style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-                {p.bookmaker} {p.price > 0 ? "+" : ""}{p.price}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <h3>
+        Player Props <InfoTooltip text="Projections, lines, and edges below are this project's own model -- every number here is computed in-house from box-score history, not a licensed third-party grade." />
+      </h3>
+      <div style={{ position: "relative" }}>
+        <div className="betting-table-wrap">
+          <table className="betting-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th className="betting-table-sticky-col">Player</th>
+                <th>Prop</th>
+                <th>Pick</th>
+                <th>Proj</th>
+                <th>Cover Prob</th>
+                <th>Edge</th>
+                <th>L5 <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.l5} /></th>
+                <th>L10 <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.l10} /></th>
+                <th>Hit Rate <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.hitRate} /></th>
+                <th>H2H <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.h2h} /></th>
+                <th>Book</th>
+              </tr>
+            </thead>
+            <tbody>
+              {game.props.map((p, i) => (
+                <tr key={i}>
+                  <td>{i + 1}</td>
+                  <td className="betting-table-sticky-col">{p.playerName}</td>
+                  <td>
+                    {STAT_DISPLAY_LABEL[p.stat] ?? p.stat}
+                    {p.stat === "pra" && <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.pra} />}
+                  </td>
+                  <td style={{ textTransform: "capitalize" }}>{p.side} {p.line}</td>
+                  <td>{p.projection.toFixed(1)}</td>
+                  <td>{(p.coverProbability * 100).toFixed(0)}%</td>
+                  <td style={{ color: p.edge > 0 ? "var(--green)" : "var(--red)" }}>
+                    {p.edge >= 0 ? "+" : ""}{(p.edge * 100).toFixed(0)}%
+                  </td>
+                  <td>{p.l5Avg != null ? p.l5Avg.toFixed(1) : "—"}</td>
+                  <td>{p.l10Avg != null ? p.l10Avg.toFixed(1) : "—"}</td>
+                  <td>{hitRateText(p.hitRateHits, p.hitRateAttempts)}</td>
+                  <td>{hitRateText(p.h2hHits, p.h2hAttempts)}</td>
+                  <td style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.8rem", color: "var(--text-dim)" }}>
+                    <SportsbookLink sportsbook={p.bookmaker} />
+                    {p.price > 0 ? "+" : ""}{p.price}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="betting-table-fade" aria-hidden="true" />
+      </div>
     </div>
   );
 }
@@ -1098,8 +1197,10 @@ export default function NbaGameDetailView({ game }: { game: NbaGameDetail }) {
       <PageTabStrip active={activeTab} onChange={setActiveTab} />
       {activeTab === "overview" ? (
         <OverviewTab game={game} />
-      ) : (
+      ) : activeTab === "matchups" ? (
         <MatchupsTab game={game} />
+      ) : (
+        <BettingEdgeTab game={game} />
       )}
     </>
   );

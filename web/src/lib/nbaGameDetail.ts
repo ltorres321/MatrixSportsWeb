@@ -56,7 +56,27 @@ export interface NbaPropEdge {
   projection: number;
   coverProbability: number;
   edge: number;
+  // Added 2026-10-27 -- NBA's own recent-form columns (src4/33, sql/012).
+  // No PFF-for-basketball exists to read these off a vendor table the
+  // way NFL's pffBettingEdge.ts does, so they're computed in-house --
+  // see sql/012's own header for the exact shape/naming differences
+  // from PFF's l5Record/l10Record pair.
+  l5Avg: number | null;
+  l10Avg: number | null;
+  hitRateHits: number | null;
+  hitRateAttempts: number;
+  h2hHits: number | null;
+  h2hAttempts: number;
 }
+
+// Props below this edge are hidden for now (not deleted -- still
+// scored and stored) at the user's request 2026-10-27: NBA's
+// projections are new enough that a low-edge pick isn't worth
+// surfacing yet. Revisit once there's a real grading-loop track
+// record to judge low-edge picks against, same spec step ("tune
+// thresholds after 2 weeks of grading") this number should eventually
+// come from instead of being hand-set.
+const MIN_DISPLAYED_EDGE = 0.1;
 
 export interface NbaMarginBucket {
   label: string;
@@ -211,13 +231,17 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
     player_name: string; stat: string; line: number; side: string;
     bookmaker: string; price: number; projection: number;
     cover_probability: number; edge: number;
+    l5_avg: number | null; l10_avg: number | null;
+    hit_rate_hits: number | null; hit_rate_attempts: number | null;
+    h2h_hits: number | null; h2h_attempts: number | null;
   }>(
     `SELECT player_name, stat, line, side, bookmaker, price, projection,
-            cover_probability, edge
+            cover_probability, edge, l5_avg, l10_avg,
+            hit_rate_hits, hit_rate_attempts, h2h_hits, h2h_attempts
      FROM latest_nba_player_prop_predictions
-     WHERE universal_game_id = $1
+     WHERE universal_game_id = $1 AND edge >= $2
      ORDER BY edge DESC`,
-    [gameId]
+    [gameId, MIN_DISPLAYED_EDGE]
   );
 
   const scheduled = await getNbaScheduledGame(game.home_team, game.away_team, new Date(game.game_date));
@@ -334,6 +358,12 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
       projection: r.projection,
       coverProbability: r.cover_probability,
       edge: r.edge,
+      l5Avg: r.l5_avg,
+      l10Avg: r.l10_avg,
+      hitRateHits: r.hit_rate_hits,
+      hitRateAttempts: r.hit_rate_attempts ?? 0,
+      h2hHits: r.h2h_hits,
+      h2hAttempts: r.h2h_attempts ?? 0,
     })),
     starterGrades,
     teamGrades,

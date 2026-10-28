@@ -102,6 +102,27 @@ export const SPORTSBOOK_INFO: Record<string, { name: string; url: string; logo: 
     url: "https://www.courtside.app/",
     logo: "/assets/favicons/courtside.png",
   },
+  // Added 2026-10-27 for NBA's player-prop bookmaker set
+  // (etl.player_prop_lines_current) -- same "unverified homepage
+  // root" caveat as fanatics/bovada above, plus these three
+  // specifically are exchanges/international books, not U.S. retail
+  // sportsbooks, so double-check availability in your jurisdiction
+  // before relying on the link.
+  novig: {
+    name: "Novig",
+    url: "https://novig.us/",
+    logo: "/assets/favicons/novig-favicon.ico",
+  },
+  stoiximan: {
+    name: "Stoiximan",
+    url: "https://www.stoiximan.gr/",
+    logo: "/assets/favicons/stoiximan.png",
+  },
+  onexbet: {
+    name: "1xBet",
+    url: "https://1xbet.com/",
+    logo: "/assets/favicons/onexbet-favicon.ico",
+  },
 };
 
 export function SportsbookLink({ sportsbook }: { sportsbook: string }) {
