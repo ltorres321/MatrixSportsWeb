@@ -11,7 +11,21 @@ import type { Parlay } from "@/lib/parlayHelper";
 // url is an unverified homepage root, not a click-through-confirmed
 // NFL deep link like caesars/draftKings/betmgm/fanduel above -- safer
 // to land on a page that definitely exists than guess a path that 404s.
-export const SPORTSBOOK_INFO: Record<string, { name: string; url: string; logo: string }> = {
+// url/logo are optional: a handful of "bookmaker" keys in the raw odds
+// feeds (e.g. dst_propbuilder, see its own entry below) aren't a site a
+// user can actually wager on -- for those, SportsbookLink renders a
+// plain, non-clickable label instead of a dead link, rather than let a
+// user click through expecting a real book and find nothing.
+//
+// logo is the DARK-theme icon (this site's default theme); logoLight,
+// when present, overrides it under :root[data-theme="light"] (see the
+// .betting-sportsbook-icon-light/-dark toggle in globals.css). Most
+// books' real-world logo already reads fine on both -- only add
+// logoLight for a book where one single icon is genuinely unreadable
+// on one of the two themes (confirmed live: fanatics.png's black mark
+// disappears against this site's dark backdrop; UnibetWo.png's white
+// outline disappears against the light theme's white page background).
+export const SPORTSBOOK_INFO: Record<string, { name: string; url?: string; logo?: string; logoLight?: string }> = {
   caesars: {
     name: "Caesars Sportsbook",
     url: "https://sportsbook.caesars.com/us/nj/bet/americanfootball?id=007d7c61-07a7-4e18-bb40-15104b6eac92",
@@ -50,7 +64,10 @@ export const SPORTSBOOK_INFO: Record<string, { name: string; url: string; logo: 
   fanatics: {
     name: "Fanatics Sportsbook",
     url: "https://sportsbook.fanatics.com/",
-    logo: "/assets/favicons/fanatics.png",
+    // Black mark is unreadable against this site's dark theme -- white
+    // variant for dark (the default), the original black one for light.
+    logo: "/assets/favicons/fanatics-white.png",
+    logoLight: "/assets/favicons/fanatics.png",
   },
   bovada: {
     name: "Bovada",
@@ -123,11 +140,40 @@ export const SPORTSBOOK_INFO: Record<string, { name: string; url: string; logo: 
     url: "https://1xbet.com/",
     logo: "/assets/favicons/onexbet-favicon.ico",
   },
+  pick6: {
+    name: "DraftKings Pick6",
+    url: "https://pick6.draftkings.com/",
+    logo: "/assets/favicons/Pick6.png",
+  },
+  unibet: {
+    name: "Unibet",
+    url: "https://unibet.com/",
+    // White-outline mark reads fine on dark, disappears on light --
+    // the plain-color mark for light instead.
+    logo: "/assets/favicons/UnibetWo.png",
+    logoLight: "/assets/favicons/Unibet.png",
+  },
+  // dst_propbuilder (Digital Sports Tech's "Prop Builder") deliberately
+  // has NO entry here -- it's not a sportsbook a user can visit and
+  // wager on, just backend odds-generation infrastructure licensed by
+  // real operators. Per the user's "no good anywhere, suppress them"
+  // (2026-10-31), its lines are excluded at the query level instead
+  // (nbaGameDetail.ts's propRows WHERE clause, pffBettingEdge.ts's
+  // bookmaker NOT IN lists, src4/33's EXCLUDED_BOOKMAKERS) -- they
+  // never reach this component at all, so there's nothing to render
+  // a label for.
 };
 
 export function SportsbookLink({ sportsbook }: { sportsbook: string }) {
   const info = SPORTSBOOK_INFO[sportsbook];
   if (!info) return <span className="betting-sportsbook-unknown">{sportsbook}</span>;
+  if (!info.url || !info.logo) {
+    return (
+      <span className="betting-sportsbook-unknown" title="Not a sportsbook -- odds source only, no wagering here">
+        {info.name}
+      </span>
+    );
+  }
   return (
     <a
       className="betting-sportsbook-link"
@@ -137,7 +183,15 @@ export function SportsbookLink({ sportsbook }: { sportsbook: string }) {
       title={`Odds via ${info.name}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={info.logo} alt={info.name} className="betting-sportsbook-icon" />
+      <img
+        src={info.logo}
+        alt={info.name}
+        className={`betting-sportsbook-icon${info.logoLight ? " betting-sportsbook-icon-dark" : ""}`}
+      />
+      {info.logoLight && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={info.logoLight} alt={info.name} className="betting-sportsbook-icon betting-sportsbook-icon-light" />
+      )}
     </a>
   );
 }

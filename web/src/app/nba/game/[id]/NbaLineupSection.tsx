@@ -181,18 +181,20 @@ function matchesQuarter(period: number | null, filter: QuarterFilter): boolean {
   }
 }
 
-// How far back a chart type's data reaches -- "Current Game" narrows
-// to ShotMarker.gameId === the matchup's own GameShotChart.currentGameId
-// (a client-side filter, not a second server fetch: the season-to-date
-// query this page already loads already contains this game's own
-// shots as a subset). "L5"/"L10" are the team's own 5/10 most recent
-// games (including the current one), same client-side approach --
-// see lastNGameIds below. "Season to Date" is the unfiltered existing
-// behavior.
-type Lookback = "currentGame" | "l5" | "l10" | "seasonToDate";
+// How far back a chart type's data reaches -- "Last Game Percentages"
+// is the team's single most recently COMPLETED game (lastNGameIds(shots, 1)
+// below), not tied to this specific matchup's own game_id the way the
+// old "Current Game" option was. That old option showed nothing (or a
+// "not played yet" message) for every game up until tipoff, since it
+// filtered to THIS matchup's own GameShotChart.currentGameId -- always
+// a real, already-played game, so there's no pending/empty state to
+// handle here the way "Current Game" needed. "L5"/"L10" are the same
+// idea, just the 5/10 most recent games -- see lastNGameIds below.
+// "Season to Date" is the unfiltered existing behavior.
+type Lookback = "lastGame" | "l5" | "l10" | "seasonToDate";
 
 const LOOKBACK_OPTIONS: { value: Lookback; label: string }[] = [
-  { value: "currentGame", label: "Current Game" },
+  { value: "lastGame", label: "Last Game Percentages" },
   { value: "l5", label: "L5" },
   { value: "l10", label: "L10" },
   { value: "seasonToDate", label: "Season to Date" },
@@ -245,8 +247,8 @@ function filterShotsByGames(
 
 function lookbackGameIds(shots: ShotMarker[], lookback: Lookback, currentGameId: string): Set<string> | null {
   switch (lookback) {
-    case "currentGame":
-      return new Set([currentGameId]);
+    case "lastGame":
+      return lastNGameIds(shots, 1);
     case "l5":
       return lastNGameIds(shots, 5);
     case "l10":
@@ -850,10 +852,10 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
   const [homeSelectedPlayers, setHomeSelectedPlayers] = useState<string[]>([]);
   const [awayQuarter, setAwayQuarter] = useState<QuarterFilter>("all");
   const [homeQuarter, setHomeQuarter] = useState<QuarterFilter>("all");
-  const [awayChartType, setAwayChartType] = useState<ChartType>("shotSelection");
-  const [homeChartType, setHomeChartType] = useState<ChartType>("shotSelection");
-  const [awayLookback, setAwayLookback] = useState<Lookback>("currentGame");
-  const [homeLookback, setHomeLookback] = useState<Lookback>("currentGame");
+  const [awayChartType, setAwayChartType] = useState<ChartType>("zoneEff");
+  const [homeChartType, setHomeChartType] = useState<ChartType>("zoneEff");
+  const [awayLookback, setAwayLookback] = useState<Lookback>("l5");
+  const [homeLookback, setHomeLookback] = useState<Lookback>("l5");
   const [awayAnalysis, setAwayAnalysis] = useState<Analysis>("none");
   const [homeAnalysis, setHomeAnalysis] = useState<Analysis>("none");
 
@@ -879,19 +881,6 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
   const homeFilteredShots = game.shotChart
     ? filterShots(game.shotChart.home.shots, homeSelectedPlayerIds, homeQuarter, homeLookback, game.shotChart.currentGameId)
     : [];
-
-  // game.shotChart itself only means "this TEAM has shots on record
-  // somewhere this season" -- it stays truthy for a game that hasn't
-  // tipped off yet, so Current Game lookback silently rendered an
-  // empty court with no explanation. True "not played yet" is: no
-  // shot anywhere in either team's full season list is tagged with
-  // this specific currentGameId.
-  const currentGamePlayed = game.shotChart
-    ? game.shotChart.away.shots.some((s) => s.gameId === game.shotChart!.currentGameId)
-      || game.shotChart.home.shots.some((s) => s.gameId === game.shotChart!.currentGameId)
-    : false;
-  const awayPendingTipoff = awayLookback === "currentGame" && !currentGamePlayed;
-  const homePendingTipoff = homeLookback === "currentGame" && !currentGamePlayed;
 
   // Analysis always compares the literal current game against a
   // baseline, independent of whatever the Lookback dropdown above is
@@ -1011,20 +1000,14 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
                 {mode === "shotChart" ? (
                   game.shotChart ? (
                     <>
-                      {awayPendingTipoff ? (
-                        <div className="nba-shotchart-pending">Shot chart will be available after the game is completed.</div>
-                      ) : awayChartType === "zoneEff" ? (
+                      {awayChartType === "zoneEff" ? (
                         <ZoneEfficiencyOverlay shots={awayFilteredShots} flipped={false} analysis={awayAnalysisInput} />
                       ) : awayChartType === "zoneCnt" ? (
                         <ZoneCountOverlay shots={awayFilteredShots} flipped={false} analysis={awayAnalysisInput} />
                       ) : (
                         <ShotChartOverlay shots={awayFilteredShots} flipped={false} />
                       )}
-                      {homePendingTipoff ? (
-                        <div className="nba-shotchart-pending nba-shotchart-pending-home">
-                          Shot chart will be available after the game is completed.
-                        </div>
-                      ) : homeChartType === "zoneEff" ? (
+                      {homeChartType === "zoneEff" ? (
                         <ZoneEfficiencyOverlay shots={homeFilteredShots} flipped analysis={homeAnalysisInput} />
                       ) : homeChartType === "zoneCnt" ? (
                         <ZoneCountOverlay shots={homeFilteredShots} flipped analysis={homeAnalysisInput} />

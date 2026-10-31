@@ -239,7 +239,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
             cover_probability, edge, l5_avg, l10_avg,
             hit_rate_hits, hit_rate_attempts, h2h_hits, h2h_attempts
      FROM latest_nba_player_prop_predictions
-     WHERE universal_game_id = $1 AND edge >= $2
+     WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
      ORDER BY edge DESC`,
     [gameId, MIN_DISPLAYED_EDGE]
   );
