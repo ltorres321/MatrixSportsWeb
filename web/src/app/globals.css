@@ -5146,29 +5146,6 @@ h1.glow span {
   top: 75%;
 }
 
-/* Current Game lookback, game not tipped off yet -- same top:25%/75%
-   per-half centering as the watermark above, text-only so it reads
-   over the empty court instead of a blank half with no explanation. */
-.nba-shotchart-pending {
-  position: absolute;
-  top: 25%;
-  left: 50%;
-  width: 70%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  /* Was rgba(255, 255, 255, 0.6) -- unreadable against the light wood
-     court background underneath it (confirmed by user report
-     2026-10-28). Dark + bolder + bigger so it actually reads. */
-  color: rgba(0, 0, 0, 0.85);
-  font-size: 1.05rem;
-  font-weight: 600;
-  pointer-events: none;
-}
-
-.nba-shotchart-pending-home {
-  top: 75%;
-}
-
 /* Shots By Zone Eff: the zone-boundary reference court
    (Fullcourt-nba-bbr_SectionsBlueNum2Blnk.png -- same numbered zone
    chart nbaShotChart.ts's masks come from, minus the digits) painted
@@ -5790,6 +5767,23 @@ h1.glow span {
   width: 18px;
   height: 18px;
   border-radius: 3px;
+}
+
+/* A book with a logoLight entry (see SPORTSBOOK_INFO's own comment)
+   renders BOTH <img>s; this toggles which one shows per theme instead
+   of swapping `src` in JS. Dark is this site's default theme, so the
+   dark icon needs no selector of its own -- only light-theme hides it
+   and reveals the light-theme icon instead. */
+.betting-sportsbook-icon-light {
+  display: none;
+}
+
+:root[data-theme="light"] .betting-sportsbook-icon-dark {
+  display: none;
+}
+
+:root[data-theme="light"] .betting-sportsbook-icon-light {
+  display: inline;
 }
 
 .betting-sportsbook-unknown {

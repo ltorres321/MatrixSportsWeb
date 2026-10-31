@@ -439,14 +439,14 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
                       AND l2.stat = pp.consensus_stat
                       AND l2.line = pp.consensus_line
                       AND l2.side = pp.pick_side
-                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6')) AS book_count
+                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = pp.universal_game_id
               AND l.player_name = pp.player_name
               AND l.stat = pp.consensus_stat
               AND l.line = pp.consensus_line
               AND l.side = pp.pick_side
-              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6')
+              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
@@ -670,14 +670,14 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
                       AND l2.stat = pp.consensus_stat
                       AND l2.line = pp.consensus_line
                       AND l2.side = pp.pick_side
-                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6')) AS book_count
+                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = pp.universal_game_id
               AND l.player_name = pp.player_name
               AND l.stat = pp.consensus_stat
               AND l.line = pp.consensus_line
               AND l.side = pp.pick_side
-              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6')
+              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
