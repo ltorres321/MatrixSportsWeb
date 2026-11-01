@@ -2326,11 +2326,11 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
                   </div>
                 </td>
                 <td className={e.projDirection === "Under" ? "betting-proj-under" : "betting-proj-over"}>
-                  {e.projValue ?? "—"}
+                  {e.projValue != null ? e.projValue.toFixed(1) : "—"}
                   {e.projDirection && <div className="betting-hit-type">{e.projDirection}</div>}
                 </td>
-                <td>{e.l10Avg ?? "—"}</td>
-                <td>{e.covProbPct != null ? `${e.covProbPct}%` : "—"}</td>
+                <td>{e.l10Avg != null ? e.l10Avg.toFixed(1) : "—"}</td>
+                <td>{e.covProbPct != null ? `${e.covProbPct.toFixed(1)}%` : "—"}</td>
                 <td>{e.edgePct != null ? <EdgeBadge pct={e.edgePct} /> : "—"}</td>
                 <td>
                   {e.defVsPropRank && e.defVsPropRank !== "-" ? e.defVsPropRank : "—"}
@@ -2408,10 +2408,10 @@ function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }
         </div>
         <div className="prop-card-proj">
           <div className="prop-card-proj-value">
-            {e.projValue ?? "—"}
+            {e.projValue != null ? e.projValue.toFixed(1) : "—"}
             <span className="prop-card-proj-label">PROJ</span>
           </div>
-          {e.l10Avg != null && <div className="prop-card-avg">AVG: {e.l10Avg}</div>}
+          {e.l10Avg != null && <div className="prop-card-avg">AVG: {e.l10Avg.toFixed(1)}</div>}
         </div>
       </div>
       <div className="prop-card-stats-row">
@@ -2421,7 +2421,7 @@ function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }
         </div>
         <div className="prop-card-stat-box">
           <div className="prop-card-stat-label">Cover Prob</div>
-          <div className="prop-card-stat-value">{e.covProbPct != null ? `${e.covProbPct}%` : "—"}</div>
+          <div className="prop-card-stat-value">{e.covProbPct != null ? `${e.covProbPct.toFixed(1)}%` : "—"}</div>
         </div>
         <div className="prop-card-stat-box">
           <div className="prop-card-stat-label">{e.pickSide ?? ""} Hit Rate</div>

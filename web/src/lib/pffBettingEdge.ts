@@ -341,7 +341,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
       [universalGameId]
     ),
     query<PlayerPropRow>(
-      `WITH props AS (
+      `WITH pff_props AS (
          SELECT pp.player_name, pp.player_team, pp.opponent_team,
                 COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
                 COALESCE(lu.position, ec.position) AS lineup_position,
@@ -451,6 +451,89 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
             LIMIT 1
          ) market ON true
          WHERE pp.universal_game_id = $1
+       ),
+       -- SECOND, INDEPENDENT SOURCE: nfl_player_prop_predictions
+       -- (sql/014, serving/7_predict_independent_player_props.py) --
+       -- built from this project's OWN polled stat history and market
+       -- lines, never from PFF's export. Only fills a (player, stat)
+       -- PFF's own CSV drop didn't cover this week -- the NOT EXISTS
+       -- guard means PFF's row always wins when both sources have the
+       -- same prop, so this never overrides or duplicates a PFF pick,
+       -- only fills the gap (see sql/014's own header for why this
+       -- table exists -- PFF publishing late or thin for a week, e.g.
+       -- week 8 2026, otherwise leaves the whole section empty).
+       own_props AS (
+         SELECT np.player_name, np.player_team, np.opponent_team,
+                COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
+                COALESCE(lu.position, ec.position) AS lineup_position,
+                np.consensus_stat, np.consensus_line, np.pick_sportsbook, np.pick_side, np.pick_line,
+                np.pick_odds, np.pick_result, np.actual_value, np.proj_value,
+                NULL::text AS proj_direction, np.l10_avg, np.cov_prob_pct, np.edge_pct,
+                NULL::text AS def_vs_prop_rank, NULL::text AS matchup_grade, NULL::text AS matchup_position,
+                NULL::text AS sim_def_record, NULL::text AS sim_def_hit_type,
+                np.l5_record, NULL::text AS l5_hit_type, np.l10_record, NULL::text AS l10_hit_type,
+                NULL::text AS h2h_record, NULL::text AS h2h_hit_type,
+                np.generated_at AS odds_as_of,
+                -- Same pred join as pff_props below -- serving/6 now scores
+                -- BOTH sources into the same public.player_prop_predictions
+                -- population (see that script's own comment for why), so
+                -- our own rows get a real overall_rank too, not just a
+                -- per-game pRank. Falls back to our own raw hit-rate only
+                -- for the brief window after serving/7 writes a new prop
+                -- before serving/6's next scoring pass has scored it yet --
+                -- never leaves p_rank (below) with nothing to sort by.
+                COALESCE(pred.predicted_correct_probability, (np.cov_prob_pct / 100.0)::double precision)
+                  AS predicted_correct_probability,
+                pred.model_rank AS overall_rank,
+                market.bookmaker AS matching_line_sportsbook,
+                market.price AS matching_line_odds,
+                COALESCE(market.book_count, 0) AS matching_line_book_count,
+                market.last_seen_at AS matching_line_as_of
+         FROM nfl_player_prop_predictions np
+         LEFT JOIN LATERAL (
+           SELECT predicted_correct_probability, model_rank
+           FROM public.latest_player_prop_predictions pred
+           WHERE pred.universal_game_id = np.universal_game_id
+             AND pred.player_name = np.player_name
+             AND pred.consensus_stat = np.consensus_stat
+           LIMIT 1
+         ) pred ON true
+         LEFT JOIN LATERAL (
+           SELECT espn_id, position FROM etl.pff_lineup
+           WHERE player_name = np.player_name AND season = np.season
+           LIMIT 1
+         ) lu ON true
+         LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = np.player_name
+         LEFT JOIN LATERAL (
+           SELECT l.bookmaker, l.price, l.last_seen_at,
+                  (SELECT COUNT(DISTINCT l2.bookmaker)
+                     FROM etl.player_prop_lines_current l2
+                    WHERE l2.universal_game_id = np.universal_game_id
+                      AND l2.player_name = np.player_name
+                      AND l2.stat = np.consensus_stat
+                      AND l2.line = np.consensus_line
+                      AND l2.side = np.pick_side
+                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')) AS book_count
+             FROM etl.player_prop_lines_current l
+            WHERE l.universal_game_id = np.universal_game_id
+              AND l.player_name = np.player_name
+              AND l.stat = np.consensus_stat
+              AND l.line = np.consensus_line
+              AND l.side = np.pick_side
+              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')
+            ORDER BY l.price DESC
+            LIMIT 1
+         ) market ON true
+         WHERE np.universal_game_id = $1
+           AND NOT EXISTS (
+             SELECT 1 FROM etl.pff_player_props pp2
+             WHERE pp2.universal_game_id = np.universal_game_id
+               AND pp2.player_name = np.player_name
+               AND pp2.consensus_stat = np.consensus_stat
+           )
+       ),
+       props AS (
+         SELECT * FROM pff_props UNION ALL SELECT * FROM own_props
        )
        -- overall_rank (pred.model_rank, above) ranks across EVERY prop
        -- the model scored that week, league-wide -- the population the
@@ -610,7 +693,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
 // is the only change needed; no new ranking math.
 export async function getLeagueBettingEdge(season: number, week: number): Promise<PlayerPropEntry[]> {
   const rows = await query<PlayerPropRow>(
-    `WITH props AS (
+    `WITH pff_props AS (
        SELECT pp.player_name, pp.player_team, pp.opponent_team,
               COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
               COALESCE(lu.position, ec.position) AS lineup_position,
@@ -681,6 +764,79 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
+       ),
+       -- Same second, independent source as getGameBettingEdge's own
+       -- own_props CTE above -- see that one's comment for why it
+       -- exists. Joined to latest_predictions the same way pff_props
+       -- is, purely to scope by season+week and pick up game_date.
+       own_props AS (
+         SELECT np.player_name, np.player_team, np.opponent_team,
+                COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
+                COALESCE(lu.position, ec.position) AS lineup_position,
+                np.consensus_stat, np.consensus_line, np.pick_sportsbook, np.pick_side, np.pick_line,
+                np.pick_odds, np.pick_result, np.actual_value, np.proj_value,
+                NULL::text AS proj_direction, np.l10_avg, np.cov_prob_pct, np.edge_pct,
+                NULL::text AS def_vs_prop_rank, NULL::text AS matchup_grade, NULL::text AS matchup_position,
+                NULL::text AS sim_def_record, NULL::text AS sim_def_hit_type,
+                np.l5_record, NULL::text AS l5_hit_type, np.l10_record, NULL::text AS l10_hit_type,
+                NULL::text AS h2h_record, NULL::text AS h2h_hit_type,
+                np.generated_at AS odds_as_of,
+                -- Same pred join as pff_props above -- see getGameBettingEdge's
+                -- identical own_props comment for why.
+                COALESCE(pred.predicted_correct_probability, (np.cov_prob_pct / 100.0)::double precision)
+                  AS predicted_correct_probability,
+                pred.model_rank AS overall_rank,
+                market.bookmaker AS matching_line_sportsbook,
+                market.price AS matching_line_odds,
+                COALESCE(market.book_count, 0) AS matching_line_book_count,
+                market.last_seen_at AS matching_line_as_of,
+                lp.game_date
+         FROM nfl_player_prop_predictions np
+         JOIN latest_predictions lp
+           ON lp.universal_game_id = np.universal_game_id AND lp.season = $1 AND lp.week = $2
+         LEFT JOIN LATERAL (
+           SELECT predicted_correct_probability, model_rank
+           FROM public.latest_player_prop_predictions pred
+           WHERE pred.universal_game_id = np.universal_game_id
+             AND pred.player_name = np.player_name
+             AND pred.consensus_stat = np.consensus_stat
+           LIMIT 1
+         ) pred ON true
+         LEFT JOIN LATERAL (
+           SELECT espn_id, position FROM etl.pff_lineup
+           WHERE player_name = np.player_name AND season = np.season
+           LIMIT 1
+         ) lu ON true
+         LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = np.player_name
+         LEFT JOIN LATERAL (
+           SELECT l.bookmaker, l.price, l.last_seen_at,
+                  (SELECT COUNT(DISTINCT l2.bookmaker)
+                     FROM etl.player_prop_lines_current l2
+                    WHERE l2.universal_game_id = np.universal_game_id
+                      AND l2.player_name = np.player_name
+                      AND l2.stat = np.consensus_stat
+                      AND l2.line = np.consensus_line
+                      AND l2.side = np.pick_side
+                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')) AS book_count
+             FROM etl.player_prop_lines_current l
+            WHERE l.universal_game_id = np.universal_game_id
+              AND l.player_name = np.player_name
+              AND l.stat = np.consensus_stat
+              AND l.line = np.consensus_line
+              AND l.side = np.pick_side
+              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')
+            ORDER BY l.price DESC
+            LIMIT 1
+         ) market ON true
+         WHERE NOT EXISTS (
+           SELECT 1 FROM etl.pff_player_props pp2
+           WHERE pp2.universal_game_id = np.universal_game_id
+             AND pp2.player_name = np.player_name
+             AND pp2.consensus_stat = np.consensus_stat
+         )
+       ),
+       props AS (
+         SELECT * FROM pff_props UNION ALL SELECT * FROM own_props
        )
        -- p_rank here re-ranks within this SAME league-wide population
        -- (there's no single game to scope it to), so it lands on the

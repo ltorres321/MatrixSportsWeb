@@ -109,6 +109,11 @@ export const SPORTSBOOK_INFO: Record<string, { name: string; url?: string; logo?
     url: "https://rebet.app/",
     logo: "/assets/favicons/rebet.png",
   },
+  tonybet: {
+    name: "TonyBet",
+    url: "https://tonybet.com/",
+    logo: "/assets/favicons/Tonybet.png",
+  },
   sportzino: {
     name: "Sportzino",
     url: "https://sportzino.com/",
