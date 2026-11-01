@@ -37,8 +37,8 @@ export interface WeekParlays {
   parlays: Record<ParlayBookMode, LeagueParlays>;
 }
 
-async function buildWeekParlays(season: number, week: number): Promise<WeekParlays> {
-  const playerProps = await getLeagueBettingEdge(season, week);
+async function buildWeekParlays(season: number, week: number, hideBannedBooks: boolean): Promise<WeekParlays> {
+  const playerProps = await getLeagueBettingEdge(season, week, hideBannedBooks);
   const parlays: Record<ParlayBookMode, LeagueParlays> = {
     single: buildLeagueParlays(playerProps, "single"),
     mixed: buildLeagueParlays(playerProps, "mixed"),
@@ -99,7 +99,12 @@ function SignUpGate() {
 // recent first below it), rather than a picker for one week at a time,
 // since the whole point of this page is "how did the model do, and
 // what's it saying now" at a glance.
-export default async function ParlaysPage() {
+export default async function ParlaysPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ hideBanned?: string }>;
+}) {
+  const hideBannedBooks = (await searchParams).hideBanned !== "0";
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
@@ -121,7 +126,7 @@ export default async function ParlaysPage() {
   const weeksToShow =
     currentWeek == null ? [] : weeks.filter((w) => w >= FIRST_PARLAY_WEEK && w <= currentWeek).sort((a, b) => b - a);
 
-  const weekParlays = await Promise.all(weeksToShow.map((w) => buildWeekParlays(activeSeason, w)));
+  const weekParlays = await Promise.all(weeksToShow.map((w) => buildWeekParlays(activeSeason, w, hideBannedBooks)));
 
   return <ParlaysView season={activeSeason} currentWeek={currentWeek} weeks={weekParlays} />;
 }

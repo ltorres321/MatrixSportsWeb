@@ -74,6 +74,17 @@ export const SPORTSBOOK_INFO: Record<string, { name: string; url?: string; logo?
     url: "https://www.bovada.lv/",
     logo: "/assets/favicons/bovada.png",
   },
+  // Canada-only -- not legally available to US bettors (confirmed by the
+  // user, 2026-11), so also added to pffBettingEdge.ts's BANNED_US_BOOKS.
+  // Still gets a real icon here since this entry is theme-independent of
+  // that filter -- a non-US reader, or the toggle switched off, still
+  // sees a proper icon instead of a plain-text fallback.
+  bet99: {
+    name: "Bet99",
+    url: "https://bet99.com/",
+    logo: "/assets/favicons/Bet99_Dark.png",
+    logoLight: "/assets/favicons/Bet99_Light.png",
+  },
   hardrock: {
     name: "Hard Rock Bet",
     url: "https://app.hardrock.bet/",
