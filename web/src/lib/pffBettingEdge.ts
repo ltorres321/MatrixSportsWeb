@@ -20,6 +20,21 @@ import { recordDisplayedParlays } from "@/lib/parlayLog";
 // this week) just returns null from getGameBettingEdge -- not an
 // error, same as every other optional PFF section on this page.
 
+// Books confirmed (2026-11, by the user) NOT legally available to US
+// bettors -- different category from NON_RETAIL_BOOKS below (those are
+// exchanges/DFS/prediction-markets, never a real retail book for ANYONE;
+// these ARE real retail books, just not ones a US user can place a bet
+// at). Toggled, not hardcoded out permanently -- the data stays valid
+// for a non-US context, so hideBannedBooks defaults true but can be
+// turned off to see everything PFF/the line pollers actually have.
+export const BANNED_US_BOOKS = ["tonybet", "stoiximan", "bet99"];
+
+// Exchanges/prediction markets/DFS pick'em -- never a parlay-combinable
+// retail book regardless of region (see the line-shopping join's own
+// comment below for the full reasoning). Always excluded, independent
+// of the hideBannedBooks toggle.
+const NON_RETAIL_BOOKS = ["novig", "prophetx", "kalshi", "polymarket_us", "pick6", "dst_propbuilder"];
+
 // ----------------------------------------------------------------------
 // Game Lines (etl.pff_best_bets)
 // ----------------------------------------------------------------------
@@ -300,7 +315,17 @@ export interface GameBettingEdge {
   parlays: Record<ParlayBookMode, GameParlays>;
 }
 
-export async function getGameBettingEdge(universalGameId: string): Promise<GameBettingEdge | null> {
+export async function getGameBettingEdge(
+  universalGameId: string,
+  hideBannedBooks: boolean = true
+): Promise<GameBettingEdge | null> {
+  // Empty array makes `!= ALL($n::text[])` vacuously true for every row
+  // (no filtering) -- so passing [] when the toggle is off, rather than a
+  // separate boolean param, keeps every query below a single uniform
+  // shape regardless of toggle state.
+  const bannedBooks = hideBannedBooks ? BANNED_US_BOOKS : [];
+  const excludedLineShopBooks = [...NON_RETAIL_BOOKS, ...bannedBooks];
+
   const [bestGameBetRows, scheduledGame, firstTouchdownRows, playerPropRows, keyInsightRows] = await Promise.all([
     query<BestGameBetRow>(
       `SELECT prop_type, line, side_one_type, side_one_odds, side_one_edge_pct,
@@ -337,16 +362,33 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
        -- case: Austin Ekeler, not yet on any team's PFF depth chart --
        -- see sql/014_espn_player_crosswalk.sql's own docstring).
        LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = ft.player_name
-       WHERE ft.universal_game_id = $1 ORDER BY ft.first_td_odds ASC`,
-      [universalGameId]
+       -- First Touchdown has no independent market-line data of its own
+       -- (unlike Player Props below) to fall back to -- PFF's export is
+       -- the only source for this market at all, so a banned-book row
+       -- here has no legal-book backup and is simply excluded, not
+       -- swapped. Empty bannedBooks array (toggle off) excludes nothing.
+       WHERE ft.universal_game_id = $1 AND ft.sportsbook != ALL($2::text[])
+       ORDER BY ft.first_td_odds ASC`,
+      [universalGameId, bannedBooks]
     ),
     query<PlayerPropRow>(
       `WITH pff_props AS (
          SELECT pp.player_name, pp.player_team, pp.opponent_team,
                 COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
                 COALESCE(lu.position, ec.position) AS lineup_position,
-                pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
-                pp.pick_odds,
+                pp.consensus_stat, pp.consensus_line,
+                -- Swap PFF's own recommended book away from a banned one to
+                -- the best legal alternative quoting the SAME line/side
+                -- (the market join below, already excluding banned books
+                -- itself) -- never just drops the pick when a legal backup
+                -- exists. Falls through to PFF's original pick untouched
+                -- when it's already a legal book, or when bannedBooks is
+                -- empty (toggle off).
+                CASE WHEN pp.pick_sportsbook = ANY($2::text[]) THEN market.bookmaker ELSE pp.pick_sportsbook END
+                  AS pick_sportsbook,
+                pp.pick_side, pp.pick_line,
+                CASE WHEN pp.pick_sportsbook = ANY($2::text[]) THEN market.price ELSE pp.pick_odds END
+                  AS pick_odds,
                 -- Derived fallback for when SportsPipelines' grading job has
                 -- filled in actual_value but hasn't (yet, or at all -- a
                 -- confirmed gap, not just a timing lag) set pick_result
@@ -439,14 +481,14 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
                       AND l2.stat = pp.consensus_stat
                       AND l2.line = pp.consensus_line
                       AND l2.side = pp.pick_side
-                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')) AS book_count
+                      AND l2.bookmaker != ALL($3::text[])) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = pp.universal_game_id
               AND l.player_name = pp.player_name
               AND l.stat = pp.consensus_stat
               AND l.line = pp.consensus_line
               AND l.side = pp.pick_side
-              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')
+              AND l.bookmaker != ALL($3::text[])
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
@@ -466,8 +508,14 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
          SELECT np.player_name, np.player_team, np.opponent_team,
                 COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
                 COALESCE(lu.position, ec.position) AS lineup_position,
-                np.consensus_stat, np.consensus_line, np.pick_sportsbook, np.pick_side, np.pick_line,
-                np.pick_odds, np.pick_result, np.actual_value, np.proj_value,
+                np.consensus_stat, np.consensus_line,
+                -- Same banned-book swap as pff_props above.
+                CASE WHEN np.pick_sportsbook = ANY($2::text[]) THEN market.bookmaker ELSE np.pick_sportsbook END
+                  AS pick_sportsbook,
+                np.pick_side, np.pick_line,
+                CASE WHEN np.pick_sportsbook = ANY($2::text[]) THEN market.price ELSE np.pick_odds END
+                  AS pick_odds,
+                np.pick_result, np.actual_value, np.proj_value,
                 NULL::text AS proj_direction, np.l10_avg, np.cov_prob_pct, np.edge_pct,
                 NULL::text AS def_vs_prop_rank, NULL::text AS matchup_grade, NULL::text AS matchup_position,
                 NULL::text AS sim_def_record, NULL::text AS sim_def_hit_type,
@@ -513,14 +561,14 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
                       AND l2.stat = np.consensus_stat
                       AND l2.line = np.consensus_line
                       AND l2.side = np.pick_side
-                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')) AS book_count
+                      AND l2.bookmaker != ALL($3::text[])) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = np.universal_game_id
               AND l.player_name = np.player_name
               AND l.stat = np.consensus_stat
               AND l.line = np.consensus_line
               AND l.side = np.pick_side
-              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')
+              AND l.bookmaker != ALL($3::text[])
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
@@ -553,7 +601,7 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
               END AS p_rank
        FROM props
        ORDER BY p_rank ASC NULLS LAST`,
-      [universalGameId]
+      [universalGameId, bannedBooks, excludedLineShopBooks]
     ),
     query<KeyInsightRow>(
       `SELECT player_name, position, player_team, opponent_team, insight_headline,
@@ -691,14 +739,26 @@ export async function getGameBettingEdge(universalGameId: string): Promise<GameB
 // (pred.model_rank) is already a league-wide-per-week value in
 // public.latest_player_prop_predictions, so widening the WHERE clause
 // is the only change needed; no new ranking math.
-export async function getLeagueBettingEdge(season: number, week: number): Promise<PlayerPropEntry[]> {
+export async function getLeagueBettingEdge(
+  season: number,
+  week: number,
+  hideBannedBooks: boolean = true
+): Promise<PlayerPropEntry[]> {
+  const bannedBooks = hideBannedBooks ? BANNED_US_BOOKS : [];
+  const excludedLineShopBooks = [...NON_RETAIL_BOOKS, ...bannedBooks];
+
   const rows = await query<PlayerPropRow>(
     `WITH pff_props AS (
        SELECT pp.player_name, pp.player_team, pp.opponent_team,
               COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
               COALESCE(lu.position, ec.position) AS lineup_position,
-              pp.consensus_stat, pp.consensus_line, pp.pick_sportsbook, pp.pick_side, pp.pick_line,
-              pp.pick_odds,
+              pp.consensus_stat, pp.consensus_line,
+              -- Same banned-book swap as getGameBettingEdge's pff_props.
+              CASE WHEN pp.pick_sportsbook = ANY($3::text[]) THEN market.bookmaker ELSE pp.pick_sportsbook END
+                AS pick_sportsbook,
+              pp.pick_side, pp.pick_line,
+              CASE WHEN pp.pick_sportsbook = ANY($3::text[]) THEN market.price ELSE pp.pick_odds END
+                AS pick_odds,
               -- See getGameBettingEdge's identical derivation above for why.
               COALESCE(
                 pp.pick_result,
@@ -753,14 +813,14 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
                       AND l2.stat = pp.consensus_stat
                       AND l2.line = pp.consensus_line
                       AND l2.side = pp.pick_side
-                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')) AS book_count
+                      AND l2.bookmaker != ALL($4::text[])) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = pp.universal_game_id
               AND l.player_name = pp.player_name
               AND l.stat = pp.consensus_stat
               AND l.line = pp.consensus_line
               AND l.side = pp.pick_side
-              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')
+              AND l.bookmaker != ALL($4::text[])
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
@@ -773,8 +833,14 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
          SELECT np.player_name, np.player_team, np.opponent_team,
                 COALESCE(lu.espn_id, ec.espn_id) AS espn_id,
                 COALESCE(lu.position, ec.position) AS lineup_position,
-                np.consensus_stat, np.consensus_line, np.pick_sportsbook, np.pick_side, np.pick_line,
-                np.pick_odds, np.pick_result, np.actual_value, np.proj_value,
+                np.consensus_stat, np.consensus_line,
+                -- Same banned-book swap as pff_props above.
+                CASE WHEN np.pick_sportsbook = ANY($3::text[]) THEN market.bookmaker ELSE np.pick_sportsbook END
+                  AS pick_sportsbook,
+                np.pick_side, np.pick_line,
+                CASE WHEN np.pick_sportsbook = ANY($3::text[]) THEN market.price ELSE np.pick_odds END
+                  AS pick_odds,
+                np.pick_result, np.actual_value, np.proj_value,
                 NULL::text AS proj_direction, np.l10_avg, np.cov_prob_pct, np.edge_pct,
                 NULL::text AS def_vs_prop_rank, NULL::text AS matchup_grade, NULL::text AS matchup_position,
                 NULL::text AS sim_def_record, NULL::text AS sim_def_hit_type,
@@ -817,14 +883,14 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
                       AND l2.stat = np.consensus_stat
                       AND l2.line = np.consensus_line
                       AND l2.side = np.pick_side
-                      AND l2.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')) AS book_count
+                      AND l2.bookmaker != ALL($4::text[])) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = np.universal_game_id
               AND l.player_name = np.player_name
               AND l.stat = np.consensus_stat
               AND l.line = np.consensus_line
               AND l.side = np.pick_side
-              AND l.bookmaker NOT IN ('novig', 'prophetx', 'kalshi', 'polymarket_us', 'pick6', 'dst_propbuilder')
+              AND l.bookmaker != ALL($4::text[])
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
@@ -850,7 +916,7 @@ export async function getLeagueBettingEdge(season: number, week: number): Promis
               END AS p_rank
        FROM props
        ORDER BY p_rank ASC NULLS LAST`,
-    [season, week]
+    [season, week, bannedBooks, excludedLineShopBooks]
   );
 
   return rows.map((r) => ({

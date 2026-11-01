@@ -46,9 +46,18 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
-export default async function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function GameDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ hideBanned?: string }>;
+}) {
   const { id } = await params;
-  const game = await getGameDetail(id);
+  // Default ON -- only an explicit "0" turns it off. See GameDetailView.tsx's
+  // BannedBooksToggle for the control that sets this query param.
+  const hideBannedBooks = (await searchParams).hideBanned !== "0";
+  const game = await getGameDetail(id, hideBannedBooks);
   if (game) {
     const story = game.finalResult ? await getStoryForGame(id) : null;
     const a = teamDisplay(game.teamA.alias);

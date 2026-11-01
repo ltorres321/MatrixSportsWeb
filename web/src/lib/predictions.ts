@@ -1073,7 +1073,10 @@ function rowToGameStat(
 // view was paying that full cost TWICE. cache() scopes the dedup to
 // one request/render pass, not across requests, so this never risks
 // serving one visitor another's stale data.
-export const getGameDetail = cache(async function getGameDetail(universalGameId: string): Promise<GameStat | null> {
+export const getGameDetail = cache(async function getGameDetail(
+  universalGameId: string,
+  hideBannedBooks: boolean = true
+): Promise<GameStat | null> {
   const rows = await query<PredictionRow>(
     `SELECT ${PREDICTION_COLUMNS} FROM latest_predictions WHERE universal_game_id = $1`,
     [universalGameId]
@@ -1125,7 +1128,7 @@ export const getGameDetail = cache(async function getGameDetail(universalGameId:
       getGameTeamPressure(row.season, row.home_team, row.away_team),
       getGameTeamGrades(row.season, row.home_team, row.away_team),
       getGameLineup(row.season, row.home_team, row.away_team),
-      getGameBettingEdge(row.universal_game_id),
+      getGameBettingEdge(row.universal_game_id, hideBannedBooks),
     ]);
   if (injuryReport) game.injuryReport = injuryReport;
   if (playerGrades) game.playerGrades = playerGrades;

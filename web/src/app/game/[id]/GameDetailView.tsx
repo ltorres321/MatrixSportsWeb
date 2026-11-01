@@ -23,6 +23,7 @@ import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
 import { TrendingUpArrow } from "@/components/MatchupCard";
+import { BannedBooksToggle } from "@/components/BannedBooksToggle";
 import {
   SportsbookLink,
   formatOdds,
@@ -2444,6 +2445,9 @@ function BettingEdgeView({ game }: { game: GameStat }) {
 
   return (
     <>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+        <BannedBooksToggle />
+      </div>
       <GameLinesSection game={game} />
       <FirstTouchdownSection game={game} />
       <KeyInsightsSection game={game} />
@@ -2476,7 +2480,10 @@ function ParlayHelperView({ game }: { game: GameStat }) {
 
   return (
     <div className="stat-section">
-      <h2>Parlay Helper</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <h2>Parlay Helper</h2>
+        <BannedBooksToggle />
+      </div>
       <p className="stat-sub">
         Same-game parlays built from this game&apos;s top {PARLAY_POOL_SIZE} player props by pRank, using our model&apos;s
         estimate of how likely each pick is to hit based on historical results. One leg per player.

@@ -1,6 +1,7 @@
 import { PARLAY_POOL_SIZE } from "@/lib/parlayHelper";
 import { ParlayCard } from "@/components/ParlayCard";
 import type { WeekParlays } from "./page";
+import { BannedBooksToggle } from "@/components/BannedBooksToggle";
 
 // League-wide sibling of GameDetailView.tsx's ParlayHelperView -- same
 // card, same notice copy, same Hit/Missed grading (ParlayCard reads
@@ -103,6 +104,9 @@ export default function ParlaysView({
       </header>
 
       <main>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+          <BannedBooksToggle />
+        </div>
         <div className="parlay-notice" role="note">
           <p>
             <strong>Play responsibly.</strong> Gambling carries real risk, and parlays are long shots that lose far
