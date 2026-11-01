@@ -828,6 +828,14 @@ function ShotChartControls({
 type LineupMode = "starters" | "secondTeam" | "shotChart";
 
 function NbaLineupToggle({ mode, onChange }: { mode: LineupMode; onChange: (m: LineupMode) => void }) {
+  // "Shot Chart" button removed from this toggle as of 2026-11-01 --
+  // historical-only data on a site built around predicting future
+  // games, plus too many controls to be usable as-is (see the
+  // "Potential Features" doc for redesign ideas). "shotChart" stays in
+  // LineupMode and every branch below keyed on it stays wired up --
+  // mode just can never reach it from the UI now -- so restoring this
+  // button is the one-line re-add once it's redesigned. Starters/Second
+  // Team (the actual lineup cards) are unaffected.
   return (
     <div className="lineup-toggle-group" role="tablist">
       <button type="button" role="tab" aria-selected={mode === "starters"} className={mode === "starters" ? "active" : ""} onClick={() => onChange("starters")}>
@@ -835,9 +843,6 @@ function NbaLineupToggle({ mode, onChange }: { mode: LineupMode; onChange: (m: L
       </button>
       <button type="button" role="tab" aria-selected={mode === "secondTeam"} className={mode === "secondTeam" ? "active" : ""} onClick={() => onChange("secondTeam")}>
         Second Team
-      </button>
-      <button type="button" role="tab" aria-selected={mode === "shotChart"} className={mode === "shotChart" ? "active" : ""} onClick={() => onChange("shotChart")}>
-        Shot Chart
       </button>
     </div>
   );
