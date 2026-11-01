@@ -67,6 +67,11 @@ export interface NbaPropEdge {
   hitRateAttempts: number;
   h2hHits: number | null;
   h2hAttempts: number;
+  // Added 2026-10-31 -- sql/013, src4/40_grade_nba_player_props.py.
+  // null = game not final / not graded yet (most props, since most
+  // games haven't been played) -- same semantics as NFL's own
+  // pick_result, read by the same PickResultIcon component.
+  pickResult: string | null;
 }
 
 // Props below this edge are hidden for now (not deleted -- still
@@ -234,10 +239,12 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
     l5_avg: number | null; l10_avg: number | null;
     hit_rate_hits: number | null; hit_rate_attempts: number | null;
     h2h_hits: number | null; h2h_attempts: number | null;
+    pick_result: string | null;
   }>(
     `SELECT player_name, stat, line, side, bookmaker, price, projection,
             cover_probability, edge, l5_avg, l10_avg,
-            hit_rate_hits, hit_rate_attempts, h2h_hits, h2h_attempts
+            hit_rate_hits, hit_rate_attempts, h2h_hits, h2h_attempts,
+            pick_result
      FROM latest_nba_player_prop_predictions
      WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
      ORDER BY edge DESC`,
@@ -364,6 +371,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
       hitRateAttempts: r.hit_rate_attempts ?? 0,
       h2hHits: r.h2h_hits,
       h2hAttempts: r.h2h_attempts ?? 0,
+      pickResult: r.pick_result,
     })),
     starterGrades,
     teamGrades,

@@ -10,7 +10,7 @@ import type { TeamGradeSet, TeamStatWithRank } from "@/lib/nbaTeamGrades";
 import type { TeamPer100Stats, TeamPer100StatWithRank } from "@/lib/nbaEfficiencyScoring";
 import { teamLogoPath } from "@/lib/teamsNba";
 import { teamPrimaryColorNba } from "@/lib/teamColorsNba";
-import { SportsbookLink } from "@/components/ParlayCard";
+import { PickResultIcon, SportsbookLink } from "@/components/ParlayCard";
 import NbaLineupSection from "./NbaLineupSection";
 
 // Same polling interval as GameDetailView.tsx's LIVE_REFRESH_MS --
@@ -1087,7 +1087,10 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
               {game.props.map((p, i) => (
                 <tr key={i}>
                   <td>{i + 1}</td>
-                  <td className="betting-table-sticky-col">{p.playerName}</td>
+                  <td className="betting-table-sticky-col">
+                    {p.playerName}
+                    <PickResultIcon result={p.pickResult} />
+                  </td>
                   <td>
                     {STAT_DISPLAY_LABEL[p.stat] ?? p.stat}
                     {p.stat === "pra" && <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.pra} />}
