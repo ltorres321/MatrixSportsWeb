@@ -6,6 +6,7 @@ import type { LineupPlayer, CourtSlot } from "@/lib/nbaLineup";
 import type { ShotMarker, TeamShotPlayer } from "@/lib/nbaShotChart";
 import { teamLogoPath } from "@/lib/teamsNba";
 import { teamPrimaryColorNba } from "@/lib/teamColorsNba";
+import NbaRadarChart from "./NbaRadarChart";
 
 // NBA equivalent of GameDetailView.tsx's MatchupsView (the NFL
 // "Lineup" card) -- same anatomy (toggle header, shared field/court
@@ -825,7 +826,13 @@ function ShotChartControls({
   );
 }
 
-type LineupMode = "starters" | "secondTeam" | "shotChart";
+// "shotChart" stays a valid mode (every branch below keyed on it is
+// still there, untouched) even though no button sets it anymore -- see
+// that button's own removal note below. "radarChart" replaces it as
+// the third toggle option as of 2026-11-01: the Four Factors radar
+// (lib/nbaFourFactors.ts, NbaRadarChart.tsx) works pregame off
+// season-to-date team stats, unlike the old shot chart.
+type LineupMode = "starters" | "secondTeam" | "shotChart" | "radarChart";
 
 function NbaLineupToggle({ mode, onChange }: { mode: LineupMode; onChange: (m: LineupMode) => void }) {
   // "Shot Chart" button removed from this toggle as of 2026-11-01 --
@@ -834,8 +841,9 @@ function NbaLineupToggle({ mode, onChange }: { mode: LineupMode; onChange: (m: L
   // "Potential Features" doc for redesign ideas). "shotChart" stays in
   // LineupMode and every branch below keyed on it stays wired up --
   // mode just can never reach it from the UI now -- so restoring this
-  // button is the one-line re-add once it's redesigned. Starters/Second
-  // Team (the actual lineup cards) are unaffected.
+  // button is the one-line re-add if it's ever wanted back. Starters/
+  // Second Team (the actual lineup cards) are unaffected. "Radar Chart"
+  // (below) replaces it as the third option.
   return (
     <div className="lineup-toggle-group" role="tablist">
       <button type="button" role="tab" aria-selected={mode === "starters"} className={mode === "starters" ? "active" : ""} onClick={() => onChange("starters")}>
@@ -844,12 +852,15 @@ function NbaLineupToggle({ mode, onChange }: { mode: LineupMode; onChange: (m: L
       <button type="button" role="tab" aria-selected={mode === "secondTeam"} className={mode === "secondTeam" ? "active" : ""} onClick={() => onChange("secondTeam")}>
         Second Team
       </button>
+      <button type="button" role="tab" aria-selected={mode === "radarChart"} className={mode === "radarChart" ? "active" : ""} onClick={() => onChange("radarChart")}>
+        Radar Chart
+      </button>
     </div>
   );
 }
 
-export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
-  const [mode, setMode] = useState<LineupMode>("starters");
+export default function NbaLineupSection({ game, initialMode }: { game: NbaGameDetail; initialMode?: LineupMode }) {
+  const [mode, setMode] = useState<LineupMode>(initialMode ?? "starters");
   // Empty array means "All Players" -- see TeamPlayerDropdown's own
   // comment. Separate state per team since each half now has its own
   // dropdown, not one shared control.
@@ -928,7 +939,9 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
     <div className="stat-section">
       <h2>Matchups</h2>
       <p className="stat-sub">
-        {mode === "shotChart"
+        {mode === "radarChart"
+          ? "Each team's Four Factors (shooting, rebounding, turnovers, free throws) as a league percentile, offense and defense, built from season-to-date stats -- works before tipoff, not just after."
+          : mode === "shotChart"
           ? "Every shot each team has taken this season, plotted at its real court location -- green is a make, red is a miss."
           : "Season-to-date PER for each team's real starters (per basketball-reference's own games-started data) or next 5 by minutes played. The 5 court spots are a standard position map, not a literal play -- each card shows the player's own real position, which won't always match one-of-each when a team's real lineup doesn't."}
       </p>
@@ -936,6 +949,9 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
         <div className="lineup-card-header">
           <NbaLineupToggle mode={mode} onChange={setMode} />
         </div>
+        {mode === "radarChart" ? (
+          <NbaRadarChart game={game} />
+        ) : (
         <div className="lineup-field nba-lineup-field">
           <div className="nba-lineup-shotchart-row">
             {mode === "shotChart" && game.shotChart && (
@@ -1041,6 +1057,7 @@ export default function NbaLineupSection({ game }: { game: NbaGameDetail }) {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

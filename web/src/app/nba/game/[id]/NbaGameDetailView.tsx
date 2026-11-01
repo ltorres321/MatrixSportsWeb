@@ -966,10 +966,10 @@ function EfficiencyScoringSection({ game }: { game: NbaGameDetail }) {
   );
 }
 
-function MatchupsTab({ game }: { game: NbaGameDetail }) {
+function MatchupsTab({ game, initialMode }: { game: NbaGameDetail; initialMode?: "radarChart" }) {
   return (
     <div className="page-edge-section">
-      <NbaLineupSection game={game} />
+      <NbaLineupSection game={game} initialMode={initialMode} />
     </div>
   );
 }
@@ -1177,8 +1177,19 @@ function ParlayHelperTab({ game }: { game: NbaGameDetail }) {
   );
 }
 
-export default function NbaGameDetailView({ game }: { game: NbaGameDetail }) {
-  const [activeTab, setActiveTab] = useState<PageTab>("overview");
+export default function NbaGameDetailView({
+  game,
+  initialView,
+}: {
+  game: NbaGameDetail;
+  // "radar" (from ?view=radar, see page.tsx) lands straight on the
+  // Matchups tab with Radar Chart mode pre-selected -- the social/promo
+  // card's own click-through target (see renderNbaSpotlightCard.ts and
+  // nbaSpotlightCaption.ts in SportsContentCreation), instead of making
+  // someone navigate there themselves from the default Overview tab.
+  initialView?: "radar";
+}) {
+  const [activeTab, setActiveTab] = useState<PageTab>(initialView === "radar" ? "matchups" : "overview");
   const router = useRouter();
 
   useEffect(() => {
@@ -1201,7 +1212,7 @@ export default function NbaGameDetailView({ game }: { game: NbaGameDetail }) {
       {activeTab === "overview" ? (
         <OverviewTab game={game} />
       ) : activeTab === "matchups" ? (
-        <MatchupsTab game={game} />
+        <MatchupsTab game={game} initialMode={initialView === "radar" ? "radarChart" : undefined} />
       ) : (
         <BettingEdgeTab game={game} />
       )}
