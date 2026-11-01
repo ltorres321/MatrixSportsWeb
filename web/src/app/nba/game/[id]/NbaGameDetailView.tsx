@@ -248,15 +248,9 @@ function TotalsSection({ game }: { game: NbaGameDetail }) {
 type PageTab = "overview" | "matchups" | "bettingEdge";
 
 function PageTabStrip({ active, onChange }: { active: PageTab; onChange: (tab: PageTab) => void }) {
-  // "matchups" (the shot-chart widget) is hidden from the tab strip as
-  // of 2026-11-01 -- historical-only data on a site built around
-  // predicting future games, plus too many controls to be usable as-is.
-  // See the "Potential Features" doc for redesign ideas. Left wired up
-  // below (MatchupsTab, NbaLineupSection) rather than deleted so it's a
-  // one-line re-add once redesigned; data collection keeps running
-  // unaffected in SportsPipelines.
   const tabs: { key: PageTab; label: string }[] = [
     { key: "overview", label: "Overview" },
+    { key: "matchups", label: "Matchups" },
     { key: "bettingEdge", label: "Betting Edge" },
   ];
   return (
