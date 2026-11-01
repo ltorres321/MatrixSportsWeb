@@ -6278,3 +6278,132 @@ h1.glow span {
   color: var(--text-dim);
   font-size: 0.72rem;
 }
+
+/* Four Factors radar -- replaces the old nba-shotchart-/nba-zoneeff-
+   rules (left in place, unused) as the Matchups tab's third toggle
+   view. Same .panel/.panel-border/Chakra Petch language as .eff-card
+   (NbaGameDetailView.tsx's Efficiency and Scoring cards) rather than a
+   new visual language -- see NbaRadarChart.tsx's own header. */
+.nba-radar-wrap {
+  padding: 0.5rem 0 0;
+}
+
+.nba-radar-headline-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.nba-radar-headline-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-top: 3px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+}
+
+.nba-radar-headline-name {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.nba-radar-headline-row-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  padding: 0.2rem 0;
+}
+
+.nba-radar-headline-row-item strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.nba-radar-pace-line {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin: 0 0 1rem;
+}
+
+.nba-radar-pace-line strong {
+  color: var(--text);
+}
+
+.nba-radar-chart-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.6rem;
+}
+
+.nba-radar-axis-label {
+  fill: var(--text-dim);
+}
+
+.nba-radar-axis-label-main {
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--text);
+}
+
+.nba-radar-axis-label-sub {
+  font-size: 10px;
+  fill: var(--text-dim);
+}
+
+.nba-radar-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-size: calc(0.76rem + 3px);
+  color: var(--text-dim);
+  margin-bottom: 1.1rem;
+}
+
+.nba-radar-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+
+.nba-radar-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: calc(0.78rem + 3px);
+  margin-bottom: 0.75rem;
+}
+
+.nba-radar-table th,
+.nba-radar-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid rgba(var(--glow-rgb), 0.08);
+  text-align: right;
+}
+
+.nba-radar-table th:first-child,
+.nba-radar-table td:first-child {
+  text-align: left;
+  color: var(--text-dim);
+}
+
+.nba-radar-table-sub {
+  color: var(--text-dim);
+  font-size: calc(0.68rem + 3px);
+}
+
+.nba-radar-footnote {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  margin: 0;
+}

@@ -13,8 +13,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   });
 }
 
-export default async function NbaGamePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function NbaGamePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ view?: string }>;
+}) {
   const { id } = await params;
+  const { view } = await searchParams;
   const game = await getNbaGameDetail(id);
 
   if (!game) {
@@ -27,5 +34,9 @@ export default async function NbaGamePage({ params }: { params: Promise<{ id: st
     );
   }
 
-  return <NbaGameDetailView game={game} />;
+  // ?view=radar -- deep link straight into the Matchups tab's Radar
+  // Chart mode, for social/promo links that want to drop someone right
+  // on the chart instead of the default Overview tab. See
+  // NbaGameDetailView.tsx's own initialView prop.
+  return <NbaGameDetailView game={game} initialView={view === "radar" ? "radar" : undefined} />;
 }
