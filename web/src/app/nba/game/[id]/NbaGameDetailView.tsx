@@ -1109,7 +1109,23 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
   // yet are all pickResult === null, so nothing to summarize until at
   // least one is graded. Reuses that component's own
   // .betting-props-summary-* CSS classes.
-  const graded = game.props.filter((p) => p.pickResult === "correct" || p.pickResult === "incorrect");
+  //
+  // Deduped to one row per REAL prop (player+stat+side+line) before
+  // counting -- the table below deliberately lists the same actual
+  // pick once per bookmaker for line-shopping (confirmed live:
+  // Bogdan Bogdanovic Assists Under 2.5 appeared 7 times, one per
+  // book, all sharing the same real-world outcome). Counting every
+  // row would let one pick's result count 7x toward the hit rate --
+  // not wrong exactly, but misleading since it doesn't match "how
+  // many distinct picks did the model get right."
+  const uniqueProps = new Map<string, NbaPropEdge>();
+  for (const p of game.props) {
+    const key = `${p.playerName}|${p.stat}|${p.side}|${p.line}`;
+    if (!uniqueProps.has(key)) uniqueProps.set(key, p);
+  }
+  const graded = [...uniqueProps.values()].filter(
+    (p) => p.pickResult === "correct" || p.pickResult === "incorrect"
+  );
   const correctCount = graded.filter((p) => p.pickResult === "correct").length;
   const correctPct = graded.length > 0 ? Math.round((correctCount / graded.length) * 100) : null;
 
@@ -1127,9 +1143,13 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
           <span className="betting-props-summary-correct">{correctCount}</span>
           <span className="betting-props-summary-sep">/</span>
           <span className="betting-props-summary-total">{graded.length}</span>
-          <span className="betting-props-summary-pct">{correctPct}% Hit Rate</span>
+          <span className="betting-props-summary-pct">{correctPct}% Hit Rate — Unique Props</span>
         </p>
       )}
+      <p className="stat-sub" style={{ marginTop: graded.length > 0 ? "0.25rem" : 0 }}>
+        The table below lists the same pick once per sportsbook for price comparison, so it shows more rows
+        than the unique-props count above.
+      </p>
       <div style={{ position: "relative" }}>
         <div className="betting-table-wrap">
           <table className="betting-table">
