@@ -122,6 +122,15 @@ export interface NbaGameDetail {
   isFinal: boolean;
   isLive: boolean;
   livePeriod: string | null; // e.g. "3rd Quarter" -- null unless isLive
+  // Same grading nbaPredictions.ts already computes for the list/
+  // matchup-card view (and predictions.ts's computeCorrect() does for
+  // football) -- undefined there maps to null here (no TS "optional
+  // prop" on a plain data object): no score yet, or a tie. Added so
+  // the single-game page can show the same yellow-check/red-X verdict
+  // on the team pick that it already shows per-prop (PickResultIcon),
+  // which this page never had at all -- NFL's GameDetailView.tsx has
+  // had an equivalent (ResultCompare's hit/miss card) all along.
+  predictionCorrect: boolean | null;
   // 'propline_market' (real polled line) | 'model_regression'
   // (fallback) | null (row predates sql/011). Check this, not just
   // whether marketSpread/marketTotal happen to be non-null, to label
@@ -252,7 +261,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
             pick_result
      FROM latest_nba_player_prop_predictions
      WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
-     ORDER BY edge DESC`,
+     ORDER BY cover_probability DESC`,
     [gameId, MIN_DISPLAYED_EDGE]
   );
 
@@ -263,6 +272,10 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
   const isLive = Boolean(
     scheduled?.live && scheduled.actualHomeScore !== null && scheduled.actualAwayScore !== null
   );
+  const hasGradableScore = (isFinal || isLive) && scheduled!.actualHomeScore !== scheduled!.actualAwayScore;
+  const predictionCorrect = hasGradableScore
+    ? (game.home_win_probability >= 0.5) === (scheduled!.actualHomeScore! > scheduled!.actualAwayScore!)
+    : null;
 
   // Record entering THIS game -- see getNbaTeamRecords's own header
   // for why it can't come from the DB the way football's can.
@@ -346,6 +359,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
     isFinal,
     isLive,
     livePeriod: isLive ? scheduled!.period : null,
+    predictionCorrect,
     oddsSource: game.odds_source,
     marketSpread:
       game.odds_source === "propline_market" && game.market_spread_line_current !== null
