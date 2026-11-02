@@ -8,6 +8,8 @@ import { getGameEfficiencyScoring, type GameEfficiencyScoring } from "@/lib/nbaE
 import { getGameFourFactors, type GameFourFactors } from "@/lib/nbaFourFactors";
 import { getGameLineup, type GameLineup } from "@/lib/nbaLineup";
 import { getGameShotChart, type GameShotChart } from "@/lib/nbaShotChart";
+import { BANNED_US_BOOKS, NON_RETAIL_BOOKS } from "@/lib/pffBettingEdge";
+import { buildGameParlays, type NbaGameParlays, type NbaParlayPick } from "@/lib/nbaParlayHelper";
 
 // NBA equivalent of predictions.ts's getGameDetail(), scoped to just
 // what src4 actually produces: the matchup (nba_predictions), real
@@ -73,6 +75,11 @@ export interface NbaPropEdge {
   // games haven't been played) -- same semantics as NFL's own
   // pick_result, read by the same PickResultIcon component.
   pickResult: string | null;
+  // The player's real final value for this exact stat -- null pre-game,
+  // same gating as pickResult (src4/40 sets both together). Shown next
+  // to the player's name in the Betting Edge table's "Player (actual)"
+  // column once the game is graded.
+  actualValue: number | null;
 }
 
 // Props below this edge are hidden for now (not deleted -- still
@@ -164,6 +171,12 @@ export interface NbaGameDetail {
   // null only if nba.bbr_shot_chart has no rows yet for this game's
   // two teams (season) -- see getGameShotChart.
   shotChart: GameShotChart | null;
+  // Same-game parlays built from this game's top player props by pRank
+  // -- backs the Parlay Helper tab, positioned after Betting Edge. Built
+  // here on the server (not in the browser) from parlayPicks below, same
+  // "what's built is exactly what's shown" contract pffBettingEdge.ts's
+  // getGameBettingEdge follows for NFL.
+  parlays: NbaGameParlays;
 }
 
 interface GameRow {
@@ -222,7 +235,10 @@ function spreadDisplay(spread: number, homeTeamName: string, awayTeamName: strin
 // 4 sequential/parallel DB round trips (the prediction row, injuries,
 // props, schedule/records) -- without this, every view paid that cost
 // twice.
-export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: string): Promise<NbaGameDetail | null> {
+export const getNbaGameDetail = cache(async function getNbaGameDetail(
+  gameId: string,
+  hideBannedBooks: boolean = true
+): Promise<NbaGameDetail | null> {
   const games = await query<GameRow>(
     `SELECT universal_game_id, season, home_team, home_team_name,
             away_team, away_team_name, game_date, home_win_probability,
@@ -253,17 +269,92 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
     l5_avg: number | null; l10_avg: number | null;
     hit_rate_hits: number | null; hit_rate_attempts: number | null;
     h2h_hits: number | null; h2h_attempts: number | null;
-    pick_result: string | null;
+    pick_result: string | null; actual_value: number | null;
   }>(
     `SELECT player_name, stat, line, side, bookmaker, price, projection,
             cover_probability, edge, l5_avg, l10_avg,
             hit_rate_hits, hit_rate_attempts, h2h_hits, h2h_attempts,
-            pick_result
+            pick_result, actual_value
      FROM latest_nba_player_prop_predictions
      WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
      ORDER BY cover_probability DESC`,
     [gameId, MIN_DISPLAYED_EDGE]
   );
+
+  // Dedicated query for the Parlay Helper tab -- deliberately separate
+  // from propRows above (which stays one row per bookmaker, for the
+  // Betting Edge table's own line-shopping display) so this file's
+  // existing, already-shipped Betting Edge query/type stays completely
+  // untouched by this addition.
+  //
+  // "legs" collapses every bookmaker's row for the same real pick
+  // (player+stat+line+side) down to ONE row, picking whichever retail,
+  // non-excluded book currently pays the most (price DESC) -- same
+  // line-shopping idea as parlayHelper.ts's pickBestPrice for NFL, just
+  // simpler here since NBA's own props table already carries every
+  // book's price directly (sql/009's header), no separate market-lines
+  // join needed. A pick whose only quotes are from an excluded book
+  // (non-retail, or banned-when-the-toggle-is-on) drops out of `legs`
+  // entirely -- that leg has no usable price, same "skipped" outcome
+  // parlayHelper.ts's bestParlay gives a book-less leg.
+  //
+  // "ranked" computes pRank over the FULL pool (unfiltered by book), so
+  // a pick's rank reflects its true standing in this game's props
+  // regardless of which book ends up quoting it.
+  const excludedParlayBooks = [...NON_RETAIL_BOOKS, ...(hideBannedBooks ? BANNED_US_BOOKS : [])];
+  const parlayPickRows = await query<{
+    player_name: string; team: string; opponent: string; stat: string;
+    line: number; side: string; projection: number; cover_probability: number;
+    pick_result: string | null; actual_value: number | null;
+    bookmaker: string; price: number; generated_at: Date | string;
+    p_rank: string | number;
+  }>(
+    `WITH legs AS (
+       SELECT DISTINCT ON (player_name, stat, line, side)
+              player_name, team, opponent, stat, line, side,
+              projection, cover_probability, pick_result, actual_value,
+              bookmaker, price, generated_at
+         FROM latest_nba_player_prop_predictions
+        WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
+          AND bookmaker != ALL($3::text[])
+        ORDER BY player_name, stat, line, side, price DESC
+     ),
+     ranked AS (
+       SELECT player_name, stat, line, side, MAX(cover_probability) AS cover_probability
+         FROM latest_nba_player_prop_predictions
+        WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
+        GROUP BY player_name, stat, line, side
+     ),
+     pr AS (
+       SELECT player_name, stat, line, side,
+              ROW_NUMBER() OVER (ORDER BY cover_probability DESC) AS p_rank
+         FROM ranked
+     )
+     SELECT legs.*, pr.p_rank
+       FROM legs
+       JOIN pr ON pr.player_name = legs.player_name AND pr.stat = legs.stat
+              AND pr.line = legs.line AND pr.side = legs.side
+      ORDER BY pr.p_rank ASC`,
+    [gameId, MIN_DISPLAYED_EDGE, excludedParlayBooks]
+  );
+  const parlayPicks: NbaParlayPick[] = parlayPickRows.map((r) => ({
+    playerName: r.player_name,
+    team: r.team,
+    opponent: r.opponent,
+    stat: r.stat,
+    line: r.line,
+    side: r.side as "over" | "under",
+    projection: r.projection,
+    coverProbability: r.cover_probability,
+    // ROW_NUMBER() comes back from pg as a string (bigint).
+    pRank: r.p_rank == null ? null : Number(r.p_rank),
+    pickResult: r.pick_result,
+    actualValue: r.actual_value,
+    bookmaker: r.bookmaker,
+    price: r.price,
+    oddsAsOf: r.generated_at ? new Date(r.generated_at).toISOString() : null,
+  }));
+  const parlays = buildGameParlays(parlayPicks);
 
   const scheduled = await getNbaScheduledGame(game.home_team, game.away_team, new Date(game.game_date));
   const isFinal = Boolean(
@@ -392,6 +483,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
       h2hHits: r.h2h_hits,
       h2hAttempts: r.h2h_attempts ?? 0,
       pickResult: r.pick_result,
+      actualValue: r.actual_value,
     })),
     starterGrades,
     teamGrades,
@@ -399,5 +491,6 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(gameId: st
     fourFactors,
     lineup,
     shotChart,
+    parlays,
   };
 });

@@ -5702,10 +5702,15 @@ h1.glow span {
    and the sticky column + scroll-fade already carry mobile. */
 @media (min-width: 768px) {
   .betting-table-outer {
-    width: calc(100% + 360px);
+    /* Bumped from 360/180 to 480/240 (2026-11) -- the NFL Player Props
+       table's last column (H2H) was still getting clipped at the old
+       width on a real desktop viewport. max-width below keeps this a
+       no-op (falls back to the unwidened column) on any viewport too
+       narrow to fit it, so this can't introduce a page-wide scrollbar. */
+    width: calc(100% + 480px);
     max-width: calc(100vw - 32px);
-    margin-left: -180px;
-    margin-right: -180px;
+    margin-left: -240px;
+    margin-right: -240px;
   }
 }
 

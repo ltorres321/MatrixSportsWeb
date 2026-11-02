@@ -11,6 +11,9 @@ import type { TeamPer100Stats, TeamPer100StatWithRank } from "@/lib/nbaEfficienc
 import { teamLogoPath } from "@/lib/teamsNba";
 import { teamPrimaryColorNba } from "@/lib/teamColorsNba";
 import { PickResultIcon, SportsbookLink } from "@/components/ParlayCard";
+import { NbaParlayCard } from "@/components/NbaParlayCard";
+import { BannedBooksToggle } from "@/components/BannedBooksToggle";
+import { PARLAY_POOL_SIZE, THREE_LEG_PRANK_CAP } from "@/lib/nbaParlayHelper";
 import NbaLineupSection from "./NbaLineupSection";
 
 // Same polling interval as GameDetailView.tsx's LIVE_REFRESH_MS --
@@ -326,10 +329,12 @@ function TotalsSection({ game }: { game: NbaGameDetail }) {
 // re-added the same day once projections v1 (src4/33) replaced the
 // flat-average formula with the real rate x minutes x matchup model
 // -- see src4/33's own module header and this repo's NBA Betting Edge
-// memory for the full history. "parlayHelper" stays out: it still
-// needs its own correlation-guardrail pass (same spec, later step)
-// before this project is comfortable showing it.
-type PageTab = "overview" | "matchups" | "bettingEdge";
+// memory for the full history. "parlayHelper" (2026-11) ships with the
+// same same-game-legs-aren't-independent disclaimer NFL's own Parlay
+// Helper already carries (see ParlayHelperTab's own notice copy),
+// rather than a separate correlation guardrail -- same bar NFL cleared
+// to ship.
+type PageTab = "overview" | "matchups" | "bettingEdge" | "parlayHelper";
 
 function PageTabStrip({
   active,
@@ -344,6 +349,7 @@ function PageTabStrip({
     { key: "overview", label: "Overview" },
     { key: "matchups", label: "Matchups" },
     { key: "bettingEdge", label: "Betting Edge" },
+    { key: "parlayHelper", label: "Parlay Helper" },
   ];
   return (
     <nav id="page-tab-strip" className={`page-tab-strip ${spotlight ? "spotlight" : ""}`} aria-label="Game detail sections">
@@ -1203,7 +1209,9 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
             <thead>
               <tr>
                 <th>#</th>
-                <th className="betting-table-sticky-col">Player</th>
+                <th className="betting-table-sticky-col">
+                  Player <span style={{ color: "var(--gold)" }}>(actual)</span>
+                </th>
                 <th>Prop</th>
                 <th>Pick</th>
                 <th>Proj</th>
@@ -1222,6 +1230,9 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
                   <td>{i + 1}</td>
                   <td className="betting-table-sticky-col">
                     {p.playerName}
+                    {p.actualValue != null && (
+                      <span style={{ color: "var(--gold)" }}> ({p.actualValue})</span>
+                    )}
                     <PickResultIcon result={p.pickResult} />
                   </td>
                   <td>
@@ -1253,59 +1264,72 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
   );
 }
 
-// Simple same-game parlay: top props by edge, paired into 2-leg
-// combos (combined probability = product of each leg's cover
-// probability -- the same independence assumption football's own
-// parlayHelper.ts makes). No same-book combined pricing yet.
-function buildParlays(props: NbaPropEdge[]) {
-  const pool = [...props].filter((p) => p.edge > 0).sort((a, b) => b.edge - a.edge).slice(0, 6);
-  const combos: { legs: NbaPropEdge[]; probability: number }[] = [];
-  for (let i = 0; i < pool.length; i++) {
-    for (let j = i + 1; j < pool.length; j++) {
-      combos.push({
-        legs: [pool[i], pool[j]],
-        probability: pool[i].coverProbability * pool[j].coverProbability,
-      });
-    }
-  }
-  return combos.sort((a, b) => b.probability - a.probability).slice(0, 5);
-}
-
+// NBA counterpart to GameDetailView.tsx's own ParlayHelperView -- same
+// copy, same notice text, same card grid, just reading NbaGameDetail's
+// own parlays (built server-side by nbaGameDetail.ts/nbaParlayHelper.ts)
+// instead of football's PFF-sourced ones. Single-book only (no
+// NFL-style mixed-book toggle) -- see nbaParlayHelper.ts's own header
+// for why.
 function ParlayHelperTab({ game }: { game: NbaGameDetail }) {
-  const parlays = buildParlays(game.props);
-  if (parlays.length === 0) {
+  const { twoLeg, threeLeg } = game.parlays;
+
+  if (twoLeg.length === 0) {
     return (
       <div className="page-edge-section">
-        <p style={{ color: "var(--text-dim)" }}>
-          Not enough positive-edge props scored for this game yet to build a parlay.
-        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <h3>Parlay Helper</h3>
+          <BannedBooksToggle />
+        </div>
+        <div className="lineup-unavailable">
+          No parlay with every leg at one sportsbook for this game yet.
+        </div>
       </div>
     );
   }
+
   return (
     <div className="page-edge-section">
-      <h3>Suggested 2-Leg Parlays</h3>
-      <p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
-        Combined probability only — same-book combined pricing isn&apos;t built yet.
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <h3>Parlay Helper</h3>
+        <BannedBooksToggle />
+      </div>
+      <p className="stat-sub">
+        Same-game parlays built from this game&apos;s top {PARLAY_POOL_SIZE} player props by pRank, using our
+        model&apos;s estimate of how likely each pick is to hit based on historical results. One leg per player.
       </p>
-      {parlays.map((combo, i) => (
-        <div key={i} className="matchup-card" style={{ marginBottom: "0.75rem" }}>
-          {combo.legs.map((leg, j) => (
-            <div key={j} className="team-row">
-              <div className="team-info">
-                <div className="team-name">{leg.playerName}</div>
-                <div className="team-record" style={{ textTransform: "capitalize" }}>
-                  {leg.side} {leg.line} {leg.stat}
-                </div>
-              </div>
-              <div className="team-metric">
-                <div className="team-prob">{(leg.coverProbability * 100).toFixed(0)}%</div>
-              </div>
-            </div>
-          ))}
-          <div className="vs-divider">Combined: {(combo.probability * 100).toFixed(0)}%</div>
-        </div>
-      ))}
+
+      <div className="parlay-notice" role="note">
+        <p>
+          <strong>Play responsibly.</strong> Gambling carries real risk, and parlays are long shots that lose far more
+          often than they win. Only bet what you can afford to lose, set limits, and treat any winnings as a bonus. If
+          gambling stops being fun, call or text 1-800-GAMBLER. You must be of legal betting age where you live.
+        </p>
+        <p>
+          <strong>Use these as a starting point, not a guarantee.</strong> These are the strongest combinations we can
+          build from this game&apos;s props, but every leg in a parlay has to be offered by the same sportsbook, and a
+          book may not offer a given leg or may price the combination differently. So each parlay below uses legs from
+          a single book you can place as one slip. Check that your book offers every leg, at these lines, before you
+          bet.
+        </p>
+      </div>
+
+      <div className="parlay-grid">
+        {twoLeg.map((parlay, i) => (
+          <NbaParlayCard key={i} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} />
+        ))}
+        {threeLeg && <NbaParlayCard title="3-Leg Parlay" parlay={threeLeg} />}
+      </div>
+      {!threeLeg && (
+        <p className="parlay-note">
+          No 3-leg parlay for this game: fewer than three players at a single sportsbook are within this game&apos;s
+          top {THREE_LEG_PRANK_CAP} ranked picks.
+        </p>
+      )}
+      <p className="parlay-note">
+        Chance to hit multiplies each leg&apos;s probability and assumes the legs are independent. Payout is the total
+        returned on a $1 bet, including your $1 stake, estimated from each leg&apos;s listed odds; sportsbooks price
+        same-game parlays themselves, so the real payout is usually lower.
+      </p>
     </div>
   );
 }
@@ -1366,8 +1390,10 @@ export default function NbaGameDetailView({
         <OverviewTab game={game} />
       ) : activeTab === "matchups" ? (
         <MatchupsTab game={game} initialMode={initialView === "radar" ? "radarChart" : undefined} />
-      ) : (
+      ) : activeTab === "bettingEdge" ? (
         <BettingEdgeTab game={game} />
+      ) : (
+        <ParlayHelperTab game={game} />
       )}
     </>
   );

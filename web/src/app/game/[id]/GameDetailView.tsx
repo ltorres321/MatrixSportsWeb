@@ -2266,7 +2266,8 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
                 pRank <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.pRank} />
               </th>
               <th rowSpan={2}>
-                Player <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.player} />
+                Player <span style={{ color: "var(--gold)" }}>(actual)</span>{" "}
+                <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.player} />
               </th>
               <th rowSpan={2}>
                 Consensus <InfoTooltip text={PLAYER_PROP_COLUMN_INFO.consensus} />
@@ -2329,6 +2330,12 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
                 <td>
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
                   {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
+                  {e.actualValue != null && (
+                    <span style={{ color: "var(--gold)" }}>
+                      {" "}
+                      ({e.consensusStat === "Anytime TD" ? (e.actualValue > 0 ? "TD" : "No TD") : e.actualValue})
+                    </span>
+                  )}
                   <PickResultIcon result={e.pickResult} />
                 </td>
                 <td>

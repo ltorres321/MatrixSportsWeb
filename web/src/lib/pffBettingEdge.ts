@@ -32,8 +32,10 @@ export const BANNED_US_BOOKS = ["tonybet", "stoiximan", "bet99"];
 // Exchanges/prediction markets/DFS pick'em -- never a parlay-combinable
 // retail book regardless of region (see the line-shopping join's own
 // comment below for the full reasoning). Always excluded, independent
-// of the hideBannedBooks toggle.
-const NON_RETAIL_BOOKS = ["novig", "prophetx", "kalshi", "polymarket_us", "pick6", "dst_propbuilder"];
+// of the hideBannedBooks toggle. Exported for reuse by nbaGameDetail.ts's
+// own parlay-leg book selection -- same real-world books, same
+// never-parlay-combinable fact, not sport-specific.
+export const NON_RETAIL_BOOKS = ["novig", "prophetx", "kalshi", "polymarket_us", "pick6", "dst_propbuilder"];
 
 // ----------------------------------------------------------------------
 // Game Lines (etl.pff_best_bets)
