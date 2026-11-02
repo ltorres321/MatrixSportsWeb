@@ -1675,7 +1675,7 @@ h1.glow span {
 
 .vs-divider {
   text-align: center;
-  font-size: 0.7rem;
+  font-size: calc(0.7rem + 8px);
   color: var(--text-dim);
   letter-spacing: 0.2em;
   margin: 0.15rem 0;

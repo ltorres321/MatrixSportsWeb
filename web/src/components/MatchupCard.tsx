@@ -116,7 +116,7 @@ export default function MatchupCard({
         <span className="game-meta">{matchup.kickoff}</span>
       </div>
       <TeamRow side={matchup.teamA} status={matchup.status} predictionCorrect={matchup.predictionCorrect} />
-      <div className="vs-divider">VS</div>
+      <div className="vs-divider">AT</div>
       <TeamRow side={matchup.teamB} status={matchup.status} predictionCorrect={matchup.predictionCorrect} />
       {/* Every final game gets a written recap within a few hours (see
           weekly-stories.mts's 3-hourly cron) -- surfacing that here,
