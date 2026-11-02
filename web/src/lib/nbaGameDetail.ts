@@ -262,6 +262,22 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(
     [game.home_team_name, game.away_team_name]
   );
 
+  // "latest_nba_player_prop_predictions" keeps the latest row PER DISTINCT
+  // LINE VALUE, not per book's current board -- a book that quietly
+  // retires an alt-line (replaced by a different number at its next
+  // hourly poll) still leaves that retired line's own last-seen row
+  // sitting in the view forever, looking exactly as "current" as a line
+  // the book is still actually offering. Confirmed live 2026-11-02: a
+  // book's board moved from a James Harden assists line of 8.5 to 6.5
+  // between polls, and without this filter the page kept showing 8.5 --
+  // a real line nobody could actually place anymore. Every book's props
+  // for a game are written in one atomic batch (shared generated_at
+  // across every row, every bookmaker, confirmed live), so "within
+  // FRESHNESS_WINDOW of this book's own latest poll for this game" is a
+  // reliable per-book cutoff that naturally self-adjusts for a live game
+  // (keeps up with each new hourly poll) and a finished one (that book's
+  // last pre-close poll just becomes its own permanent "latest," nothing
+  // gets wrongly filtered out once polling for a closed game stops).
   const propRows = await query<{
     player_name: string; stat: string; line: number; side: string;
     bookmaker: string; price: number; projection: number;
@@ -271,13 +287,21 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(
     h2h_hits: number | null; h2h_attempts: number | null;
     pick_result: string | null; actual_value: number | null;
   }>(
-    `SELECT player_name, stat, line, side, bookmaker, price, projection,
-            cover_probability, edge, l5_avg, l10_avg,
-            hit_rate_hits, hit_rate_attempts, h2h_hits, h2h_attempts,
-            pick_result, actual_value
-     FROM latest_nba_player_prop_predictions
-     WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
-     ORDER BY cover_probability DESC`,
+    `WITH freshness AS (
+       SELECT bookmaker, MAX(generated_at) AS max_gen
+         FROM nba_player_prop_predictions
+        WHERE universal_game_id = $1
+        GROUP BY bookmaker
+     )
+     SELECT p.player_name, p.stat, p.line, p.side, p.bookmaker, p.price, p.projection,
+            p.cover_probability, p.edge, p.l5_avg, p.l10_avg,
+            p.hit_rate_hits, p.hit_rate_attempts, p.h2h_hits, p.h2h_attempts,
+            p.pick_result, p.actual_value
+     FROM latest_nba_player_prop_predictions p
+     JOIN freshness f ON f.bookmaker = p.bookmaker
+     WHERE p.universal_game_id = $1 AND p.edge >= $2 AND p.bookmaker != 'dst_propbuilder'
+       AND p.generated_at >= f.max_gen - interval '15 minutes'
+     ORDER BY p.cover_probability DESC`,
     [gameId, MIN_DISPLAYED_EDGE]
   );
 
@@ -309,20 +333,36 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(
     bookmaker: string; price: number; generated_at: Date | string;
     p_rank: string | number;
   }>(
-    `WITH legs AS (
+    `WITH freshness AS (
+       SELECT bookmaker, MAX(generated_at) AS max_gen
+         FROM nba_player_prop_predictions
+        WHERE universal_game_id = $1
+        GROUP BY bookmaker
+     ),
+     -- Same per-book "only this book's latest poll" freshness filter as
+     -- propRows above -- see that query's own comment for why. Applied
+     -- here too so the Parlay Helper can't pick a retired alt-line as a
+     -- leg's price, and so a retired line never even enters the pRank
+     -- population in the first place (ranked/pr below).
+     fresh AS (
+       SELECT p.*
+         FROM latest_nba_player_prop_predictions p
+         JOIN freshness f ON f.bookmaker = p.bookmaker
+        WHERE p.universal_game_id = $1 AND p.edge >= $2 AND p.bookmaker != 'dst_propbuilder'
+          AND p.generated_at >= f.max_gen - interval '15 minutes'
+     ),
+     legs AS (
        SELECT DISTINCT ON (player_name, stat, line, side)
               player_name, team, opponent, stat, line, side,
               projection, cover_probability, pick_result, actual_value,
               bookmaker, price, generated_at
-         FROM latest_nba_player_prop_predictions
-        WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
-          AND bookmaker != ALL($3::text[])
+         FROM fresh
+        WHERE bookmaker != ALL($3::text[])
         ORDER BY player_name, stat, line, side, price DESC
      ),
      ranked AS (
        SELECT player_name, stat, line, side, MAX(cover_probability) AS cover_probability
-         FROM latest_nba_player_prop_predictions
-        WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
+         FROM fresh
         GROUP BY player_name, stat, line, side
      ),
      pr AS (
