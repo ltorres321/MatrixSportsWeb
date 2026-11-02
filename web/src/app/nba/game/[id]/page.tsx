@@ -18,11 +18,11 @@ export default async function NbaGamePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; hideBanned?: string }>;
 }) {
   const { id } = await params;
-  const { view } = await searchParams;
-  const game = await getNbaGameDetail(id);
+  const { view, hideBanned } = await searchParams;
+  const game = await getNbaGameDetail(id, hideBanned !== "0");
 
   if (!game) {
     return (
