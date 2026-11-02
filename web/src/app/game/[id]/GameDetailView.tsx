@@ -163,7 +163,13 @@ function MarginSection({ game }: { game: GameStat }) {
         {game.marginBuckets.map((b) => (
           <div className={`bucket-row ${b.label === actualLabel ? "bucket-actual" : ""}`} key={b.label}>
             <span className="bucket-label">
-              {b.label}
+              {/* Display-only clarification -- underlying label stays
+                  "Lost / Tied" (also the match key against actualLabel
+                  below). Shortened per explicit request -- see
+                  NbaGameDetailView.tsx's identical fix: means the HOME
+                  team (this chart's own subject) lost, not specifically
+                  "the favored team" -- home isn't always the favorite. */}
+              {b.label === "Lost / Tied" ? "Lost" : b.label}
               {b.label === actualLabel && <span className="actual-tag"> ← actual result</span>}
             </span>
             <div className="bucket-track">

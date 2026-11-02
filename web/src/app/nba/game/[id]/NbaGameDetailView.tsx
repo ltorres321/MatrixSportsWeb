@@ -63,6 +63,36 @@ function InjuryColumn({ title, entries }: { title: string; entries: NbaInjuryEnt
   );
 }
 
+// NBA equivalent of GameDetailView.tsx's StickyBar -- this page never
+// had one at all (user comparison request: "the top layout is not
+// the same it should be exactly the same"), so the mini score strip
+// NFL keeps visible while scrolling was missing here. No
+// trending-arrow (same as the rest of this page -- see module header,
+// no NBA equivalent of that feature exists yet).
+function NbaStickyBar({ game }: { game: NbaGameDetail }) {
+  const homeProb = Math.round(game.homeWinProbability * 100);
+  const awayProb = 100 - homeProb;
+  const showScore = game.isFinal || game.isLive;
+  const statusWord = game.isFinal ? "FINAL" : game.isLive ? "LIVE" : game.kickoff;
+  return (
+    <div className="game-sticky-bar">
+      <div className="side">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={teamLogoPath(game.awayTeam)} alt="" />
+        <span>{game.awayTeam}</span>
+        <span className="prob">{showScore ? game.actualAwayScore : `${awayProb}%`}</span>
+      </div>
+      <div className="vs">{statusWord}</div>
+      <div className="side">
+        <span className="prob">{showScore ? game.actualHomeScore : `${homeProb}%`}</span>
+        <span>{game.homeTeam}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={teamLogoPath(game.homeTeam)} alt="" />
+      </div>
+    </div>
+  );
+}
+
 function Hero({ game }: { game: NbaGameDetail }) {
   const homeProb = Math.round(game.homeWinProbability * 100);
   const awayProb = 100 - homeProb;
@@ -204,7 +234,16 @@ function MarginSection({ game }: { game: NbaGameDetail }) {
         {game.marginBuckets.map((b) => (
           <div className={`bucket-row ${b.label === actualLabel ? "bucket-actual" : ""}`} key={b.label}>
             <span className="bucket-label">
-              {b.label}
+              {/* Display-only clarification -- the underlying label stays
+                  "Lost / Tied" (unchanged) since it's also the match key
+                  against actualLabel below. Shortened from the earlier
+                  "Lost / Tied (any margin)" per explicit request: means
+                  the home team (this chart's own subject -- see the
+                  "(Home)" in the h2 above) lost, at any margin, not
+                  specifically "the favored team" -- see module note on
+                  MarginSection for why this chart's home-team framing
+                  can look odd when the home team isn't the favorite. */}
+              {b.label === "Lost / Tied" ? "Lost" : b.label}
               {b.label === actualLabel && <span className="actual-tag"> ← actual result</span>}
             </span>
             <div className="bucket-track">
@@ -292,14 +331,22 @@ function TotalsSection({ game }: { game: NbaGameDetail }) {
 // before this project is comfortable showing it.
 type PageTab = "overview" | "matchups" | "bettingEdge";
 
-function PageTabStrip({ active, onChange }: { active: PageTab; onChange: (tab: PageTab) => void }) {
+function PageTabStrip({
+  active,
+  onChange,
+  spotlight,
+}: {
+  active: PageTab;
+  onChange: (tab: PageTab) => void;
+  spotlight?: boolean;
+}) {
   const tabs: { key: PageTab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "matchups", label: "Matchups" },
     { key: "bettingEdge", label: "Betting Edge" },
   ];
   return (
-    <nav className="page-tab-strip" aria-label="Game detail sections">
+    <nav id="page-tab-strip" className={`page-tab-strip ${spotlight ? "spotlight" : ""}`} aria-label="Game detail sections">
       {tabs.map((t) => (
         <button
           key={t.key}
@@ -1277,6 +1324,14 @@ export default function NbaGameDetailView({
 }) {
   const [activeTab, setActiveTab] = useState<PageTab>(initialView === "radar" ? "matchups" : "overview");
   const router = useRouter();
+  // Same "Advanced Analysis" jump link as GameDetailView.tsx (NFL) --
+  // see that file's own comment for the full reasoning.
+  const [toolsSpotlight, setToolsSpotlight] = useState(false);
+  function jumpToTools() {
+    document.getElementById("page-tab-strip")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setToolsSpotlight(true);
+    window.setTimeout(() => setToolsSpotlight(false), 2500);
+  }
 
   useEffect(() => {
     if (!game.isLive) return;
@@ -1286,16 +1341,27 @@ export default function NbaGameDetailView({
 
   return (
     <>
-      <Link href="/home/nba" style={{ display: "inline-block", margin: "1rem 0", color: "var(--text-dim)" }}>
-        ← back to predictions
-      </Link>
+      <NbaStickyBar game={game} />
+      <div style={{ position: "relative", margin: "1rem 0" }}>
+        <Link href="/home/nba" style={{ display: "inline-block", color: "var(--text-dim)" }}>
+          ← back to predictions
+        </Link>
+        <button
+          type="button"
+          className="tools-jump-link"
+          onClick={jumpToTools}
+          style={{ position: "absolute", left: "50%", top: 0, transform: "translateX(-50%)" }}
+        >
+          Advanced Analysis <span aria-hidden="true">↓</span>
+        </button>
+      </div>
       <Hero game={game} />
       <InjuryReportSection game={game} />
       <ResultCompare game={game} />
       <MarginSection game={game} />
       <TotalsSection game={game} />
 
-      <PageTabStrip active={activeTab} onChange={setActiveTab} />
+      <PageTabStrip active={activeTab} onChange={setActiveTab} spotlight={toolsSpotlight} />
       {activeTab === "overview" ? (
         <OverviewTab game={game} />
       ) : activeTab === "matchups" ? (
