@@ -135,7 +135,7 @@ export default function NbaMatchupCard({
         <span className="game-meta">{matchup.kickoff}</span>
       </div>
       <TeamRow side={matchup.teamA} status={matchup.status} predictionCorrect={matchup.predictionCorrect} />
-      <div className="vs-divider">VS</div>
+      <div className="vs-divider">AT</div>
       <TeamRow side={matchup.teamB} status={matchup.status} predictionCorrect={matchup.predictionCorrect} />
     </div>
     </Link>
