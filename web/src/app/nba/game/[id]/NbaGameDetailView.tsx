@@ -139,6 +139,51 @@ function InjuryReportSection({ game }: { game: NbaGameDetail }) {
   );
 }
 
+// NBA equivalent of GameDetailView.tsx's ResultCompare -- this page
+// never had one at all (only per-prop grading via PickResultIcon
+// lower down), so a completed game showed the final score but no
+// explicit verdict on the model's own win/loss pick. Reuses the same
+// .result-compare/.compare-card CSS and the same PickResultIcon
+// (yellow check / red X) the per-prop rows already use, for one
+// consistent grading language across the whole page.
+function ResultCompare({ game }: { game: NbaGameDetail }) {
+  if (!game.isFinal || game.predictionCorrect === null) return null;
+  if (game.actualHomeScore === null || game.actualAwayScore === null) return null;
+
+  const homeFavored = game.homeWinProbability >= 0.5;
+  const favoredName = homeFavored ? game.homeTeamName : game.awayTeamName;
+  const favoredProb = Math.round((homeFavored ? game.homeWinProbability : 1 - game.homeWinProbability) * 100);
+  const winnerName = game.actualHomeScore > game.actualAwayScore ? game.homeTeamName : game.awayTeamName;
+  const margin = Math.abs(game.actualHomeScore - game.actualAwayScore);
+  const totalScore = game.actualHomeScore + game.actualAwayScore;
+
+  return (
+    <div className="stat-section">
+      <h2>Prediction vs. Result</h2>
+      <p className="stat-sub">We keep every prediction permanently so we can always show our work.</p>
+      <div className="result-compare">
+        <div className="compare-card">
+          <div className="label">PREGAME WIN PROBABILITY</div>
+          <div className="value">
+            {favoredName.split(" ").pop()} {favoredProb}%
+          </div>
+        </div>
+        <div className={`compare-card ${game.predictionCorrect ? "hit" : "miss"}`}>
+          <div className="label">ACTUAL RESULT</div>
+          <div className="value">
+            <PickResultIcon result={game.predictionCorrect ? "correct" : "incorrect"} />{" "}
+            {winnerName.split(" ").pop()} won by {margin}
+          </div>
+        </div>
+        <div className="compare-card">
+          <div className="label">COMBINED SCORE</div>
+          <div className="value">{totalScore}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MarginSection({ game }: { game: NbaGameDetail }) {
   const actualLabel =
     game.isFinal && game.actualHomeScore !== null && game.actualAwayScore !== null
@@ -1059,11 +1104,32 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
   // Props already arrive ORDER BY edge DESC from nbaGameDetail.ts (and
   // already floored at MIN_DISPLAYED_EDGE there) -- the # column below
   // is just making that existing rank visible, not a new sort.
+  // Same graded-results summary NFL's PlayerPropsSection shows
+  // (GameDetailView.tsx) -- props on a game that hasn't been played
+  // yet are all pickResult === null, so nothing to summarize until at
+  // least one is graded. Reuses that component's own
+  // .betting-props-summary-* CSS classes.
+  const graded = game.props.filter((p) => p.pickResult === "correct" || p.pickResult === "incorrect");
+  const correctCount = graded.filter((p) => p.pickResult === "correct").length;
+  const correctPct = graded.length > 0 ? Math.round((correctCount / graded.length) * 100) : null;
+
   return (
     <div className="page-edge-section">
       <h3>
         Player Props <InfoTooltip text="Projections, lines, and edges below are this project's own model -- every number here is computed in-house from box-score history, not a licensed third-party grade." />
       </h3>
+      <p className="stat-sub">
+        Prop picks for this game, sorted by cover probability (our model&apos;s estimate of how likely each pick
+        is to hit) — highest-confidence pick first.
+      </p>
+      {graded.length > 0 && (
+        <p className="betting-props-summary">
+          <span className="betting-props-summary-correct">{correctCount}</span>
+          <span className="betting-props-summary-sep">/</span>
+          <span className="betting-props-summary-total">{graded.length}</span>
+          <span className="betting-props-summary-pct">{correctPct}% Hit Rate</span>
+        </p>
+      )}
       <div style={{ position: "relative" }}>
         <div className="betting-table-wrap">
           <table className="betting-table">
@@ -1205,6 +1271,7 @@ export default function NbaGameDetailView({
       </Link>
       <Hero game={game} />
       <InjuryReportSection game={game} />
+      <ResultCompare game={game} />
       <MarginSection game={game} />
       <TotalsSection game={game} />
 
