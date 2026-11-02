@@ -75,6 +75,11 @@ export interface NbaPropEdge {
   // games haven't been played) -- same semantics as NFL's own
   // pick_result, read by the same PickResultIcon component.
   pickResult: string | null;
+  // The player's real final value for this exact stat -- null pre-game,
+  // same gating as pickResult (src4/40 sets both together). Shown next
+  // to the player's name in the Betting Edge table's "Player (actual)"
+  // column once the game is graded.
+  actualValue: number | null;
 }
 
 // Props below this edge are hidden for now (not deleted -- still
@@ -264,12 +269,12 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(
     l5_avg: number | null; l10_avg: number | null;
     hit_rate_hits: number | null; hit_rate_attempts: number | null;
     h2h_hits: number | null; h2h_attempts: number | null;
-    pick_result: string | null;
+    pick_result: string | null; actual_value: number | null;
   }>(
     `SELECT player_name, stat, line, side, bookmaker, price, projection,
             cover_probability, edge, l5_avg, l10_avg,
             hit_rate_hits, hit_rate_attempts, h2h_hits, h2h_attempts,
-            pick_result
+            pick_result, actual_value
      FROM latest_nba_player_prop_predictions
      WHERE universal_game_id = $1 AND edge >= $2 AND bookmaker != 'dst_propbuilder'
      ORDER BY cover_probability DESC`,
@@ -478,6 +483,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(
       h2hHits: r.h2h_hits,
       h2hAttempts: r.h2h_attempts ?? 0,
       pickResult: r.pick_result,
+      actualValue: r.actual_value,
     })),
     starterGrades,
     teamGrades,

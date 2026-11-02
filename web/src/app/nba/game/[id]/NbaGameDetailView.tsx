@@ -1209,7 +1209,9 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
             <thead>
               <tr>
                 <th>#</th>
-                <th className="betting-table-sticky-col">Player</th>
+                <th className="betting-table-sticky-col">
+                  Player <span style={{ color: "var(--gold)" }}>(actual)</span>
+                </th>
                 <th>Prop</th>
                 <th>Pick</th>
                 <th>Proj</th>
@@ -1228,6 +1230,9 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
                   <td>{i + 1}</td>
                   <td className="betting-table-sticky-col">
                     {p.playerName}
+                    {p.actualValue != null && (
+                      <span style={{ color: "var(--gold)" }}> ({p.actualValue})</span>
+                    )}
                     <PickResultIcon result={p.pickResult} />
                   </td>
                   <td>
