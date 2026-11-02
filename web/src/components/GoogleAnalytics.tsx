@@ -50,6 +50,10 @@ export default function GoogleAnalytics() {
   function choose(value: "granted" | "denied") {
     localStorage.setItem(CONSENT_KEY, value);
     setConsent(value);
+    // Lets TikTokPixel.tsx (and any future pixel) react to the same
+    // one banner decision immediately, same tab -- a plain storage
+    // write alone only fires the "storage" event in *other* tabs.
+    window.dispatchEvent(new CustomEvent("matrixsports-consent-change", { detail: value }));
   }
 
   return (
