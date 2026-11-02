@@ -4158,6 +4158,53 @@ h1.glow span {
   top: var(--navbar-height);
   z-index: 40;
   background: var(--panel-solid);
+  /* Lets the "Advanced Analysis" jump link's scrollIntoView (and any
+     plain #page-tab-strip anchor) land this element exactly where it
+     already sticks on manual scroll, instead of flush against the
+     viewport's true top edge and hidden behind the sticky navbar. */
+  scroll-margin-top: var(--navbar-height);
+  transition: box-shadow 0.4s ease, border-bottom-color 0.4s ease;
+}
+
+/* Brief "you just landed here" cue after the Advanced Analysis jump
+   link -- swaps the strip's normal green accents for the site's gold
+   (same --gold/--gold-rgb used elsewhere for an attention/notice
+   color, e.g. .parlay-notice's border) for a few seconds, then
+   GameDetailView.tsx's own timeout clears the class and this fades
+   back to normal via the transition above. */
+.page-tab-strip.spotlight {
+  border-bottom-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(var(--gold-rgb), 0.5), 0 0 18px rgba(var(--gold-rgb), 0.35);
+}
+
+.page-tab-strip.spotlight button.active {
+  border-bottom-color: var(--gold);
+  color: var(--gold);
+}
+
+/* The jump link itself -- gold/pill styling previews the gold
+   highlight the tab strip gets once you land on it, so the two reads
+   as one connected interaction rather than an unrelated link. */
+.tools-jump-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(var(--gold-rgb), 0.5);
+  border-radius: 999px;
+  background: rgba(var(--gold-rgb), 0.1);
+  color: var(--gold);
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tools-jump-link:hover {
+  background: rgba(var(--gold-rgb), 0.18);
+  border-color: var(--gold);
 }
 
 .page-tab-strip button {
