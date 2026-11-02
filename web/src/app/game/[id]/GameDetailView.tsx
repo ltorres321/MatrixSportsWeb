@@ -2212,10 +2212,26 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
   const entries = game.bettingEdge?.playerProps ?? [];
   if (entries.length === 0) return null;
 
+  // Deduped to one row per REAL prop (player+stat+side+line) before
+  // counting -- same fix as NBA's BettingEdgeTab (NbaGameDetailView.tsx).
+  // Verified live against etl.pff_player_props: this source table
+  // already has zero duplicate (player, stat, side, line) groups per
+  // game (it keeps only the single best-priced book per pick, unlike
+  // NBA's per-bookmaker rows), so this is currently a no-op here --
+  // added for parity so both sports use the same counting rule, and
+  // so this section stays correct if that ever changes.
+  //
   // Graded entries only -- most props on this site are for games that
   // haven't been played yet, where pickResult is still null. Nothing
   // to summarize until at least one prop has an actual result.
-  const graded = entries.filter((e) => e.pickResult === "correct" || e.pickResult === "incorrect");
+  const uniqueEntries = new Map<string, PlayerPropEntry>();
+  for (const e of entries) {
+    const key = `${e.playerName}|${e.consensusStat}|${e.pickSide}|${e.pickLine}`;
+    if (!uniqueEntries.has(key)) uniqueEntries.set(key, e);
+  }
+  const graded = [...uniqueEntries.values()].filter(
+    (e) => e.pickResult === "correct" || e.pickResult === "incorrect"
+  );
   const correctCount = graded.filter((e) => e.pickResult === "correct").length;
   const correctPct = graded.length > 0 ? Math.round((correctCount / graded.length) * 100) : null;
 
@@ -2232,7 +2248,7 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
           <span className="betting-props-summary-correct">{correctCount}</span>
           <span className="betting-props-summary-sep">/</span>
           <span className="betting-props-summary-total">{graded.length}</span>
-          <span className="betting-props-summary-pct">{correctPct}% Hit Rate</span>
+          <span className="betting-props-summary-pct">{correctPct}% Hit Rate — Unique Props</span>
         </p>
       )}
       <div className="betting-table-outer betting-desktop-only">
