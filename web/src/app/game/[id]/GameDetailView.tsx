@@ -163,7 +163,13 @@ function MarginSection({ game }: { game: GameStat }) {
         {game.marginBuckets.map((b) => (
           <div className={`bucket-row ${b.label === actualLabel ? "bucket-actual" : ""}`} key={b.label}>
             <span className="bucket-label">
-              {b.label}
+              {/* Display-only clarification -- underlying label stays
+                  "Lost / Tied" (also the match key against actualLabel
+                  below). Shortened per explicit request -- see
+                  NbaGameDetailView.tsx's identical fix: means the HOME
+                  team (this chart's own subject) lost, not specifically
+                  "the favored team" -- home isn't always the favorite. */}
+              {b.label === "Lost / Tied" ? "Lost" : b.label}
               {b.label === actualLabel && <span className="actual-tag"> ← actual result</span>}
             </span>
             <div className="bucket-track">
@@ -2550,12 +2556,14 @@ type PageTab = "overview" | "matchups" | "bettingEdge" | "parlayHelper";
 function PageTabStrip({
   active,
   onChange,
+  spotlight,
 }: {
   active: PageTab;
   onChange: (tab: PageTab) => void;
+  spotlight?: boolean;
 }) {
   return (
-    <div className="page-tab-strip" role="tablist">
+    <div id="page-tab-strip" className={`page-tab-strip ${spotlight ? "spotlight" : ""}`} role="tablist">
       <button
         type="button"
         role="tab"
@@ -2711,6 +2719,20 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
   const router = useRouter();
   const locked = !game.premier && !isMember;
   const [activeTab, setActiveTab] = useState<PageTab>("overview");
+  // "Advanced Analysis" jump link (user request: the Matchups/Betting
+  // Edge/Parlay Helper tools sit far enough below the fold that users
+  // weren't finding them). Scrolls #page-tab-strip to the top of the
+  // viewport (that element's own position: sticky + scroll-margin-top
+  // already land it right under the navbar, same spot it sticks to on
+  // manual scroll) and briefly swaps its active-tab underline/glow from
+  // the site's normal green to gold so the jump itself is obvious, not
+  // just a silent scroll.
+  const [toolsSpotlight, setToolsSpotlight] = useState(false);
+  function jumpToTools() {
+    document.getElementById("page-tab-strip")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setToolsSpotlight(true);
+    window.setTimeout(() => setToolsSpotlight(false), 2500);
+  }
 
   useEffect(() => {
     if (game.status !== "live") return;
@@ -2744,9 +2766,23 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
         </aside>
 
         <main className="content-main">
-          <Link href="/home" style={{ display: "inline-block", marginBottom: "1.5rem", color: "var(--text-dim)" }}>
-            &larr; back to predictions
-          </Link>
+          <div style={{ position: "relative", marginBottom: "1.5rem" }}>
+            <Link href="/home" style={{ display: "inline-block", color: "var(--text-dim)" }}>
+              &larr; back to predictions
+            </Link>
+            {/* Centered on the same row/height as the back link, lined
+                up under the sticky top bar's own "FINAL" label directly
+                above it -- NOT the bigger "FINAL" tag inside the Hero
+                card below, which is a different element entirely. */}
+            <button
+              type="button"
+              className="tools-jump-link"
+              onClick={jumpToTools}
+              style={{ position: "absolute", left: "50%", top: 0, transform: "translateX(-50%)" }}
+            >
+              Advanced Analysis <span aria-hidden="true">&darr;</span>
+            </button>
+          </div>
 
           <Hero game={game} />
 
@@ -2880,7 +2916,7 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
         </MobileAdFrame>
       </div>
 
-      <PageTabStrip active={activeTab} onChange={setActiveTab} />
+      <PageTabStrip active={activeTab} onChange={setActiveTab} spotlight={toolsSpotlight} />
 
       {/* Same free-premier-game-only pattern as MarginSection/TotalsSection
           above -- these three tabs are PFF-backed stats/tools (grades,
