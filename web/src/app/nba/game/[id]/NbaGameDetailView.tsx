@@ -1187,6 +1187,16 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
       <h3>
         Player Props <InfoTooltip text="Projections, lines, and edges below are this project's own model -- every number here is computed in-house from box-score history, not a licensed third-party grade." />
       </h3>
+      {game.isLive && (
+        <div className="parlay-notice" role="note">
+          <p>
+            <strong>This game is live ({game.livePeriod ?? "in progress"}).</strong> Lines/odds below are the last
+            pregame snapshot we have -- our data source stops offering pregame props the moment a game tips off, so
+            these prices can no longer be refreshed and may not be the same ones your sportsbook is still showing or
+            letting you place.
+          </p>
+        </div>
+      )}
       <p className="stat-sub">
         Prop picks for this game, sorted by cover probability (our model&apos;s estimate of how likely each pick
         is to hit) — highest-confidence pick first.
@@ -1202,6 +1212,10 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
       <p className="stat-sub" style={{ marginTop: graded.length > 0 ? "0.25rem" : 0 }}>
         The table below lists the same pick once per sportsbook for price comparison, so it shows more rows
         than the unique-props count above.
+      </p>
+      <p className="stat-sub">
+        <span style={{ color: "var(--gold)" }}>Lines change.</span> We put real effort into keeping ours current,
+        but always double-check that a line still matches your sportsbook&apos;s own board before you place a bet.
       </p>
       <div style={{ position: "relative" }}>
         <div className="betting-table-wrap">
@@ -1299,6 +1313,13 @@ function ParlayHelperTab({ game }: { game: NbaGameDetail }) {
       </p>
 
       <div className="parlay-notice" role="note">
+        {game.isLive && (
+          <p>
+            <strong>This game is live ({game.livePeriod ?? "in progress"}).</strong> These parlays are built from the
+            last pregame snapshot we have -- our data source stops offering pregame props the moment a game tips off,
+            so these prices can no longer be refreshed and may not still be placeable at your sportsbook.
+          </p>
+        )}
         <p>
           <strong>Play responsibly.</strong> Gambling carries real risk, and parlays are long shots that lose far more
           often than they win. Only bet what you can afford to lose, set limits, and treat any winnings as a bonus. If
