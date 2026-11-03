@@ -57,6 +57,12 @@ export interface NbaParlayPick {
   bookmaker: string | null;
   price: number | null;
   oddsAsOf: string | null;
+  // "Tue" etc. -- only set by the league-wide query (nbaLeagueBettingEdge.ts),
+  // since a per-game pick's matchup is implied by the page you're on
+  // (nbaGameDetail.ts's parlayPickRows always sets this null). Lets
+  // NbaParlayCard's showMatchup mode label which game/day a leg is from
+  // when legs in one parlay can span the whole week's slate.
+  gameDay: string | null;
 }
 
 export interface NbaParlayLeg {

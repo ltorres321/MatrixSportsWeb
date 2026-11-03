@@ -45,7 +45,20 @@ function sportsbookName(key: string): string {
   return SPORTSBOOK_INFO[key]?.name ?? key;
 }
 
-export function NbaParlayCard({ title, parlay }: { title: string; parlay: NbaParlay }) {
+export function NbaParlayCard({
+  title,
+  parlay,
+  // Per-game cards (NbaGameDetailView.tsx's Parlay Helper tab) omit this
+  // -- the game is implied by the page you're on. The league-wide
+  // Parlays page (app/parlays/nba) sets this since its legs can come
+  // from different games -- same showMatchup contract as ParlayCard.tsx
+  // (NFL).
+  showMatchup = false,
+}: {
+  title: string;
+  parlay: NbaParlay;
+  showMatchup?: boolean;
+}) {
   const outcome = parlayOutcome(parlay);
   return (
     <div className={`parlay-card${outcome ? ` parlay-card-${outcome}` : ""}`}>
@@ -94,6 +107,12 @@ export function NbaParlayCard({ title, parlay }: { title: string; parlay: NbaPar
                   <span className="betting-player-team">{p.team}</span> {p.playerName}
                   <PickResultIcon result={p.pickResult} />
                 </div>
+                {showMatchup && (
+                  <div className="parlay-leg-matchup">
+                    {p.team} vs {p.opponent}
+                    {p.gameDay && ` (${p.gameDay})`}
+                  </div>
+                )}
                 <div className="parlay-leg-pick">{legLabel(p)}</div>
                 {actualLabel && <div className="parlay-leg-actual">{actualLabel}</div>}
               </div>

@@ -89,7 +89,7 @@ export interface NbaPropEdge {
 // record to judge low-edge picks against, same spec step ("tune
 // thresholds after 2 weeks of grading") this number should eventually
 // come from instead of being hand-set.
-const MIN_DISPLAYED_EDGE = 0.1;
+export const MIN_DISPLAYED_EDGE = 0.1;
 
 export interface NbaMarginBucket {
   label: string;
@@ -393,6 +393,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(
     bookmaker: r.bookmaker,
     price: r.price,
     oddsAsOf: r.generated_at ? new Date(r.generated_at).toISOString() : null,
+    gameDay: null,
   }));
   const parlays = buildGameParlays(parlayPicks);
 
