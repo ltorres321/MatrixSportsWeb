@@ -109,6 +109,37 @@ export function etDateKey(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(date);
 }
 
+// Sunday-to-Sunday window (ET calendar days) covering "now" -- backs the
+// league-wide NBA Parlays page (app/parlays/nba), which shows one such
+// window at a time rather than NFL's season/week numbering (there's no
+// NBA equivalent of that -- see the user's own framing: "all the visible
+// parlays are viewable from Sunday to Sunday... display current week").
+// Returns plain "YYYY-MM-DD" strings, not Date/timestamp instants --
+// nbaLeagueBettingEdge.ts's query casts game_date AT TIME ZONE
+// 'America/New_York' itself and compares calendar dates, so a DST
+// transition inside the window (confirmed: Nov 1 2026 is one) is
+// Postgres's problem to get right, not something this function needs to
+// reconstruct as a UTC offset.
+export function getCurrentNbaWeek(now: Date = new Date()): {
+  weekStart: string; // the window's Sunday
+  weekEndExclusive: string; // the following Sunday, for a `< ` bound
+  weekEndInclusive: string; // the window's Saturday, for display
+} {
+  const [y, m, d] = etDateKey(now).split("-").map(Number);
+  // A plain Y-M-D interpreted as UTC midnight has the same day-of-week as
+  // the real ET calendar date -- weekday is a property of the calendar
+  // date alone, so no timezone conversion is needed from here on.
+  const today = new Date(Date.UTC(y, m - 1, d));
+  const sunday = new Date(today);
+  sunday.setUTCDate(today.getUTCDate() - today.getUTCDay());
+  const nextSunday = new Date(sunday);
+  nextSunday.setUTCDate(sunday.getUTCDate() + 7);
+  const saturday = new Date(nextSunday);
+  saturday.setUTCDate(nextSunday.getUTCDate() - 1);
+  const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+  return { weekStart: fmt(sunday), weekEndExclusive: fmt(nextSunday), weekEndInclusive: fmt(saturday) };
+}
+
 
 function theSportsDbSeasonString(season: number): string {
   return `${season - 1}-${season}`;

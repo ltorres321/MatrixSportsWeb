@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { query } from "@/lib/db";
 import type { GameParlays, Parlay, ParlayBookMode } from "@/lib/parlayHelper";
 import type { LeagueParlays } from "@/lib/leagueParlayHelper";
+import type { NbaParlay, NbaParlayLeg } from "@/lib/nbaParlayHelper";
+import type { NbaLeagueParlays } from "@/lib/nbaLeagueParlayHelper";
 
 // Records every parlay the Parlay Helper tab shows into public.site_parlay_log
 // (see sql/012_site_parlay_log.sql for the why). Called from
@@ -130,6 +132,73 @@ export async function recordDisplayedLeagueParlays(
   await query(
     `INSERT INTO public.site_league_parlay_log AS t
        (parlay_hash, season, week, mode, leg_count, sportsbook, parlay_probability, payout_per_dollar, legs)
+     VALUES ${placeholders.join(", ")}
+     ON CONFLICT (parlay_hash) DO UPDATE SET
+       last_shown_at = now(),
+       times_shown = t.times_shown + 1`,
+    values,
+  );
+}
+
+// NBA counterpart to legSnapshot above, built from NbaParlayLeg's own
+// shape (pick.* instead of entry.*) -- no odds_source/odds-history
+// pointer field, since NBA's props table already carries each book's
+// price directly (no separate PFF-vs-market-line distinction to record
+// the way NFL's legSnapshot does).
+function nbaLegSnapshot(leg: NbaParlayLeg) {
+  const p = leg.pick;
+  return {
+    player: p.playerName,
+    team: p.team,
+    stat: p.stat,
+    side: p.side,
+    line: p.line,
+    odds: leg.odds,
+    sportsbook: leg.sportsbook,
+    probability: leg.probability,
+    pRank: p.pRank,
+    odds_as_of: p.oddsAsOf,
+  };
+}
+
+// Keyed by week_start (the Sunday-to-Sunday window's own Sunday, ET
+// calendar date) instead of season+week -- NBA has no week numbering
+// (see sql/014_site_nba_league_parlay_log.sql's own header). No "mode"
+// dimension either -- NBA parlays are single-book-only (see
+// nbaParlayHelper.ts's module header), so there's nothing to loop over
+// the way recordDisplayedLeagueParlays loops "single"/"mixed".
+function nbaLeagueParlayHash(weekStart: string, legs: ReturnType<typeof nbaLegSnapshot>[]) {
+  const identity = legs.map((l) => [l.player, l.stat, l.side, l.line, l.odds, l.sportsbook]);
+  return createHash("sha256").update(JSON.stringify([weekStart, identity])).digest("hex");
+}
+
+export async function recordDisplayedNbaLeagueParlays(weekStart: string, parlays: NbaLeagueParlays): Promise<void> {
+  const rows = new Map<string, unknown[]>();
+  for (const parlay of [...parlays.twoLeg, ...parlays.threeLeg] as NbaParlay[]) {
+    const legs = parlay.legs.map(nbaLegSnapshot);
+    const hash = nbaLeagueParlayHash(weekStart, legs);
+    rows.set(hash, [
+      hash,
+      weekStart,
+      legs.length,
+      parlay.sportsbook,
+      parlay.probability,
+      parlay.decimalOdds,
+      JSON.stringify(legs),
+    ]);
+  }
+  if (rows.size === 0) return;
+
+  const values: unknown[] = [];
+  const placeholders = [...rows.values()].map((row, i) => {
+    values.push(...row);
+    const o = i * 7;
+    return `($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}, $${o + 5}, $${o + 6}, $${o + 7}::jsonb)`;
+  });
+
+  await query(
+    `INSERT INTO public.site_nba_league_parlay_log AS t
+       (parlay_hash, week_start, leg_count, sportsbook, parlay_probability, payout_per_dollar, legs)
      VALUES ${placeholders.join(", ")}
      ON CONFLICT (parlay_hash) DO UPDATE SET
        last_shown_at = now(),

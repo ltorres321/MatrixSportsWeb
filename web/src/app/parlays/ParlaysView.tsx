@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PARLAY_POOL_SIZE } from "@/lib/parlayHelper";
 import { ParlayCard } from "@/components/ParlayCard";
 import type { WeekParlays } from "./page";
@@ -102,6 +103,15 @@ export default function ParlaysView({
         <h1 className="glow">{season} SEASON — PARLAYS</h1>
         <p className="subtitle">{"// our model's 6 best-probability parlays, picked from every game each week"}</p>
       </header>
+
+      <div className="league-chips" aria-label="Sport selector">
+        <button className="league-chip active" type="button">
+          NFL
+        </button>
+        <Link href="/parlays/nba" className="league-chip">
+          NBA
+        </Link>
+      </div>
 
       <main>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
