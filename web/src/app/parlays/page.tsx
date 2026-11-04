@@ -10,8 +10,18 @@ import { buildLeagueParlays, type LeagueParlays } from "@/lib/leagueParlayHelper
 import type { ParlayBookMode } from "@/lib/parlayHelper";
 import { recordDisplayedLeagueParlays } from "@/lib/parlayLog";
 import { createClient } from "@/lib/supabase/server";
+import { cachedAsync } from "@/lib/memoCache";
 import ParlaysView from "./ParlaysView";
 import { pageMetadata } from "@/lib/seo";
+
+// Same reasoning as the NBA sibling page's own CACHE_TTL_MS -- the
+// underlying props/odds regenerate on an hourly cron either way, and this
+// page is worse off uncached than NBA's: it fans out one
+// getLeagueBettingEdge query PER WEEK shown (every week from
+// FIRST_PARLAY_WEEK through the current one), all in parallel, on every
+// single page view. Caching each week's own result turns that fan-out
+// into a once-per-5-minutes cost instead of paying it per visitor.
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export const metadata = pageMetadata({
   title: "NFL Parlays — Matrix Sports Analytics",
@@ -38,22 +48,26 @@ export interface WeekParlays {
 }
 
 async function buildWeekParlays(season: number, week: number, hideBannedBooks: boolean): Promise<WeekParlays> {
-  const playerProps = await getLeagueBettingEdge(season, week, hideBannedBooks);
-  const parlays: Record<ParlayBookMode, LeagueParlays> = {
-    single: buildLeagueParlays(playerProps, "single"),
-    mixed: buildLeagueParlays(playerProps, "mixed"),
-  };
+  return cachedAsync(`nfl-league-parlays:${season}:${week}:${hideBannedBooks}`, CACHE_TTL_MS, async () => {
+    const playerProps = await getLeagueBettingEdge(season, week, hideBannedBooks);
+    const parlays: Record<ParlayBookMode, LeagueParlays> = {
+      single: buildLeagueParlays(playerProps, "single"),
+      mixed: buildLeagueParlays(playerProps, "mixed"),
+    };
 
-  // Same "log what's actually shown, never let a logging failure take
-  // the page down" contract as the per-game Parlay Helper tab (see
-  // pffBettingEdge.ts's getGameBettingEdge).
-  try {
-    await recordDisplayedLeagueParlays(season, week, parlays);
-  } catch (error) {
-    console.error("site_league_parlay_log write failed:", error instanceof Error ? error.message : error);
-  }
+    // Same "log what's actually shown, never let a logging failure take
+    // the page down" contract as the per-game Parlay Helper tab (see
+    // pffBettingEdge.ts's getGameBettingEdge). Runs once per cache fill,
+    // not once per page view -- same tradeoff as the NBA page's own
+    // comment on this.
+    try {
+      await recordDisplayedLeagueParlays(season, week, parlays);
+    } catch (error) {
+      console.error("site_league_parlay_log write failed:", error instanceof Error ? error.message : error);
+    }
 
-  return { season, week, parlays };
+    return { season, week, parlays };
+  });
 }
 
 // Registered-users-only: unlike /home's "full slate" (a blurred teaser +
