@@ -4,8 +4,19 @@ import { buildNbaLeagueParlays, type NbaLeagueParlays } from "@/lib/nbaLeaguePar
 import { recordDisplayedNbaLeagueParlays } from "@/lib/parlayLog";
 import { getCurrentNbaWeek } from "@/lib/nbaSchedule";
 import { createClient } from "@/lib/supabase/server";
+import { cachedAsync } from "@/lib/memoCache";
 import NbaParlaysView from "./NbaParlaysView";
 import { pageMetadata } from "@/lib/seo";
+
+// The underlying props/odds only regenerate once an hour (see
+// src4/33_predict_live_player_props.py's cron, :15 past the hour) --
+// caching this page's own ~11s league-wide query/build/log pipeline for
+// 5 minutes is still far fresher than that, but turns a flood of
+// concurrent visitors into a single DB hit every 5 minutes instead of
+// one ~11s query PER PAGE VIEW (see memoCache.ts's own header for why
+// this also protects against a request stampede on a cache miss, not
+// just repeat hits).
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export const metadata = pageMetadata({
   title: "NBA Parlays — Matrix Sports Analytics",
@@ -16,7 +27,8 @@ export const metadata = pageMetadata({
 
 // Server Component: same registered-users-only gate as /parlays (NFL) --
 // see that page's own SignUpGate comment for why no parlay content (or
-// its underlying query) runs at all for a signed-out visitor.
+// its underlying query) runs at all for a signed-out visitor, and for
+// why the league-chips switcher below is shown even on this gate.
 function SignUpGate() {
   return (
     <>
@@ -24,6 +36,16 @@ function SignUpGate() {
         <h1 className="glow">PARLAYS</h1>
         <p className="subtitle">{"// members-only"}</p>
       </header>
+
+      <div className="league-chips" aria-label="Sport selector">
+        <Link href="/parlays" className="league-chip">
+          NFL
+        </Link>
+        <button className="league-chip active" type="button">
+          NBA
+        </button>
+      </div>
+
       <main>
         <div style={{ display: "flex", justifyContent: "center", padding: "3rem 1rem" }}>
           <div className="unlock-card">
@@ -62,17 +84,27 @@ export default async function NbaParlaysPage({
 
   const { weekStart, weekEndExclusive, weekEndInclusive } = getCurrentNbaWeek();
 
-  const picks = await getNbaLeagueParlayPicks(weekStart, weekEndExclusive, hideBannedBooks);
-  const parlays: NbaLeagueParlays = buildNbaLeagueParlays(picks);
+  const parlays = await cachedAsync(
+    `nba-league-parlays:${weekStart}:${weekEndExclusive}:${hideBannedBooks}`,
+    CACHE_TTL_MS,
+    async () => {
+      const picks = await getNbaLeagueParlayPicks(weekStart, weekEndExclusive, hideBannedBooks);
+      const built: NbaLeagueParlays = buildNbaLeagueParlays(picks);
 
-  // Same "log what's actually shown, never let a logging failure take the
-  // page down" contract as the per-game Parlay Helper tab and NFL's own
-  // league page.
-  try {
-    await recordDisplayedNbaLeagueParlays(weekStart, parlays);
-  } catch (error) {
-    console.error("site_nba_league_parlay_log write failed:", error instanceof Error ? error.message : error);
-  }
+      // Same "log what's actually shown, never let a logging failure take
+      // the page down" contract as the per-game Parlay Helper tab and
+      // NFL's own league page. Runs once per cache fill, not once per
+      // page view -- site_nba_league_parlay_log's times_shown now tracks
+      // "shown after a cache refresh", not raw page views.
+      try {
+        await recordDisplayedNbaLeagueParlays(weekStart, built);
+      } catch (error) {
+        console.error("site_nba_league_parlay_log write failed:", error instanceof Error ? error.message : error);
+      }
+
+      return built;
+    },
+  );
 
   return <NbaParlaysView weekStart={weekStart} weekEndInclusive={weekEndInclusive} parlays={parlays} />;
 }

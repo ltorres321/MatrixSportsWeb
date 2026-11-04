@@ -278,6 +278,80 @@ function PredictionsMenu({ onNavigate }: { onNavigate: () => void }) {
   );
 }
 
+// Parlays sibling of PredictionsMenu above -- same flyout, same
+// nav-more-* classes, just NFL -> /parlays and NBA -> /parlays/nba
+// instead of /home and /home/nba (request 2026-11-04: "Parlays should
+// be like Predictions", a top-nav dropdown, not a flat link straight
+// to the NFL page). The in-page NFL/NBA pill toggle on the parlays
+// pages themselves (ParlaysView.tsx/NbaParlaysView.tsx's own
+// .league-chips) stays as-is -- this is purely about how the TOP NAV
+// reaches Parlays, same relationship PredictionsMenu already has to
+// /home's own league-chips toggle.
+function ParlaysMenu({ onNavigate }: { onNavigate: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const close = () => setOpen(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className={`nav-more ${open ? "open" : ""}`} ref={ref}>
+      <button
+        type="button"
+        className="nav-more-trigger"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="Parlays"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="nav-more-trigger-icon">
+          <ParlaysIcon />
+        </span>
+        <span className="nav-more-trigger-label">
+          Parlays
+          <span className="nav-more-caret" aria-hidden="true">
+            &#9662;
+          </span>
+        </span>
+      </button>
+      <div className="nav-more-panel">
+        <Link
+          href="/parlays"
+          onClick={() => {
+            close();
+            onNavigate();
+          }}
+        >
+          NFL
+        </Link>
+        <Link
+          href="/parlays/nba"
+          onClick={() => {
+            close();
+            onNavigate();
+          }}
+        >
+          NBA
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 // Minimal hand-rolled icons, not a library -- 3 glyphs don't justify a
 // new dependency. Stroke-based, currentColor, so they inherit the
 // rail's own hover/active color for free.
@@ -350,10 +424,7 @@ function SideRail({
         <span>Home</span>
       </Link>
       <PredictionsMenu onNavigate={() => {}} />
-      <Link href="/parlays">
-        <ParlaysIcon />
-        <span>Parlays</span>
-      </Link>
+      <ParlaysMenu onNavigate={() => {}} />
       <Link href="/stories">
         <RecapsIcon />
         <span>Recaps</span>
@@ -471,9 +542,7 @@ export default function SiteNav({
             Home
           </Link>
           <PredictionsMenu onNavigate={close} />
-          <Link href="/parlays" onClick={close}>
-            Parlays
-          </Link>
+          <ParlaysMenu onNavigate={close} />
           <Link href="/stories" onClick={close}>
             Recaps
           </Link>
