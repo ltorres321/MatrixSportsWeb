@@ -9,7 +9,6 @@ import {
   getCurrentSeasonYear,
 } from "@/lib/predictions";
 import type { Matchup } from "@/lib/matchups";
-import { teamLogoPath, TEAMS } from "@/lib/teams";
 import MatchupCard from "@/components/MatchupCard";
 import { getAvailableNbaSeasons, getDefaultNbaDate, getMatchupsForNbaDate } from "@/lib/nbaPredictions";
 import NbaMatchupCard from "@/components/NbaMatchupCard";
@@ -301,8 +300,6 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
 
   const featuredNbaGame = await getFeaturedNbaGame();
 
-  const logoStrip = TEAMS.slice(0, 12);
-
   // Site-written recaps get priority in the coverage grid, but capped
   // at SITE_MAX_SLOTS rather than free to fill all of COVERAGE_SLOTS --
   // every final game gets its own recap now (see weekly-stories.mts),
@@ -340,13 +337,6 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
         <h1 className="glow">WELCOME BACK{firstName ? `, ${firstName.toUpperCase()}` : ""}</h1>
         <p className="subtitle">{"// your weekly rundown, model insights, and this week's free pick"}</p>
       </header>
-
-      <div className="logo-strip" aria-hidden="true">
-        {logoStrip.map((t) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={t.alias} src={teamLogoPath(t.alias)} alt="" />
-        ))}
-      </div>
 
       <div className="content-split">
         <aside className="promo-rail promo-rail-left" aria-label="Promotional space">
