@@ -1691,40 +1691,6 @@ h1.glow span {
    Signed-in dashboard (index page, once authenticated)
    --------------------------------------------------------------- */
 
-.logo-strip {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0 0 2.5rem;
-  opacity: 0.7;
-}
-
-.logo-strip img {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  filter: grayscale(0.3);
-  transition: filter 0.2s, opacity 0.2s;
-}
-
-.logo-strip img:hover {
-  filter: grayscale(0);
-  opacity: 1;
-}
-
-/* The dimmed/desaturated default is tuned for the dark rain backdrop,
-   where full-color logos would visually compete with the background.
-   On white, the same treatment just looks washed out instead of
-   subtle -- so light theme shows them at full color from the start. */
-:root[data-theme="light"] .logo-strip {
-  opacity: 1;
-}
-
-:root[data-theme="light"] .logo-strip img {
-  filter: none;
-}
-
 /* Same issue on matchup cards -- a near-black circle behind each team
    logo reads as a dark hole against white instead of a subtle frame. */
 :root[data-theme="light"] .team-badge {
