@@ -80,6 +80,13 @@ async function buildWeekParlays(season: number, week: number, hideBannedBooks: b
 // getLeagueBettingEdge) no longer runs its expensive query at all for
 // anonymous/bot traffic, which is most of what a public, unauthenticated
 // route gets.
+//
+// Still shows the NFL/NBA league-chips switcher (same markup as
+// ParlaysView.tsx's own) even though no parlay content renders here --
+// without it, a signed-out visitor landing on /parlays had no way to
+// even discover /parlays/nba exists, let alone reach it, before signing
+// up (user, 2026-11-04: "someone that wants NBA data will get NFL page
+// then have to move to NFL").
 function SignUpGate() {
   return (
     <>
@@ -87,6 +94,16 @@ function SignUpGate() {
         <h1 className="glow">PARLAYS</h1>
         <p className="subtitle">{"// members-only"}</p>
       </header>
+
+      <div className="league-chips" aria-label="Sport selector">
+        <button className="league-chip active" type="button">
+          NFL
+        </button>
+        <Link href="/parlays/nba" className="league-chip">
+          NBA
+        </Link>
+      </div>
+
       <main>
         <div style={{ display: "flex", justifyContent: "center", padding: "3rem 1rem" }}>
           <div className="unlock-card">

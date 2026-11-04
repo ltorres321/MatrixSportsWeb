@@ -27,7 +27,8 @@ export const metadata = pageMetadata({
 
 // Server Component: same registered-users-only gate as /parlays (NFL) --
 // see that page's own SignUpGate comment for why no parlay content (or
-// its underlying query) runs at all for a signed-out visitor.
+// its underlying query) runs at all for a signed-out visitor, and for
+// why the league-chips switcher below is shown even on this gate.
 function SignUpGate() {
   return (
     <>
@@ -35,6 +36,16 @@ function SignUpGate() {
         <h1 className="glow">PARLAYS</h1>
         <p className="subtitle">{"// members-only"}</p>
       </header>
+
+      <div className="league-chips" aria-label="Sport selector">
+        <Link href="/parlays" className="league-chip">
+          NFL
+        </Link>
+        <button className="league-chip active" type="button">
+          NBA
+        </button>
+      </div>
+
       <main>
         <div style={{ display: "flex", justifyContent: "center", padding: "3rem 1rem" }}>
           <div className="unlock-card">
