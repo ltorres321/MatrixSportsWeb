@@ -7,7 +7,7 @@ export default function NbaParlaysLoading() {
     <>
       <header className="site-header">
         <h1 className="glow">NBA PARLAYS</h1>
-        <p className="subtitle">{"// our model's 6 best-probability parlays, picked from every game this week"}</p>
+        <p className="subtitle">{"// our model's 6 best-probability parlays for every day, graded Sunday to Saturday"}</p>
       </header>
 
       <div className="league-chips" aria-label="Sport selector">

@@ -1,27 +1,27 @@
 import Link from "next/link";
-import { getNbaLeagueParlayPicks } from "@/lib/nbaLeagueBettingEdge";
+import { getNbaLeagueParlayPicks, type NbaDayPick } from "@/lib/nbaLeagueBettingEdge";
 import { buildNbaLeagueParlays, type NbaLeagueParlays } from "@/lib/nbaLeagueParlayHelper";
 import { recordDisplayedNbaLeagueParlays } from "@/lib/parlayLog";
-import { getCurrentNbaWeek } from "@/lib/nbaSchedule";
+import { etDateKey, getCurrentNbaWeek } from "@/lib/nbaSchedule";
 import { createClient } from "@/lib/supabase/server";
 import { cachedAsync } from "@/lib/memoCache";
-import NbaParlaysView from "./NbaParlaysView";
+import NbaParlaysView, { type NbaDayParlays } from "./NbaParlaysView";
 import { pageMetadata } from "@/lib/seo";
 
 // The underlying props/odds only regenerate once an hour (see
-// src4/33_predict_live_player_props.py's cron, :15 past the hour) --
-// caching this page's own ~11s league-wide query/build/log pipeline for
-// 5 minutes is still far fresher than that, but turns a flood of
-// concurrent visitors into a single DB hit every 5 minutes instead of
-// one ~11s query PER PAGE VIEW (see memoCache.ts's own header for why
-// this also protects against a request stampede on a cache miss, not
-// just repeat hits).
+// src4/33_predict_live_player_props.py's cron, :15 past the hour), and the
+// heavy ranking query now runs in a cron job (src4/41, which fills
+// public.nba_league_parlay_picks) -- this page only reads that small table,
+// so a read is cheap. The 5-minute cache is still worth keeping: it
+// collapses a flood of concurrent visitors into one read + one parlay build
+// + one log write every 5 minutes (see memoCache.ts's own header for why
+// this also protects against a request stampede on a cache miss).
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export const metadata = pageMetadata({
   title: "NBA Parlays — Matrix Sports Analytics",
   description:
-    "The current week's 6 best-probability NBA parlays, built from our model's highest-confidence player props across every game.",
+    "The 6 best-probability NBA parlays for today's and upcoming games, built from our model's highest-confidence player props.",
   path: "/parlays/nba",
 });
 
@@ -52,7 +52,7 @@ function SignUpGate() {
             <span className="lock-icon">🔒</span>
             <h2>Sign In to View Parlays</h2>
             <p>
-              Create a free account to see our model&apos;s 6 best-probability NBA parlays every week -- no credit
+              Create a free account to see our model&apos;s 6 best-probability NBA parlays for upcoming games -- no credit
               card required.
             </p>
             <Link className="btn btn-primary btn-block" href="/signup">
@@ -66,10 +66,15 @@ function SignUpGate() {
 }
 
 // Unlike /parlays (NFL, which stacks every week of the season), NBA has
-// no week numbering to stack -- this shows just the current
-// Sunday-to-Sunday window (getCurrentNbaWeek). Going back to a past
-// window is explicitly deferred (user, 2026-11-03: "display current
-// week then I will figure out how user can go back in history").
+// no week numbering to stack -- it shows the current Sunday-to-Saturday ET
+// week as one graded unit, with SIX parlays per ET day (4 two-leg + 2
+// three-leg, same split as the NFL page's week) built from that day's own
+// pool. A day's pool is rebuilt hourly until its first game tips off, then
+// frozen (src4/41), so past days are the parlays the model actually found
+// and the week's hit/missed record is stable. (2026-11-05: an earlier
+// "upcoming games only" version of this page dropped the week's played
+// games and their graded results -- this restores them.)
+// Going back to a past week is still deferred (user, 2026-11-03).
 export default async function NbaParlaysPage({
   searchParams,
 }: {
@@ -83,13 +88,27 @@ export default async function NbaParlaysPage({
   }
 
   const { weekStart, weekEndExclusive, weekEndInclusive } = getCurrentNbaWeek();
+  const todayKey = etDateKey(new Date());
 
-  const parlays = await cachedAsync(
-    `nba-league-parlays:${weekStart}:${weekEndExclusive}:${hideBannedBooks}`,
+  const { days, builtAt } = await cachedAsync(
+    `nba-league-parlays:${weekStart}:${hideBannedBooks}`,
     CACHE_TTL_MS,
     async () => {
-      const picks = await getNbaLeagueParlayPicks(weekStart, weekEndExclusive, hideBannedBooks);
-      const built: NbaLeagueParlays = buildNbaLeagueParlays(picks);
+      const { picks, builtAt } = await getNbaLeagueParlayPicks(hideBannedBooks, weekStart, weekEndExclusive);
+
+      // Each ET day is its own pool -- p_rank is already per-day, so the
+      // builder's top-N three-leg cap applies within a day, not the week.
+      const picksByDay = new Map<string, NbaDayPick[]>();
+      for (const pick of picks) {
+        picksByDay.set(pick.dayKey, [...(picksByDay.get(pick.dayKey) ?? []), pick]);
+      }
+      const days: NbaDayParlays[] = [...picksByDay.entries()]
+        .map(([dayKey, dayPicks]) => ({ dayKey, parlays: buildNbaLeagueParlays(dayPicks) }))
+        .filter((day) => day.parlays.twoLeg.length + day.parlays.threeLeg.length > 0);
+      const built: NbaLeagueParlays = {
+        twoLeg: days.flatMap((day) => day.parlays.twoLeg),
+        threeLeg: days.flatMap((day) => day.parlays.threeLeg),
+      };
 
       // Same "log what's actually shown, never let a logging failure take
       // the page down" contract as the per-game Parlay Helper tab and
@@ -102,9 +121,17 @@ export default async function NbaParlaysPage({
         console.error("site_nba_league_parlay_log write failed:", error instanceof Error ? error.message : error);
       }
 
-      return built;
+      return { days, builtAt };
     },
   );
 
-  return <NbaParlaysView weekStart={weekStart} weekEndInclusive={weekEndInclusive} parlays={parlays} />;
+  return (
+    <NbaParlaysView
+      todayKey={todayKey}
+      weekStart={weekStart}
+      weekEndInclusive={weekEndInclusive}
+      days={days}
+      builtAt={builtAt}
+    />
+  );
 }
