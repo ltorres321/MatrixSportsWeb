@@ -9,19 +9,19 @@ import NbaParlaysView from "./NbaParlaysView";
 import { pageMetadata } from "@/lib/seo";
 
 // The underlying props/odds only regenerate once an hour (see
-// src4/33_predict_live_player_props.py's cron, :15 past the hour) --
-// caching this page's own ~11s league-wide query/build/log pipeline for
-// 5 minutes is still far fresher than that, but turns a flood of
-// concurrent visitors into a single DB hit every 5 minutes instead of
-// one ~11s query PER PAGE VIEW (see memoCache.ts's own header for why
-// this also protects against a request stampede on a cache miss, not
-// just repeat hits).
+// src4/33_predict_live_player_props.py's cron, :15 past the hour), and the
+// heavy ranking query now runs in a cron job (src4/41, which fills
+// public.nba_league_parlay_picks) -- this page only reads that small table,
+// so a read is cheap. The 5-minute cache is still worth keeping: it
+// collapses a flood of concurrent visitors into one read + one parlay build
+// + one log write every 5 minutes (see memoCache.ts's own header for why
+// this also protects against a request stampede on a cache miss).
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export const metadata = pageMetadata({
   title: "NBA Parlays — Matrix Sports Analytics",
   description:
-    "The current week's 6 best-probability NBA parlays, built from our model's highest-confidence player props across every game.",
+    "The 6 best-probability NBA parlays for today's and upcoming games, built from our model's highest-confidence player props.",
   path: "/parlays/nba",
 });
 
@@ -52,7 +52,7 @@ function SignUpGate() {
             <span className="lock-icon">🔒</span>
             <h2>Sign In to View Parlays</h2>
             <p>
-              Create a free account to see our model&apos;s 6 best-probability NBA parlays every week -- no credit
+              Create a free account to see our model&apos;s 6 best-probability NBA parlays for upcoming games -- no credit
               card required.
             </p>
             <Link className="btn btn-primary btn-block" href="/signup">
@@ -66,10 +66,13 @@ function SignUpGate() {
 }
 
 // Unlike /parlays (NFL, which stacks every week of the season), NBA has
-// no week numbering to stack -- this shows just the current
-// Sunday-to-Sunday window (getCurrentNbaWeek). Going back to a past
-// window is explicitly deferred (user, 2026-11-03: "display current
-// week then I will figure out how user can go back in history").
+// no week numbering to stack. CHANGED 2026-11-05: this used to rank the
+// whole current Sunday-to-Sunday window, which on a Wednesday meant the
+// "best" parlays were mostly built from Sunday/Monday games already played.
+// It now shows only games that haven't started, tipping within the next
+// 72 hours (src4/41's LOOKAHEAD_HOURS). getCurrentNbaWeek is still used,
+// but only as the stable key site_nba_league_parlay_log groups rows by.
+// Going back to a past window is still deferred (user, 2026-11-03).
 export default async function NbaParlaysPage({
   searchParams,
 }: {
@@ -82,13 +85,13 @@ export default async function NbaParlaysPage({
     return <SignUpGate />;
   }
 
-  const { weekStart, weekEndExclusive, weekEndInclusive } = getCurrentNbaWeek();
+  const { weekStart } = getCurrentNbaWeek();
 
-  const parlays = await cachedAsync(
-    `nba-league-parlays:${weekStart}:${weekEndExclusive}:${hideBannedBooks}`,
+  const { parlays, builtAt } = await cachedAsync(
+    `nba-league-parlays:${weekStart}:${hideBannedBooks}`,
     CACHE_TTL_MS,
     async () => {
-      const picks = await getNbaLeagueParlayPicks(weekStart, weekEndExclusive, hideBannedBooks);
+      const { picks, builtAt } = await getNbaLeagueParlayPicks(hideBannedBooks);
       const built: NbaLeagueParlays = buildNbaLeagueParlays(picks);
 
       // Same "log what's actually shown, never let a logging failure take
@@ -102,9 +105,9 @@ export default async function NbaParlaysPage({
         console.error("site_nba_league_parlay_log write failed:", error instanceof Error ? error.message : error);
       }
 
-      return built;
+      return { parlays: built, builtAt };
     },
   );
 
-  return <NbaParlaysView weekStart={weekStart} weekEndInclusive={weekEndInclusive} parlays={parlays} />;
+  return <NbaParlaysView builtAt={builtAt} parlays={parlays} />;
 }
