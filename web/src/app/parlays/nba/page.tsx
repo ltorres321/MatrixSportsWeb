@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { getNbaLeagueParlayPicks } from "@/lib/nbaLeagueBettingEdge";
+import { getNbaLeagueParlayPicks, type NbaDayPick } from "@/lib/nbaLeagueBettingEdge";
 import { buildNbaLeagueParlays, type NbaLeagueParlays } from "@/lib/nbaLeagueParlayHelper";
 import { recordDisplayedNbaLeagueParlays } from "@/lib/parlayLog";
-import { getCurrentNbaWeek } from "@/lib/nbaSchedule";
+import { etDateKey, getCurrentNbaWeek } from "@/lib/nbaSchedule";
 import { createClient } from "@/lib/supabase/server";
 import { cachedAsync } from "@/lib/memoCache";
-import NbaParlaysView from "./NbaParlaysView";
+import NbaParlaysView, { type NbaDayParlays } from "./NbaParlaysView";
 import { pageMetadata } from "@/lib/seo";
 
 // The underlying props/odds only regenerate once an hour (see
@@ -66,13 +66,15 @@ function SignUpGate() {
 }
 
 // Unlike /parlays (NFL, which stacks every week of the season), NBA has
-// no week numbering to stack. CHANGED 2026-11-05: this used to rank the
-// whole current Sunday-to-Sunday window, which on a Wednesday meant the
-// "best" parlays were mostly built from Sunday/Monday games already played.
-// It now shows only games that haven't started, tipping within the next
-// 72 hours (src4/41's LOOKAHEAD_HOURS). getCurrentNbaWeek is still used,
-// but only as the stable key site_nba_league_parlay_log groups rows by.
-// Going back to a past window is still deferred (user, 2026-11-03).
+// no week numbering to stack -- it shows the current Sunday-to-Saturday ET
+// week as one graded unit, with SIX parlays per ET day (4 two-leg + 2
+// three-leg, same split as the NFL page's week) built from that day's own
+// pool. A day's pool is rebuilt hourly until its first game tips off, then
+// frozen (src4/41), so past days are the parlays the model actually found
+// and the week's hit/missed record is stable. (2026-11-05: an earlier
+// "upcoming games only" version of this page dropped the week's played
+// games and their graded results -- this restores them.)
+// Going back to a past week is still deferred (user, 2026-11-03).
 export default async function NbaParlaysPage({
   searchParams,
 }: {
@@ -85,14 +87,28 @@ export default async function NbaParlaysPage({
     return <SignUpGate />;
   }
 
-  const { weekStart } = getCurrentNbaWeek();
+  const { weekStart, weekEndExclusive, weekEndInclusive } = getCurrentNbaWeek();
+  const todayKey = etDateKey(new Date());
 
-  const { parlays, builtAt } = await cachedAsync(
+  const { days, builtAt } = await cachedAsync(
     `nba-league-parlays:${weekStart}:${hideBannedBooks}`,
     CACHE_TTL_MS,
     async () => {
-      const { picks, builtAt } = await getNbaLeagueParlayPicks(hideBannedBooks);
-      const built: NbaLeagueParlays = buildNbaLeagueParlays(picks);
+      const { picks, builtAt } = await getNbaLeagueParlayPicks(hideBannedBooks, weekStart, weekEndExclusive);
+
+      // Each ET day is its own pool -- p_rank is already per-day, so the
+      // builder's top-N three-leg cap applies within a day, not the week.
+      const picksByDay = new Map<string, NbaDayPick[]>();
+      for (const pick of picks) {
+        picksByDay.set(pick.dayKey, [...(picksByDay.get(pick.dayKey) ?? []), pick]);
+      }
+      const days: NbaDayParlays[] = [...picksByDay.entries()]
+        .map(([dayKey, dayPicks]) => ({ dayKey, parlays: buildNbaLeagueParlays(dayPicks) }))
+        .filter((day) => day.parlays.twoLeg.length + day.parlays.threeLeg.length > 0);
+      const built: NbaLeagueParlays = {
+        twoLeg: days.flatMap((day) => day.parlays.twoLeg),
+        threeLeg: days.flatMap((day) => day.parlays.threeLeg),
+      };
 
       // Same "log what's actually shown, never let a logging failure take
       // the page down" contract as the per-game Parlay Helper tab and
@@ -105,9 +121,17 @@ export default async function NbaParlaysPage({
         console.error("site_nba_league_parlay_log write failed:", error instanceof Error ? error.message : error);
       }
 
-      return { parlays: built, builtAt };
+      return { days, builtAt };
     },
   );
 
-  return <NbaParlaysView builtAt={builtAt} parlays={parlays} />;
+  return (
+    <NbaParlaysView
+      todayKey={todayKey}
+      weekStart={weekStart}
+      weekEndInclusive={weekEndInclusive}
+      days={days}
+      builtAt={builtAt}
+    />
+  );
 }

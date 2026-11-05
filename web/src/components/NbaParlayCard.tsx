@@ -35,7 +35,7 @@ function legActualLabel(pick: NbaParlayPick): string | null {
 
 // Hit only when every leg is graded correct, missed as soon as any leg
 // is graded incorrect, otherwise still pending (game not final yet).
-function parlayOutcome(parlay: NbaParlay): "hit" | "missed" | null {
+export function parlayOutcome(parlay: NbaParlay): "hit" | "missed" | null {
   if (parlay.legs.some((l) => l.pick.pickResult === "incorrect")) return "missed";
   if (parlay.legs.every((l) => l.pick.pickResult === "correct")) return "hit";
   return null;
