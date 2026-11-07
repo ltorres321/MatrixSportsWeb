@@ -22,10 +22,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified,
   }));
 
-  const [gameStories, performanceReviews] = await Promise.all([
-    getPublishedStories(CONTENT_LIMIT),
-    getPublishedPerformanceReviews(CONTENT_LIMIT),
-  ]);
+  // Next.js prerenders this route at build time, so a transient DB
+  // hiccup (e.g. Supabase's pooler timing out a connection checkout
+  // under concurrent build workers) would otherwise fail the ENTIRE
+  // site build, not just the sitemap -- falling back to the static
+  // routes keeps the build green; the dynamic entries just catch up
+  // on the next successful build.
+  let gameStories: Awaited<ReturnType<typeof getPublishedStories>> = [];
+  let performanceReviews: Awaited<ReturnType<typeof getPublishedPerformanceReviews>> = [];
+  try {
+    [gameStories, performanceReviews] = await Promise.all([
+      getPublishedStories(CONTENT_LIMIT),
+      getPublishedPerformanceReviews(CONTENT_LIMIT),
+    ]);
+  } catch (err) {
+    console.error("sitemap: DB unavailable at build time, falling back to static routes only", err);
+  }
 
   const gameEntries = gameStories
     .filter((story) => story.universal_game_id)

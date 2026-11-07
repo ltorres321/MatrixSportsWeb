@@ -19,6 +19,13 @@
 # since there's genuinely no file diff for it to build. Needs an
 # actual content change somewhere -- this comment edit, e.g., after
 # adding CONTENT_JOB_SECRET/RESEND_API_KEY to Branch deploy scope.)
+#
+# (Fourth time -- same deal for NEXT_PUBLIC_GOOGLE_CLIENT_ID (Google
+# One Tap). This one's a NEXT_PUBLIC_ var, so it's not just a missing-
+# scope issue: those get baked into the client JS at `next build` time,
+# not read at runtime, so the already-built ltorres-1 deploy wouldn't
+# pick it up no matter how it's scoped in Netlify -- a real rebuild
+# after adding the var is required, same as always.)
 [build]
   base = "web"
   command = "npm run build"

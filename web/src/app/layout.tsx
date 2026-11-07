@@ -9,6 +9,7 @@ import GoogleAnalytics from "@/components/GoogleAnalytics";
 import AhrefsAnalytics from "@/components/AhrefsAnalytics";
 import AdSenseScript from "@/components/AdSenseScript";
 import TikTokPixel from "@/components/TikTokPixel";
+import GoogleOneTap from "@/components/GoogleOneTap";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAdminUserId } from "@/lib/admin";
 import { siteJsonLdGraph, TWITTER_SITE } from "@/lib/seo";
@@ -99,6 +100,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <AhrefsAnalytics />
         <AdSenseScript />
         <TikTokPixel />
+        {!userData.user && <GoogleOneTap />}
         <div className="page">
           <SiteNav signedIn={!!userData.user} isAdmin={isAdmin} theme={theme} userId={userData.user?.id} />
           {children}
