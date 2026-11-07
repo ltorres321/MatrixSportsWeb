@@ -33,11 +33,18 @@ function legActualLabel(pick: NbaParlayPick): string | null {
   return `actual ${pick.actualValue} ${statLabel(pick.stat)}`;
 }
 
-// Hit only when every leg is graded correct, missed as soon as any leg
-// is graded incorrect, otherwise still pending (game not final yet).
+// Hit only when every NON-VOID leg is graded correct, missed as soon as
+// any leg is graded incorrect, otherwise still pending (game not final
+// yet). A 'void' leg (src4/40_grade_nba_player_props.py: the player was
+// inactive/DNP, so it never gets a real actual_value) is dropped from
+// consideration entirely -- same as a sportsbook settling a parlay around
+// a scratched leg -- so it can't block the other legs from ever grading.
+// All-void is the one edge case this can't resolve either way (no graded
+// legs to judge by), so it falls through to "still pending" like before.
 export function parlayOutcome(parlay: NbaParlay): "hit" | "missed" | null {
-  if (parlay.legs.some((l) => l.pick.pickResult === "incorrect")) return "missed";
-  if (parlay.legs.every((l) => l.pick.pickResult === "correct")) return "hit";
+  const graded = parlay.legs.filter((l) => l.pick.pickResult !== "void");
+  if (graded.some((l) => l.pick.pickResult === "incorrect")) return "missed";
+  if (graded.length > 0 && graded.every((l) => l.pick.pickResult === "correct")) return "hit";
   return null;
 }
 
