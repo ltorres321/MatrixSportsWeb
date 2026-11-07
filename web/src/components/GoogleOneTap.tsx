@@ -2,7 +2,6 @@
 
 import Script from "next/script";
 import { useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 // Google's identity script attaches this global -- not worth pulling
@@ -52,7 +51,6 @@ async function generateNonce(): Promise<[nonce: string, hashedNonce: string]> {
 // on an origin Google hasn't been told about, which is why this needs
 // testing on a real deployed URL rather than localhost.
 export default function GoogleOneTap() {
-  const router = useRouter();
   const initialized = useRef(false);
 
   const handleScriptLoad = useCallback(async () => {
@@ -70,7 +68,12 @@ export default function GoogleOneTap() {
           token: response.credential,
           nonce,
         });
-        if (!error) router.push("/home");
+        // A full navigation, not router.push: the signed-in/out state
+        // in layout.tsx is read server-side once per request, and a
+        // client-side route change doesn't make Next.js re-run that --
+        // same reasoning as the Server Action login flow (see
+        // layout.tsx's getAppearance comment).
+        if (!error) window.location.assign("/home");
       },
       nonce: hashedNonce,
       // Chrome is retiring the old third-party-cookie-based prompt in
@@ -79,7 +82,7 @@ export default function GoogleOneTap() {
       use_fedcm_for_prompt: true,
     });
     window.google.accounts.id.prompt();
-  }, [router]);
+  }, []);
 
   if (!CLIENT_ID) return null;
 
