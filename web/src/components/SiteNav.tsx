@@ -167,7 +167,7 @@ function MoreMenu({
               onNavigate();
             }}
           >
-            Sign In / Login
+            Sign In / Sign Up
           </Link>
         )}
         {isAdmin && (
