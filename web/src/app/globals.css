@@ -5441,6 +5441,14 @@ h1.glow span {
   color: #1a1a1a;
 }
 
+/* Void (NBA-only, src4/40_grade_nba_player_props.py): the player was
+   inactive/DNP, so this leg has no real outcome -- neutral gray, same
+   dot shape as hit/miss, works on both themes without an override. */
+.pick-result-void {
+  background: #8a8a8a;
+  color: #1a1a1a;
+}
+
 /* Player Props' graded-results summary line -- only rendered once at
    least one prop in this game has a pickResult, sitting right under
    the section's intro paragraph. */

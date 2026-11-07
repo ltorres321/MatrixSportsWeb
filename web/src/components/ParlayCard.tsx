@@ -248,6 +248,17 @@ export function PickResultIcon({ result }: { result: string | null }) {
       </span>
     );
   }
+  // NBA-only so far (src4/40_grade_nba_player_props.py, 2026-11-07): the
+  // player was inactive/DNP for a completed game, so there's no real stat
+  // to grade against -- same convention a real sportsbook uses for a
+  // scratched player (void/push), not a loss and not left pending forever.
+  if (result === "void") {
+    return (
+      <span className="pick-result-icon pick-result-void" title="Void (did not play)" aria-label="Void pick">
+        —
+      </span>
+    );
+  }
   return null;
 }
 
