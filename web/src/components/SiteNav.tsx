@@ -123,6 +123,20 @@ function MoreMenu({
         </span>
       </button>
       <div className="nav-more-panel">
+        {signedIn && (
+          <Link
+            href="/profile"
+            onClick={() => {
+              close();
+              onNavigate();
+            }}
+          >
+            My Profile
+          </Link>
+        )}
+        <button type="button" className="nav-more-theme" onClick={handleThemeToggle}>
+          {theme === "dark" ? "☀️ Light Theme" : "🌙 Dark Theme"}
+        </button>
         <Link
           href="/about"
           onClick={() => {
@@ -141,24 +155,10 @@ function MoreMenu({
         >
           Contact Us
         </Link>
-        <button type="button" className="nav-more-theme" onClick={handleThemeToggle}>
-          {theme === "dark" ? "☀️ Light Theme" : "🌙 Dark Theme"}
-        </button>
         {signedIn ? (
-          <>
-            <Link
-              href="/profile"
-              onClick={() => {
-                close();
-                onNavigate();
-              }}
-            >
-              My Profile
-            </Link>
-            <button type="button" className="nav-more-signout" onClick={handleSignOut}>
-              Sign Out
-            </button>
-          </>
+          <button type="button" className="nav-more-signout" onClick={handleSignOut}>
+            Sign Out
+          </button>
         ) : (
           <Link
             href="/login"
