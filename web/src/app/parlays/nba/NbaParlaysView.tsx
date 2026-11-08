@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LEAGUE_TWO_LEG_COUNT, LEAGUE_THREE_LEG_COUNT, type NbaLeagueParlays } from "@/lib/nbaLeagueParlayHelper";
 import { NbaParlayCard, parlayOutcome } from "@/components/NbaParlayCard";
 import { BannedBooksToggle } from "@/components/BannedBooksToggle";
+import { nextNbaWeekStart, previousNbaWeekStart } from "@/lib/nbaSchedule";
 
 // NBA sibling of ../ParlaysView.tsx (NFL) -- same card, same notice
 // copy/structure. NFL stacks one block per week; NBA has no week numbers
@@ -19,7 +20,7 @@ export interface NbaDayParlays {
 // "YYYY-MM-DD" (ET calendar date) -> "Nov 1" (or "Wed, Nov 4") -- parsed as
 // UTC midnight and formatted in UTC so the calendar date never shifts a day
 // in either direction regardless of the reader's own timezone.
-function formatDate(dateStr: string, withWeekday = false): string {
+export function formatDate(dateStr: string, withWeekday = false): string {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
     month: "short",
@@ -42,7 +43,7 @@ function formatUpdated(iso: string): string {
   );
 }
 
-function record(allParlays: NbaLeagueParlays[]): { hit: number; missed: number; pending: number } {
+export function record(allParlays: NbaLeagueParlays[]): { hit: number; missed: number; pending: number } {
   const counts = { hit: 0, missed: 0, pending: 0 };
   for (const parlays of allParlays) {
     for (const parlay of [...parlays.twoLeg, ...parlays.threeLeg]) {
@@ -57,6 +58,26 @@ function record(allParlays: NbaLeagueParlays[]): { hit: number; missed: number; 
 
 function recordLabel(r: { hit: number; missed: number; pending: number }): string {
   return `${r.hit} hit · ${r.missed} missed · ${r.pending} pending`;
+}
+
+// Shown both above the week's day listing and again above the bottom
+// disclaimer (user, 2026-11-08) -- same three links either place, just
+// relative to whatever week is currently displayed (weekStart), not
+// necessarily the real current week.
+function WeekNav({ weekStart }: { weekStart: string }) {
+  return (
+    <div className="week-nav" style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", margin: "0.75rem 0" }}>
+      <Link className="btn btn-ghost" href={`/parlays/nba?week=${previousNbaWeekStart(weekStart)}`}>
+        ← Previous Week
+      </Link>
+      <Link className="btn btn-ghost" href="/parlays/nba">
+        Current Week
+      </Link>
+      <Link className="btn btn-ghost" href={`/parlays/nba?week=${nextNbaWeekStart(weekStart)}`}>
+        Next Week →
+      </Link>
+    </div>
+  );
 }
 
 function DaySection({ day, tag }: { day: NbaDayParlays; tag?: string }) {
@@ -89,20 +110,31 @@ function DaySection({ day, tag }: { day: NbaDayParlays; tag?: string }) {
   );
 }
 
+export interface PastNbaWeekRecord {
+  weekStart: string;
+  weekEndInclusive: string;
+  hit: number;
+  missed: number;
+}
+
 export default function NbaParlaysView({
   todayKey,
   weekStart,
   weekEndInclusive,
   days,
   builtAt,
+  pastWeeks,
 }: {
   todayKey: string;
   weekStart: string;
   weekEndInclusive: string;
   days: NbaDayParlays[];
   builtAt: string | null;
+  pastWeeks?: PastNbaWeekRecord[];
 }) {
   const weekLabel = `${formatDate(weekStart)} – ${formatDate(weekEndInclusive)}`;
+  const weekRecord = record(days.map((day) => day.parlays));
+  const weekGraded = weekRecord.hit + weekRecord.missed;
   const today = days.filter((day) => day.dayKey === todayKey);
   const upcoming = days.filter((day) => day.dayKey > todayKey).sort((a, b) => a.dayKey.localeCompare(b.dayKey));
   const earlier = days.filter((day) => day.dayKey < todayKey).sort((a, b) => b.dayKey.localeCompare(a.dayKey));
@@ -147,7 +179,7 @@ export default function NbaParlaysView({
           <h2>Week of {weekLabel}</h2>
           {days.length > 0 ? (
             <p className="stat-sub parlay-week-subtitle">
-              Week so far: {recordLabel(record(days.map((day) => day.parlays)))}.
+              Week so far: {recordLabel(weekRecord)}.
               {builtAt ? ` Updated ${formatUpdated(builtAt)}.` : ""}
             </p>
           ) : null}
@@ -156,6 +188,14 @@ export default function NbaParlaysView({
             actually found -- results fill in as games finish. Each Sunday starts a new week.
           </p>
         </div>
+
+        {weekGraded > 0 ? (
+          <p className="week-record-badge">
+            (Week Performance: {weekRecord.hit} of {weekGraded} [{((weekRecord.hit / weekGraded) * 100).toFixed(1)}%])
+          </p>
+        ) : null}
+
+        <WeekNav weekStart={weekStart} />
 
         {days.length === 0 ? (
           <div className="stat-section">
@@ -175,6 +215,21 @@ export default function NbaParlaysView({
         {earlier.map((day) => (
           <DaySection key={day.dayKey} day={day} />
         ))}
+
+        {pastWeeks && pastWeeks.length > 0 ? (
+          <div className="stat-section">
+            {pastWeeks.map((w) => (
+              <p key={w.weekStart} className="stat-sub parlay-week-subtitle">
+                <Link href={`/parlays/nba?week=${w.weekStart}`}>
+                  {formatDate(w.weekStart)} – {formatDate(w.weekEndInclusive)}: {w.hit}-{w.hit + w.missed} (
+                  {((w.hit / (w.hit + w.missed)) * 100).toFixed(1)}% correct)
+                </Link>
+              </p>
+            ))}
+          </div>
+        ) : null}
+
+        <WeekNav weekStart={weekStart} />
 
         <div className="parlay-notice" role="note">
           <p>

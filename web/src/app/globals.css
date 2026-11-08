@@ -1075,6 +1075,33 @@ h1.glow span {
   border-radius: 3px;
 }
 
+/* Previous/Current/Next Week buttons sit directly over the rain
+   canvas (user, 2026-11-08: ".btn-ghost"'s transparent background
+   made the text hard to read against it) -- opaque panel color
+   instead, scoped to just this page's nav so every other .btn-ghost
+   elsewhere stays transparent. */
+.week-nav .btn-ghost {
+  background: var(--panel-solid);
+}
+
+/* NBA Parlays week heading's record/percentage (user, 2026-11-08):
+   gold in dark theme, blue in light -- not the usual green-flips-to-
+   blue pattern (dark theme wants gold here specifically, not green),
+   so this reuses --green for its light-theme value only, since that's
+   where the site's blue accent actually lives (see light theme's own
+   --green redefinition above). */
+.week-record-badge {
+  color: var(--gold);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.35rem;
+}
+:root[data-theme="light"] .week-record-badge {
+  color: var(--green);
+}
+
 /* ---------------------------------------------------------------
    Splash / landing hero (index.html)
    --------------------------------------------------------------- */

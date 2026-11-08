@@ -169,6 +169,17 @@ export const SPORTSBOOK_INFO: Record<string, { name: string; url?: string; logo?
     logo: "/assets/favicons/UnibetWo.png",
     logoLight: "/assets/favicons/Unibet.png",
   },
+  // Greek-licensed (ΕΕΕΠ), not legally available to US bettors (user,
+  // 2026-11-08) -- also added to pffBettingEdge.ts's BANNED_US_BOOKS,
+  // same "Canada-only"/stoiximan pattern as bet99 above. elabet.gr
+  // itself renders its logo via JS and blocks a direct favicon
+  // request, so this is a copy from a review site (bethome.gr) --
+  // small (150x150) but fine at this component's icon size.
+  elabet: {
+    name: "Elabet",
+    url: "https://www.elabet.gr/",
+    logo: "/assets/favicons/elabet.jpg",
+  },
   // dst_propbuilder (Digital Sports Tech's "Prop Builder") deliberately
   // has NO entry here -- it's not a sportsbook a user can visit and
   // wager on, just backend odds-generation infrastructure licensed by

@@ -140,6 +140,42 @@ export function getCurrentNbaWeek(now: Date = new Date()): {
   return { weekStart: fmt(sunday), weekEndExclusive: fmt(nextSunday), weekEndInclusive: fmt(saturday) };
 }
 
+// Same {weekStart, weekEndExclusive, weekEndInclusive} shape as
+// getCurrentNbaWeek, but for an explicit Sunday ("YYYY-MM-DD", ET
+// calendar date) instead of "now" -- backs the previous-week record
+// link and ?week= deep links to a specific past week on
+// app/parlays/nba.
+export function nbaWeekWindow(sundayDateKey: string): {
+  weekStart: string;
+  weekEndExclusive: string;
+  weekEndInclusive: string;
+} {
+  const [y, m, d] = sundayDateKey.split("-").map(Number);
+  const sunday = new Date(Date.UTC(y, m - 1, d));
+  const nextSunday = new Date(sunday);
+  nextSunday.setUTCDate(sunday.getUTCDate() + 7);
+  const saturday = new Date(nextSunday);
+  saturday.setUTCDate(nextSunday.getUTCDate() - 1);
+  const fmt = (dt: Date) => dt.toISOString().slice(0, 10);
+  return { weekStart: fmt(sunday), weekEndExclusive: fmt(nextSunday), weekEndInclusive: fmt(saturday) };
+}
+
+// The Sunday one week before the given one.
+export function previousNbaWeekStart(weekStart: string): string {
+  const [y, m, d] = weekStart.split("-").map(Number);
+  const sunday = new Date(Date.UTC(y, m - 1, d));
+  sunday.setUTCDate(sunday.getUTCDate() - 7);
+  return sunday.toISOString().slice(0, 10);
+}
+
+// The Sunday one week after the given one.
+export function nextNbaWeekStart(weekStart: string): string {
+  const [y, m, d] = weekStart.split("-").map(Number);
+  const sunday = new Date(Date.UTC(y, m - 1, d));
+  sunday.setUTCDate(sunday.getUTCDate() + 7);
+  return sunday.toISOString().slice(0, 10);
+}
+
 
 function theSportsDbSeasonString(season: number): string {
   return `${season - 1}-${season}`;
