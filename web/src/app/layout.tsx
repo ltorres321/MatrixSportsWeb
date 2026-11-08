@@ -51,7 +51,11 @@ async function getAppearance(
   if (!userId) {
     const cookieStore = await cookies();
     const theme = cookieStore.get("theme")?.value === "light" ? "light" : "dark";
-    return { theme, rainEnabled: theme === "light" ? false : true };
+    // Same "dark unless told otherwise" default as theme itself --
+    // mirrors MoreMenu's handleRainToggle, which sets this cookie for
+    // a signed-out visitor the same way handleThemeToggle sets "theme".
+    const rainCookie = cookieStore.get("matrix_rain_enabled")?.value;
+    return { theme, rainEnabled: theme === "light" ? false : rainCookie !== "false" };
   }
 
   const supabase = await createClient();
@@ -100,7 +104,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <AdSenseScript />
         {!userData.user && <GoogleOneTap />}
         <div className="page">
-          <SiteNav signedIn={!!userData.user} isAdmin={isAdmin} theme={theme} userId={userData.user?.id} />
+          <SiteNav
+            signedIn={!!userData.user}
+            isAdmin={isAdmin}
+            theme={theme}
+            rainEnabled={rainEnabled}
+            userId={userData.user?.id}
+          />
           {children}
           <FollowUsLinks />
           <div className="legal-footer">

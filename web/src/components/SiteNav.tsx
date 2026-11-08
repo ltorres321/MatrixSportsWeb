@@ -34,12 +34,14 @@ function MoreMenu({
   signedIn,
   isAdmin,
   theme,
+  rainEnabled,
   userId,
   onNavigate,
 }: {
   signedIn: boolean;
   isAdmin: boolean;
   theme: "dark" | "light";
+  rainEnabled: boolean;
   userId?: string;
   onNavigate: () => void;
 }) {
@@ -82,6 +84,26 @@ function MoreMenu({
       await supabase.from("profiles").update(updates).eq("id", userId);
     } else {
       document.cookie = `theme=${nextTheme}; path=/; max-age=31536000; samesite=lax`;
+    }
+    router.refresh();
+  }
+
+  // Lets rain be toggled right from the nav instead of only via the
+  // Profile page (request 2026-11-08: "changing the rain is a pain,"
+  // round trip to Profile and back). Only rendered while theme ===
+  // "dark" below -- light theme forces rain off regardless of this
+  // column/cookie (see layout.tsx's getAppearance), so there's nothing
+  // for this control to do while light, and showing it anyway would
+  // just be a dead toggle.
+  async function handleRainToggle() {
+    close();
+    onNavigate();
+    const nextRainEnabled = !rainEnabled;
+    if (signedIn && userId) {
+      const supabase = createClient();
+      await supabase.from("profiles").update({ matrix_rain_enabled: nextRainEnabled }).eq("id", userId);
+    } else {
+      document.cookie = `matrix_rain_enabled=${nextRainEnabled}; path=/; max-age=31536000; samesite=lax`;
     }
     router.refresh();
   }
@@ -137,6 +159,11 @@ function MoreMenu({
         <button type="button" className="nav-more-theme" onClick={handleThemeToggle}>
           {theme === "dark" ? "☀️ Light Theme" : "🌙 Dark Theme"}
         </button>
+        {theme === "dark" && (
+          <button type="button" className="nav-more-theme" onClick={handleRainToggle}>
+            {rainEnabled ? "🌂 No Rain" : "🌧️ Enable Rain"}
+          </button>
+        )}
         <Link
           href="/about"
           onClick={() => {
@@ -410,11 +437,13 @@ function SideRail({
   signedIn,
   isAdmin,
   theme,
+  rainEnabled,
   userId,
 }: {
   signedIn: boolean;
   isAdmin: boolean;
   theme: "dark" | "light";
+  rainEnabled: boolean;
   userId?: string;
 }) {
   return (
@@ -429,7 +458,14 @@ function SideRail({
         <RecapsIcon />
         <span>Recaps</span>
       </Link>
-      <MoreMenu signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} onNavigate={() => {}} />
+      <MoreMenu
+        signedIn={signedIn}
+        isAdmin={isAdmin}
+        theme={theme}
+        rainEnabled={rainEnabled}
+        userId={userId}
+        onNavigate={() => {}}
+      />
     </nav>
   );
 }
@@ -438,11 +474,13 @@ export default function SiteNav({
   signedIn,
   isAdmin,
   theme,
+  rainEnabled,
   userId,
 }: {
   signedIn: boolean;
   isAdmin: boolean;
   theme: "dark" | "light";
+  rainEnabled: boolean;
   userId?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -546,11 +584,18 @@ export default function SiteNav({
           <Link href="/stories" onClick={close}>
             Recaps
           </Link>
-          <MoreMenu signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} onNavigate={close} />
+          <MoreMenu
+            signedIn={signedIn}
+            isAdmin={isAdmin}
+            theme={theme}
+            rainEnabled={rainEnabled}
+            userId={userId}
+            onNavigate={close}
+          />
         </div>
       </nav>
 
-      <SideRail signedIn={signedIn} isAdmin={isAdmin} theme={theme} userId={userId} />
+      <SideRail signedIn={signedIn} isAdmin={isAdmin} theme={theme} rainEnabled={rainEnabled} userId={userId} />
     </>
   );
 }
