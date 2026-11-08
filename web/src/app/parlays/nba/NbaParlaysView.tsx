@@ -66,7 +66,7 @@ function recordLabel(r: { hit: number; missed: number; pending: number }): strin
 // necessarily the real current week.
 function WeekNav({ weekStart }: { weekStart: string }) {
   return (
-    <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", margin: "0.75rem 0" }}>
+    <div className="week-nav" style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", margin: "0.75rem 0" }}>
       <Link className="btn btn-ghost" href={`/parlays/nba?week=${previousNbaWeekStart(weekStart)}`}>
         ← Previous Week
       </Link>
