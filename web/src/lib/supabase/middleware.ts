@@ -29,8 +29,22 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Do not remove -- this call revalidates the token and must run
-  // before any other logic that depends on the session.
-  await supabase.auth.getUser();
+  // before any other logic that depends on the session. Bounded with
+  // a timeout: on 2026-11-08 Supabase's Postgres went unreachable and
+  // this call hung until the edge function itself timed out, taking
+  // every route on the site down with it. Failing fast here instead
+  // lets the request fall through with whatever session cookies it
+  // already had rather than crashing the whole function.
+  try {
+    await Promise.race([
+      supabase.auth.getUser(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("auth.getUser timed out")), 5_000)
+      ),
+    ]);
+  } catch (err) {
+    console.error("Supabase session refresh failed, continuing without it:", err);
+  }
 
   return supabaseResponse;
 }
