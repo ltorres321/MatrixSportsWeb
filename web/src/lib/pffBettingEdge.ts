@@ -27,7 +27,7 @@ import { recordDisplayedParlays } from "@/lib/parlayLog";
 // at). Toggled, not hardcoded out permanently -- the data stays valid
 // for a non-US context, so hideBannedBooks defaults true but can be
 // turned off to see everything PFF/the line pollers actually have.
-export const BANNED_US_BOOKS = ["tonybet", "stoiximan", "bet99"];
+export const BANNED_US_BOOKS = ["tonybet", "stoiximan", "bet99", "elabet"];
 
 // Exchanges/prediction markets/DFS pick'em -- never a parlay-combinable
 // retail book regardless of region (see the line-shopping join's own

@@ -27,6 +27,18 @@ import type { NbaParlayPick } from "@/lib/nbaParlayHelper";
 // A pick plus the ET calendar day ("YYYY-MM-DD") whose pool it belongs to.
 export type NbaDayPick = NbaParlayPick & { dayKey: string };
 
+// Earliest game_day this table has anything for -- backs the Parlays
+// page's "past weeks" list, so it knows how far back the season (as
+// far as this table's own history goes) actually runs without a
+// hardcoded start date to keep in sync by hand.
+export async function getEarliestNbaPickDay(): Promise<string | null> {
+  const rows = await query<{ earliest: Date | string | null }>(
+    `SELECT MIN(game_day) AS earliest FROM public.nba_league_parlay_picks`,
+  );
+  const earliest = rows[0]?.earliest;
+  return earliest ? new Date(earliest).toISOString().slice(0, 10) : null;
+}
+
 export async function getNbaLeagueParlayPicks(
   hideBannedBooks: boolean,
   weekStart: string, // "YYYY-MM-DD", ET calendar date, inclusive

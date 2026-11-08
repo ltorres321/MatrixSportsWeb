@@ -1,12 +1,18 @@
 import Link from "next/link";
-import { getNbaLeagueParlayPicks, type NbaDayPick } from "@/lib/nbaLeagueBettingEdge";
+import { getEarliestNbaPickDay, getNbaLeagueParlayPicks, type NbaDayPick } from "@/lib/nbaLeagueBettingEdge";
 import { buildNbaLeagueParlays, type NbaLeagueParlays } from "@/lib/nbaLeagueParlayHelper";
 import { recordDisplayedNbaLeagueParlays } from "@/lib/parlayLog";
-import { etDateKey, getCurrentNbaWeek } from "@/lib/nbaSchedule";
+import { etDateKey, getCurrentNbaWeek, nbaWeekWindow, previousNbaWeekStart } from "@/lib/nbaSchedule";
 import { createClient } from "@/lib/supabase/server";
 import { cachedAsync } from "@/lib/memoCache";
-import NbaParlaysView, { type NbaDayParlays } from "./NbaParlaysView";
+import NbaParlaysView, { record, type NbaDayParlays, type PastNbaWeekRecord } from "./NbaParlaysView";
 import { pageMetadata } from "@/lib/seo";
+
+// Only accepts an already-computed Sunday (every link this page
+// generates points at one) -- not a general date parser, just enough
+// validation that a malformed ?week= falls back to the current week
+// instead of reaching nbaWeekWindow/Postgres with garbage.
+const WEEK_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // The underlying props/odds only regenerate once an hour (see
 // src4/33_predict_live_player_props.py's cron, :15 past the hour), and the
@@ -75,55 +81,107 @@ function SignUpGate() {
 // "upcoming games only" version of this page dropped the week's played
 // games and their graded results -- this restores them.)
 // Going back to a past week is still deferred (user, 2026-11-03).
+// Shared by the current week (logged, since it's what's actually
+// displayed as "today's" parlays) and both the previous-week record
+// teaser and ?week= deep links (never logged -- those are historical
+// reads, not a new "shown" event for site_nba_league_parlay_log).
+// Cache key is per week, so a deep link to an already-computed
+// previous week reuses the same cache entry the teaser filled.
+async function loadNbaWeekParlays(
+  weekStart: string,
+  weekEndExclusive: string,
+  hideBannedBooks: boolean,
+  log: boolean,
+): Promise<{ days: NbaDayParlays[]; builtAt: string | null }> {
+  return cachedAsync(`nba-league-parlays:${weekStart}:${hideBannedBooks}`, CACHE_TTL_MS, async () => {
+    const { picks, builtAt } = await getNbaLeagueParlayPicks(hideBannedBooks, weekStart, weekEndExclusive);
+
+    // Each ET day is its own pool -- p_rank is already per-day, so the
+    // builder's top-N three-leg cap applies within a day, not the week.
+    const picksByDay = new Map<string, NbaDayPick[]>();
+    for (const pick of picks) {
+      picksByDay.set(pick.dayKey, [...(picksByDay.get(pick.dayKey) ?? []), pick]);
+    }
+    const days: NbaDayParlays[] = [...picksByDay.entries()]
+      .map(([dayKey, dayPicks]) => ({ dayKey, parlays: buildNbaLeagueParlays(dayPicks) }))
+      .filter((day) => day.parlays.twoLeg.length + day.parlays.threeLeg.length > 0);
+
+    // Same "log what's actually shown, never let a logging failure take
+    // the page down" contract as the per-game Parlay Helper tab and
+    // NFL's own league page. Runs once per cache fill, not once per
+    // page view -- site_nba_league_parlay_log's times_shown now tracks
+    // "shown after a cache refresh", not raw page views.
+    if (log) {
+      const built: NbaLeagueParlays = {
+        twoLeg: days.flatMap((day) => day.parlays.twoLeg),
+        threeLeg: days.flatMap((day) => day.parlays.threeLeg),
+      };
+      try {
+        await recordDisplayedNbaLeagueParlays(weekStart, built);
+      } catch (error) {
+        console.error("site_nba_league_parlay_log write failed:", error instanceof Error ? error.message : error);
+      }
+    }
+
+    return { days, builtAt };
+  });
+}
+
 export default async function NbaParlaysPage({
   searchParams,
 }: {
-  searchParams: Promise<{ hideBanned?: string }>;
+  searchParams: Promise<{ hideBanned?: string; week?: string }>;
 }) {
-  const hideBannedBooks = (await searchParams).hideBanned !== "0";
+  const params = await searchParams;
+  const hideBannedBooks = params.hideBanned !== "0";
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
     return <SignUpGate />;
   }
 
-  const { weekStart, weekEndExclusive, weekEndInclusive } = getCurrentNbaWeek();
+  const currentWeek = getCurrentNbaWeek();
+  const requestedWeekStart = params.week && WEEK_PARAM_RE.test(params.week) ? params.week : null;
+  const isCurrentWeek = !requestedWeekStart || requestedWeekStart === currentWeek.weekStart;
+  const { weekStart, weekEndExclusive, weekEndInclusive } = isCurrentWeek
+    ? currentWeek
+    : nbaWeekWindow(requestedWeekStart);
   const todayKey = etDateKey(new Date());
 
-  const { days, builtAt } = await cachedAsync(
-    `nba-league-parlays:${weekStart}:${hideBannedBooks}`,
-    CACHE_TTL_MS,
-    async () => {
-      const { picks, builtAt } = await getNbaLeagueParlayPicks(hideBannedBooks, weekStart, weekEndExclusive);
+  const { days, builtAt } = await loadNbaWeekParlays(weekStart, weekEndExclusive, hideBannedBooks, isCurrentWeek);
 
-      // Each ET day is its own pool -- p_rank is already per-day, so the
-      // builder's top-N three-leg cap applies within a day, not the week.
-      const picksByDay = new Map<string, NbaDayPick[]>();
-      for (const pick of picks) {
-        picksByDay.set(pick.dayKey, [...(picksByDay.get(pick.dayKey) ?? []), pick]);
-      }
-      const days: NbaDayParlays[] = [...picksByDay.entries()]
-        .map(([dayKey, dayPicks]) => ({ dayKey, parlays: buildNbaLeagueParlays(dayPicks) }))
-        .filter((day) => day.parlays.twoLeg.length + day.parlays.threeLeg.length > 0);
-      const built: NbaLeagueParlays = {
-        twoLeg: days.flatMap((day) => day.parlays.twoLeg),
-        threeLeg: days.flatMap((day) => day.parlays.threeLeg),
-      };
-
-      // Same "log what's actually shown, never let a logging failure take
-      // the page down" contract as the per-game Parlay Helper tab and
-      // NFL's own league page. Runs once per cache fill, not once per
-      // page view -- site_nba_league_parlay_log's times_shown now tracks
-      // "shown after a cache refresh", not raw page views.
-      try {
-        await recordDisplayedNbaLeagueParlays(weekStart, built);
-      } catch (error) {
-        console.error("site_nba_league_parlay_log write failed:", error instanceof Error ? error.message : error);
+  // Only the current week's own view carries the full past-weeks list --
+  // a past week's page (?week=) doesn't recursively show one too. Newest
+  // week first (user, 2026-11-08: "add newer weeks on top as older weeks
+  // fall to the bottom"), going back to the earliest week this table has
+  // anything for -- not a hardcoded season start, so it keeps working
+  // without edits as the season (or this table's own history) grows.
+  let pastWeeks: PastNbaWeekRecord[] = [];
+  if (isCurrentWeek) {
+    const earliestDay = await cachedAsync("nba-earliest-pick-day", CACHE_TTL_MS, getEarliestNbaPickDay);
+    if (earliestDay) {
+      const earliestWeekStart = getCurrentNbaWeek(new Date(`${earliestDay}T00:00:00Z`)).weekStart;
+      const weekStarts: string[] = [];
+      for (
+        let cursor = previousNbaWeekStart(currentWeek.weekStart);
+        cursor >= earliestWeekStart;
+        cursor = previousNbaWeekStart(cursor)
+      ) {
+        weekStarts.push(cursor);
       }
 
-      return { days, builtAt };
-    },
-  );
+      const weeks = await Promise.all(
+        weekStarts.map(async (ws) => {
+          const win = nbaWeekWindow(ws);
+          const { days: weekDays } = await loadNbaWeekParlays(win.weekStart, win.weekEndExclusive, hideBannedBooks, false);
+          const { hit, missed } = record(weekDays.map((day) => day.parlays));
+          return { weekStart: win.weekStart, weekEndInclusive: win.weekEndInclusive, hit, missed };
+        }),
+      );
+      pastWeeks = weeks.filter((w) => w.hit + w.missed > 0);
+    }
+    console.log("[DEBUG pastWeeks]", JSON.stringify(pastWeeks));
+  }
 
   return (
     <NbaParlaysView
@@ -132,6 +190,7 @@ export default async function NbaParlaysPage({
       weekEndInclusive={weekEndInclusive}
       days={days}
       builtAt={builtAt}
+      pastWeeks={pastWeeks}
     />
   );
 }
