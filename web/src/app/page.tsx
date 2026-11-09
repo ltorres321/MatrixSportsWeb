@@ -7,20 +7,32 @@ import {
   getPremierGame,
   getMatchupsForSeasonWeek,
   getCurrentSeasonYear,
+  getWeeksForSeason,
+  getConfidenceRecord,
+  type ConfidenceRecord,
 } from "@/lib/predictions";
 import type { Matchup } from "@/lib/matchups";
 import MatchupCard from "@/components/MatchupCard";
-import { getAvailableNbaSeasons, getDefaultNbaDate, getMatchupsForNbaDate } from "@/lib/nbaPredictions";
+import {
+  getAvailableNbaSeasons,
+  getDefaultNbaDate,
+  getMatchupsForNbaDate,
+  getAvailableNbaDates,
+  getNbaConfidenceRecord,
+} from "@/lib/nbaPredictions";
 import NbaMatchupCard from "@/components/NbaMatchupCard";
-import { getEspnNflNews } from "@/lib/espnNews";
+import { NBA_TEAMS } from "@/lib/teamsNba";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
-import ExternalWindowLink from "@/components/ExternalWindowLink";
-import { getPublishedStories, isStoryFeatured, getLatestPerformanceReview, isPerformanceReviewFeatured } from "@/lib/stories";
-import { getEffectiveNow } from "@/lib/admin";
-import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
+import { getPublishedStories } from "@/lib/stories";
 import { pageMetadata } from "@/lib/seo";
+import { ParlayCard } from "@/components/ParlayCard";
+import { NbaParlayCard } from "@/components/NbaParlayCard";
+import { buildWeekParlays } from "@/app/parlays/page";
+import { loadNbaWeekParlays } from "@/app/parlays/nba/page";
+import { getCurrentNbaWeek, etDateKey } from "@/lib/nbaSchedule";
+import { formatDate } from "@/app/parlays/nba/NbaParlaysView";
 
 // The only page a signed-out visitor or crawler (including Google's
 // AdSense reviewer, which never logs in) ever lands on -- see the
@@ -50,6 +62,47 @@ function truncateTeaser(text: string, maxChars = 160): string {
   return `${cut.slice(0, lastSpace > 0 ? lastSpace : maxChars)}…`;
 }
 
+// Empty-state card for the "My Favorites" row's NFL or NBA slot when
+// the signed-in user hasn't picked a favorite team for that league yet
+// (My Profile -- favorite_team / favorite_nba_team). Sized/centered to
+// sit in the same matchup-grid column a real MatchupCard/NbaMatchupCard
+// would occupy.
+function AddFavoriteCard({ league }: { league: "NFL" | "NBA" }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+      <div className="unlock-card">
+        <span className="lock-icon">⭐</span>
+        <h3>Pick a Favorite {league} Team</h3>
+        <p>Choose a favorite {league} team on My Profile and we&apos;ll surface their game right here.</p>
+        <Link className="btn btn-primary btn-block" href="/profile#address-team">
+          Add Favorite Team
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// A favorite IS set, there's just no game to show for it right now --
+// an NFL bye week, or (NBA, which this page only ever looks at TODAY's
+// slate for -- see getNbaDayMatchups) a team simply not playing today.
+// Different from AddFavoriteCard's copy on purpose: that one invites
+// picking a team; this one would be lying if it said the same thing
+// to someone who already has.
+function NoFavoriteGameCard({ league, note }: { league: "NFL" | "NBA"; note: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+      <div className="unlock-card">
+        <span className="lock-icon">⭐</span>
+        <h3>No {league} Game Today</h3>
+        <p>{note}</p>
+        <Link className="btn btn-ghost btn-block" href="/profile#address-team">
+          Change Favorite Team
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 // No premier/featured-game concept exists for NBA yet (see
 // nbaPredictions.ts's module header), so this just takes the first
 // game of the default slate's date -- same "today, or the next date
@@ -58,25 +111,155 @@ function truncateTeaser(text: string, maxChars = 160): string {
 // member-preview paywall at all yet (see NbaPredictionsView.tsx), so
 // there's no "locked" counterpart for this card to be a free preview
 // of.
-async function getFeaturedNbaGame(): Promise<Matchup | undefined> {
+// Full day's slate, not just the featured game -- SignedInDashboard's
+// "My Favorites" row needs to search this for the user's favorite NBA
+// team's own game, not only whichever game happens to be featured.
+async function getNbaDayMatchups(): Promise<Matchup[]> {
   const nbaSeasons = await getAvailableNbaSeasons();
   const nbaSeason = nbaSeasons[0];
-  if (nbaSeason === undefined) return undefined;
+  if (nbaSeason === undefined) return [];
   const nbaDate = await getDefaultNbaDate(nbaSeason);
-  if (!nbaDate) return undefined;
-  const nbaMatchups = await getMatchupsForNbaDate(nbaSeason, nbaDate);
+  if (!nbaDate) return [];
+  return getMatchupsForNbaDate(nbaSeason, nbaDate);
+}
+
+async function getFeaturedNbaGame(): Promise<Matchup | undefined> {
+  const nbaMatchups = await getNbaDayMatchups();
   return nbaMatchups[0];
+}
+
+// "My Favorites" row fallbacks: the favorite team isn't playing in the
+// current window (NFL: this week; NBA: today), so look ahead instead
+// of just saying there's no game -- a bye week or an off night isn't
+// the same as not having picked a team (user, 2026-11-09: "please
+// place there next game"). Both walk forward one window at a time and
+// stop at the first match, so the common case (team plays again
+// within a few days/weeks) costs only a couple of extra queries, not
+// a scan of the whole season.
+async function getNextNflGameForTeam(
+  season: number,
+  afterWeek: number,
+  alias: string
+): Promise<{ matchup: Matchup; week: number } | undefined> {
+  const weeks = (await getWeeksForSeason(season)).filter((w) => w > afterWeek).sort((a, b) => a - b);
+  for (const week of weeks) {
+    const matchups = await getMatchupsForSeasonWeek(season, week, null);
+    const found = matchups.find((m) => m.teamA.alias === alias || m.teamB.alias === alias);
+    if (found) return { matchup: found, week };
+  }
+  return undefined;
+}
+
+// Capped at the next 14 available predicted dates -- getAvailableNbaDates
+// only returns dates latest_nba_predictions actually has rows for
+// (typically a near-term rolling window, not the whole season), so this
+// is already a short list in practice; the cap just keeps a team with no
+// more predicted games left from turning into an unbounded scan.
+//
+// `displayName` not `alias` -- NBA's own TeamSide.alias (unlike NFL's)
+// holds the full "{market} {name}" display string, not a short code
+// (see nbaPredictions.ts's getMatchupsForNbaDate and NbaMatchupCard.tsx's
+// own comment on this). nbaTeamDisplayName() below converts a
+// profiles.favorite_nba_team alias code to that same string before
+// anything here compares against it.
+async function getNextNbaGameForTeam(
+  nbaSeason: number,
+  afterDateKey: string,
+  displayName: string
+): Promise<Matchup | undefined> {
+  const dates = (await getAvailableNbaDates(nbaSeason))
+    .filter((d) => d > afterDateKey)
+    .sort()
+    .slice(0, 14);
+  for (const date of dates) {
+    const matchups = await getMatchupsForNbaDate(nbaSeason, date);
+    const found = matchups.find((m) => m.teamA.alias === displayName || m.teamB.alias === displayName);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+// profiles.favorite_nba_team stores the short alias code (same as the
+// <select> on My Profile) -- see getNextNbaGameForTeam's own comment on
+// why every NBA matchup comparison here needs the full display string
+// instead.
+function nbaTeamDisplayName(alias: string): string | undefined {
+  const team = NBA_TEAMS.find((t) => t.alias === alias);
+  return team ? `${team.market} ${team.name}` : undefined;
+}
+
+// "22-7 (75.9%)" -- confidence-record tiles (user, 2026-11-09: "also
+// after the record ##-# (##%)").
+function formatConfidenceRecord(record: ConfidenceRecord): string {
+  const total = record.wins + record.losses;
+  const pct = total > 0 ? (record.wins / total) * 100 : 0;
+  return `${record.wins}-${record.losses} (${pct.toFixed(1)}%)`;
+}
+
+// Three-line layout (user, 2026-11-09: the flat "22-7 (75.9%)" +
+// "at 70%+ confidence" pairing read as two disconnected facts --
+// spelling out "Record for NFL games / when model predicts 70%+"
+// above the record itself makes each tile readable on its own).
+function ConfidenceTile({
+  league,
+  thresholdPct,
+  record,
+  href,
+}: {
+  league: "NFL" | "NBA";
+  thresholdPct: 70 | 80;
+  record: ConfidenceRecord;
+  // Links through to the actual games behind this record (user,
+  // 2026-11-09). NFL only for now -- omitted for NBA until its own
+  // games-list page exists, so those tiles stay plain for the moment
+  // rather than linking somewhere that doesn't exist yet.
+  href?: string;
+}) {
+  const body = (
+    <>
+      <span className="confidence-tile-label">Record for {league} games</span>
+      <span className="confidence-tile-label">when model predicts {thresholdPct}%+</span>
+      <span className="confidence-tile-record">{formatConfidenceRecord(record)}</span>
+    </>
+  );
+  if (href) {
+    return (
+      <Link className="confidence-tile confidence-tile-link" href={href}>
+        {body}
+      </Link>
+    );
+  }
+  return <div className="confidence-tile">{body}</div>;
 }
 
 // Signed-out visitors get the marketing pitch below. Signed-in users
 // get a real dashboard instead -- see SignedInDashboard.
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  // SANDBOX ONLY (branch sandbox/home-parlays): ?preview=1 forces the
+  // signed-in dashboard view without a real login, purely so this
+  // layout can be screenshotted/reviewed. previewFavNfl/previewFavNba
+  // let that same preview simulate a populated "My Favorites" row
+  // (team alias, e.g. ?previewFavNfl=MIA&previewFavNba=MIA) without
+  // writing anything to a real profile. None of this is meant to
+  // reach main.
+  searchParams: Promise<{ preview?: string; previewFavNfl?: string; previewFavNba?: string }>;
+}) {
+  const params = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
 
-  if (data.user) {
-    const firstName = (data.user.user_metadata?.first_name as string | undefined) ?? undefined;
-    return <SignedInDashboard firstName={firstName} />;
+  if (data.user || params.preview === "1") {
+    const firstName = (data.user?.user_metadata?.first_name as string | undefined) ?? "Leo";
+    return (
+      <SignedInDashboard
+        firstName={firstName}
+        userId={data.user?.id}
+        previewFavNfl={params.previewFavNfl}
+        previewFavNba={params.previewFavNba}
+      />
+    );
   }
 
   const seasons = await getAvailableSeasons();
@@ -282,54 +465,123 @@ export default async function HomePage() {
   );
 }
 
-async function SignedInDashboard({ firstName }: { firstName?: string }) {
+async function SignedInDashboard({
+  firstName,
+  userId,
+  previewFavNfl,
+  previewFavNba,
+}: {
+  firstName?: string;
+  userId?: string;
+  // SANDBOX ONLY -- see HomePage's own comment on these two.
+  previewFavNfl?: string;
+  previewFavNba?: string;
+}) {
   const seasons = await getAvailableSeasons();
   const fallbackSeason = await getCurrentSeasonYear();
   const season = seasons.includes(fallbackSeason) ? fallbackSeason : seasons[0];
 
   let premier: Matchup | undefined;
   let currentWeek: number | null = null;
+  let nflMatchups: Matchup[] = [];
   if (season !== undefined) {
     currentWeek = await getDefaultWeek(season);
     if (currentWeek !== null) {
       const premierGame = await getPremierGame(season, currentWeek);
-      const matchups = await getMatchupsForSeasonWeek(season, currentWeek, premierGame);
-      premier = matchups.find((m) => m.premier);
+      nflMatchups = await getMatchupsForSeasonWeek(season, currentWeek, premierGame);
+      premier = nflMatchups.find((m) => m.premier);
     }
   }
 
-  const featuredNbaGame = await getFeaturedNbaGame();
+  // NFL model-confidence record tiles under "View Full Week N Slate"
+  // (user, 2026-11-09: "Showing 22-7 records for model when model
+  // predicts 70%+ and 5-1 when 80%+") -- this season only, computed
+  // live rather than hardcoded so it stays correct as more games grade.
+  let confidenceRecord70: ConfidenceRecord | null = null;
+  let confidenceRecord80: ConfidenceRecord | null = null;
+  if (season !== undefined) {
+    confidenceRecord70 = await getConfidenceRecord(season, 0.7);
+    confidenceRecord80 = await getConfidenceRecord(season, 0.8);
+  }
 
-  // Site-written recaps get priority in the coverage grid, but capped
-  // at SITE_MAX_SLOTS rather than free to fill all of COVERAGE_SLOTS --
-  // every final game gets its own recap now (see weekly-stories.mts),
-  // so a normal week has far more than 6 to choose from, which would
-  // crowd ESPN out entirely without this cap. ESPN is guaranteed at
-  // least COVERAGE_SLOTS - SITE_MAX_SLOTS slots as a result, so the
-  // grid always stays a real mix of both sources, never all-site.
-  // Fetches a wider batch than the slot count since featuredCutoff()
-  // below drops some of them -- otherwise a week with, say, 10
-  // published recaps but only 4 still "fresh" would under-fill the
-  // site side even though older recaps exist to take their place.
-  const COVERAGE_SLOTS = 6;
-  const SITE_MAX_SLOTS = 3;
-  const recentStories = await getPublishedStories(30);
-  const stories = recentStories.filter(isStoryFeatured).slice(0, SITE_MAX_SLOTS);
+  const nbaDayMatchups = await getNbaDayMatchups();
+  const featuredNbaGame = nbaDayMatchups[0];
 
-  // The weekly performance review, when featured, takes the FIRST slot
-  // in the coverage grid -- ahead of per-game recaps and ESPN -- at the
-  // cost of one ESPN slot (not a per-game recap slot; those keep their
-  // own SITE_MAX_SLOTS cap). Explicitly asked for: "it should be the
-  // first article, you can drop an ESPN article."
-  const effectiveNow = await getEffectiveNow();
-  const latestPerformanceReview = await getLatestPerformanceReview();
-  const performanceReviewFeatured =
-    latestPerformanceReview !== null && isPerformanceReviewFeatured(latestPerformanceReview, effectiveNow);
-  const performanceReviewAccuracyPct = latestPerformanceReview ? accuracyPctFromStory(latestPerformanceReview) : null;
-  const performanceReviewImage =
-    performanceReviewAccuracyPct !== null ? performanceTierImagePath(performanceReviewAccuracyPct) : null;
+  // Same tiles, NBA side (user, 2026-11-09: "lets do these under the
+  // basketball premier game also"). getNbaConfidenceRecord is cached
+  // (nbaPredictions.ts's own comment on why) since, unlike NFL's,
+  // building this walks every date in the season through real external
+  // API-backed grading, not a single cheap SQL aggregate.
+  let nbaConfidenceRecord70: ConfidenceRecord | null = null;
+  let nbaConfidenceRecord80: ConfidenceRecord | null = null;
+  const nbaSeasonsForRecord = await getAvailableNbaSeasons();
+  const nbaSeasonForRecord = nbaSeasonsForRecord[0];
+  if (nbaSeasonForRecord !== undefined) {
+    nbaConfidenceRecord70 = await getNbaConfidenceRecord(nbaSeasonForRecord, 0.7);
+    nbaConfidenceRecord80 = await getNbaConfidenceRecord(nbaSeasonForRecord, 0.8);
+  }
 
-  const news = await getEspnNflNews(COVERAGE_SLOTS - stories.length - (performanceReviewFeatured ? 1 : 0));
+  // "My Favorites" row: one favorite NFL team + one favorite NBA team,
+  // each picked on My Profile (profiles.favorite_team/favorite_nba_team
+  // -- sql/015_favorite_nba_team.sql). A signed-out preview (see
+  // HomePage) has no real profile row to read, so it falls back to the
+  // previewFavNfl/previewFavNba query params instead.
+  let favoriteNflAlias: string | null = previewFavNfl ?? null;
+  let favoriteNbaAlias: string | null = previewFavNba ?? null;
+  if (userId) {
+    const supabase = await createClient();
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("favorite_team, favorite_nba_team")
+      .eq("id", userId)
+      .single();
+    favoriteNflAlias = profile?.favorite_team ?? null;
+    favoriteNbaAlias = profile?.favorite_nba_team ?? null;
+  }
+  let favoriteNflGame = favoriteNflAlias
+    ? nflMatchups.find((m) => m.teamA.alias === favoriteNflAlias || m.teamB.alias === favoriteNflAlias)
+    : undefined;
+  let favoriteNflGameWeek = currentWeek;
+  let favoriteNflIsNextGame = false;
+  if (favoriteNflAlias && !favoriteNflGame && currentWeek !== null && season !== undefined) {
+    const next = await getNextNflGameForTeam(season, currentWeek, favoriteNflAlias);
+    if (next) {
+      favoriteNflGame = next.matchup;
+      favoriteNflGameWeek = next.week;
+      favoriteNflIsNextGame = true;
+    }
+  }
+
+  const favoriteNbaDisplayName = favoriteNbaAlias ? nbaTeamDisplayName(favoriteNbaAlias) : undefined;
+  let favoriteNbaGame = favoriteNbaDisplayName
+    ? nbaDayMatchups.find((m) => m.teamA.alias === favoriteNbaDisplayName || m.teamB.alias === favoriteNbaDisplayName)
+    : undefined;
+  let favoriteNbaIsNextGame = false;
+  if (favoriteNbaDisplayName && !favoriteNbaGame) {
+    const nbaSeasons = await getAvailableNbaSeasons();
+    const nbaSeason = nbaSeasons[0];
+    if (nbaSeason !== undefined) {
+      const next = await getNextNbaGameForTeam(nbaSeason, etDateKey(new Date()), favoriteNbaDisplayName);
+      if (next) {
+        favoriteNbaGame = next;
+        favoriteNbaIsNextGame = true;
+      }
+    }
+  }
+  const hasNoFavorites = !favoriteNflAlias && !favoriteNbaAlias;
+
+  // SANDBOX (home layout preview, branch sandbox/home-parlays): the
+  // ESPN/site-recap "LATEST NFL COVERAGE" grid that used to live here
+  // is swapped out for a "Parlays to Play" section instead, reusing the
+  // same cached, Postgres-backed builders the /parlays and /parlays/nba
+  // pages already use -- no ESPN links on this dashboard for now.
+  const nflWeekParlays =
+    season !== undefined && currentWeek !== null ? await buildWeekParlays(season, currentWeek, true) : null;
+
+  const nbaWeek = getCurrentNbaWeek();
+  const { days: nbaDays } = await loadNbaWeekParlays(nbaWeek.weekStart, nbaWeek.weekEndExclusive, true, false);
+  const todayKey = etDateKey(new Date());
+  const nbaDayParlays = nbaDays.find((d) => d.dayKey === todayKey) ?? nbaDays[0] ?? null;
 
   return (
     <>
@@ -351,31 +603,134 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
         </aside>
 
         <main className="content-main">
-          {premier && (
+          {(premier || featuredNbaGame) && (
             <div className="premier-wrap">
-              <div className={`premier-ribbon ${premier.lockOfWeek ? "gold" : ""}`}>
-                {premier.lockOfWeek ? "🔒 LOCK OF THE WEEK" : `★ ${premier.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
+              <div className={`premier-ribbon ${premier?.lockOfWeek ? "gold" : ""}`}>
+                {premier?.lockOfWeek
+                  ? "🔒 LOCK OF THE WEEK"
+                  : `★ ${premier?.premierLabel ?? "GAME OF THE WEEK"} — FREE PREVIEW`}
               </div>
-              <MatchupCard matchup={premier} premier />
-              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
-                <Link className="btn btn-ghost" href="/home">
-                  View Full Week {currentWeek} Slate →
-                </Link>
+              <div className="matchup-grid">
+                {premier && (
+                  // alignSelf: start -- without it, .matchup-grid's default
+                  // grid stretch makes this div (now the grid item, unlike
+                  // a bare MatchupCard elsewhere) match the taller column's
+                  // row height, which then stretches the inner
+                  // height:100% MatchupCard too and pushes this column's
+                  // own "View Full Slate" link below where the row
+                  // visually ends -- crowding straight into the My
+                  // Favorites ribbon underneath it (user, 2026-11-09).
+                  <div style={{ alignSelf: "start" }}>
+                    <MatchupCard matchup={premier} premier />
+                    <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                      <Link className="btn btn-ghost view-slate-btn" href="/home">
+                        View Full Week {currentWeek} Slate →
+                      </Link>
+                    </div>
+                    {(confidenceRecord70 || confidenceRecord80) && (
+                      <div className="confidence-tile-row">
+                        {confidenceRecord70 && (
+                          <ConfidenceTile
+                            league="NFL"
+                            thresholdPct={70}
+                            record={confidenceRecord70}
+                            href="/home/confidence-record?min=70"
+                          />
+                        )}
+                        {confidenceRecord80 && (
+                          <ConfidenceTile
+                            league="NFL"
+                            thresholdPct={80}
+                            record={confidenceRecord80}
+                            href="/home/confidence-record?min=80"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {featuredNbaGame && (
+                  <div style={{ alignSelf: "start" }}>
+                    <NbaMatchupCard matchup={featuredNbaGame} premier />
+                    <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                      <Link className="btn btn-ghost view-slate-btn" href="/home/nba">
+                        View Full NBA Slate →
+                      </Link>
+                    </div>
+                    {(nbaConfidenceRecord70 || nbaConfidenceRecord80) && (
+                      <div className="confidence-tile-row">
+                        {nbaConfidenceRecord70 && (
+                          <ConfidenceTile
+                            league="NBA"
+                            thresholdPct={70}
+                            record={nbaConfidenceRecord70}
+                            href="/home/nba/confidence-record?min=70"
+                          />
+                        )}
+                        {nbaConfidenceRecord80 && (
+                          <ConfidenceTile
+                            league="NBA"
+                            thresholdPct={80}
+                            record={nbaConfidenceRecord80}
+                            href="/home/nba/confidence-record?min=80"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {featuredNbaGame && (
-            <div className="premier-wrap">
-              <div className="premier-ribbon">🏀 FEATURED NBA GAME</div>
-              <NbaMatchupCard matchup={featuredNbaGame} premier />
-              <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
-                <Link className="btn btn-ghost" href="/home/nba">
-                  View Full NBA Slate →
+          <div className="premier-wrap" style={{ marginTop: "2rem" }}>
+            <div className="premier-ribbon">♥ MY FAVORITES</div>
+            {/* Neither favorite is set -- a pair of empty AddFavoriteCard
+                squares here was dead weight with nothing to show yet, so
+                this collapses to a single slim pill instead (user,
+                2026-11-09: "remove the squares to regain that space").
+                Once either favorite is picked, the grid below takes over. */}
+            {hasNoFavorites && (
+              <div style={{ textAlign: "center" }}>
+                <Link className="favorites-empty-pill" href="/profile#address-team">
+                  ⭐ Add My Favorite Teams
                 </Link>
               </div>
-            </div>
-          )}
+            )}
+            {!hasNoFavorites && (
+              <div className="matchup-grid">
+                {!favoriteNflAlias ? (
+                  <AddFavoriteCard league="NFL" />
+                ) : favoriteNflGame ? (
+                  <div>
+                    {/* Always reserved, just hidden when not applicable --
+                        otherwise this column's card starts higher than the
+                        other column's whenever only one side has a tag,
+                        and the two favorite cards no longer line up
+                        (user, 2026-11-09). */}
+                    <div className="favorite-next-game-tag" style={{ visibility: favoriteNflIsNextGame ? "visible" : "hidden" }}>
+                      NEXT GAME — WEEK {favoriteNflGameWeek}
+                    </div>
+                    <MatchupCard matchup={favoriteNflGame} />
+                  </div>
+                ) : (
+                  <NoFavoriteGameCard league="NFL" note="Your favorite team has no games left scheduled right now." />
+                )}
+                {!favoriteNbaAlias ? (
+                  <AddFavoriteCard league="NBA" />
+                ) : favoriteNbaGame ? (
+                  <div>
+                    <div className="favorite-next-game-tag" style={{ visibility: favoriteNbaIsNextGame ? "visible" : "hidden" }}>
+                      NEXT GAME
+                    </div>
+                    <NbaMatchupCard matchup={favoriteNbaGame} />
+                  </div>
+                ) : (
+                  <NoFavoriteGameCard league="NBA" note="Your favorite team has no games left scheduled right now." />
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="mobile-ad-wrap" aria-label="Promotional space">
             <MobileAdFrame>
@@ -384,68 +739,56 @@ async function SignedInDashboard({ firstName }: { firstName?: string }) {
             </MobileAdFrame>
           </div>
 
-          {(performanceReviewFeatured || stories.length > 0 || news.length > 0) && (
+          {(nflWeekParlays || nbaDayParlays) && (
             <div className="news-section">
               <h2 className="section-label">
-                <span className="dot" /> LATEST NFL COVERAGE
+                <span className="dot" /> PARLAYS TO PLAY
               </h2>
-              <div className="news-grid">
-                {performanceReviewFeatured && latestPerformanceReview && (
-                  <Link className="news-card" href={`/stories/${latestPerformanceReview.id}`}>
-                    {performanceReviewImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img className="news-card-image" src={performanceReviewImage} alt="" />
-                    ) : (
-                      <div className="news-card-image news-card-image-fallback">📊</div>
-                    )}
-                    <div className="news-card-body">
-                      <h3>{latestPerformanceReview.headline}</h3>
-                      <p>{truncateTeaser(latestPerformanceReview.body)}</p>
-                      <span className="read-more">Read More →</span>
-                    </div>
-                  </Link>
-                )}
-                {stories.map((story) =>
-                  story.universal_game_id ? (
-                    <Link key={story.id} className="news-card" href={`/game/${story.universal_game_id}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element -- generated route, not a static asset next/image can optimize */}
-                      <img
-                        className="news-card-image"
-                        src={`/game/${story.universal_game_id}/thumbnail-image`}
-                        alt=""
-                      />
-                      <div className="news-card-body">
-                        <h3>{story.headline}</h3>
-                        <p>{truncateTeaser(story.body)}</p>
-                        <span className="read-more">View Game →</span>
-                      </div>
+
+              {nflWeekParlays && nflWeekParlays.parlays.single.twoLeg.length > 0 && (
+                <div className="stat-section">
+                  <h3>Week {currentWeek} Parlays</h3>
+                  <p className="stat-sub parlay-week-subtitle">
+                    This week&apos;s games haven&apos;t been played yet -- these are the model&apos;s current best
+                    picks, not graded results.
+                  </p>
+                  <div className="parlay-grid parlay-grid-current">
+                    {nflWeekParlays.parlays.single.twoLeg.map((parlay, i) => (
+                      <ParlayCard key={`nfl-2-${i}`} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+                    ))}
+                    {nflWeekParlays.parlays.single.threeLeg.map((parlay, i) => (
+                      <ParlayCard key={`nfl-3-${i}`} title={`3-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+                    ))}
+                  </div>
+                  <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                    <Link className="btn btn-ghost" href="/parlays">
+                      View All NFL Parlays →
                     </Link>
-                  ) : (
-                    <div key={story.id} className="news-card">
-                      <div className="news-card-image news-card-image-fallback">📊</div>
-                      <div className="news-card-body">
-                        <h3>{story.headline}</h3>
-                        <p>{truncateTeaser(story.body)}</p>
-                      </div>
-                    </div>
-                  )
-                )}
-                {news.map((item) => (
-                  <ExternalWindowLink key={item.link} className="news-card" href={item.link}>
-                    {item.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img className="news-card-image" src={item.image} alt="" />
-                    ) : (
-                      <div className="news-card-image news-card-image-fallback">🏈</div>
-                    )}
-                    <div className="news-card-body">
-                      <h3>{item.title}</h3>
-                      <p>{item.snippet}</p>
-                      <span className="read-more">Read on ESPN →</span>
-                    </div>
-                  </ExternalWindowLink>
-                ))}
-              </div>
+                  </div>
+                </div>
+              )}
+
+              {nbaDayParlays && nbaDayParlays.parlays.twoLeg.length > 0 && (
+                <div className="stat-section">
+                  <h3>{formatDate(nbaDayParlays.dayKey, true)} NBA Parlays</h3>
+                  <p className="stat-sub parlay-week-subtitle">
+                    The model&apos;s current best NBA picks for today&apos;s slate, not graded results.
+                  </p>
+                  <div className="parlay-grid parlay-grid-current">
+                    {nbaDayParlays.parlays.twoLeg.map((parlay, i) => (
+                      <NbaParlayCard key={`nba-2-${i}`} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+                    ))}
+                    {nbaDayParlays.parlays.threeLeg.map((parlay, i) => (
+                      <NbaParlayCard key={`nba-3-${i}`} title={`3-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+                    ))}
+                  </div>
+                  <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
+                    <Link className="btn btn-ghost" href="/parlays/nba">
+                      View All NBA Parlays →
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

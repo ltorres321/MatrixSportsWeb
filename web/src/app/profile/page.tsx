@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useMemberPreview } from "@/lib/useMemberPreview";
 import { TEAMS } from "@/lib/teams";
+import { NBA_TEAMS } from "@/lib/teamsNba";
 
 interface ProfileRow {
   first_name: string;
@@ -19,6 +20,7 @@ interface ProfileRow {
   state: string | null;
   zip: string | null;
   favorite_team: string | null;
+  favorite_nba_team: string | null;
   notify_win_prob: boolean;
   notify_teams: string[];
   theme: "dark" | "light";
@@ -78,6 +80,20 @@ export default function ProfilePage() {
         setLoadingProfile(false);
       });
   }, [isRealMember, user]);
+
+  // The browser's own "scroll to #hash on load" only fires once, right
+  // after the initial navigation -- but this whole page returns null
+  // until the auth check resolves (the `if (!loaded) return null`
+  // below), so #address-team doesn't exist in the DOM yet at that
+  // moment and the native behavior finds nothing to scroll to. Redoing
+  // it manually once the real content (and that section) has actually
+  // mounted is what makes a link like "Add Favorite Team ->
+  // /profile#address-team" actually land there instead of the page top.
+  useEffect(() => {
+    if (!isRealMember || loadingProfile) return;
+    if (window.location.hash !== "#address-team") return;
+    document.getElementById("address-team")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [isRealMember, loadingProfile]);
 
   // A verified cell is only trustworthy for whatever number Supabase
   // actually confirmed via OTP -- if the field's since been edited to
@@ -218,6 +234,7 @@ export default function ProfilePage() {
       state: (String(formData.get("state") ?? "").trim() || null) as string | null,
       zip: (String(formData.get("zip") ?? "").trim() || null) as string | null,
       favorite_team: (String(formData.get("favoriteTeam") ?? "").trim() || null) as string | null,
+      favorite_nba_team: (String(formData.get("favoriteNbaTeam") ?? "").trim() || null) as string | null,
       notify_win_prob: formData.get("notify") === "on",
       notify_teams: formData.getAll("notifyTeams").map(String),
     };
@@ -246,8 +263,15 @@ export default function ProfilePage() {
                 ? "You're previewing the signed-in nav, but this page reads and writes your real account data — it needs an actual sign-in, not the preview toggle."
                 : "Password, email, phone number, and notification preferences live on your free account. Create one to get started."}
             </p>
-            <Link className="btn btn-primary btn-block" href="/signup">
+            <Link className="btn btn-primary btn-block" href={`/signup?next=${encodeURIComponent("/profile#address-team")}`}>
               Sign Up Free
+            </Link>
+            <Link
+              className="btn btn-ghost btn-block"
+              href={`/login?next=${encodeURIComponent("/profile#address-team")}`}
+              style={{ marginTop: "0.6rem" }}
+            >
+              Already Have an Account? Sign In
             </Link>
           </div>
         </div>
@@ -485,32 +509,51 @@ export default function ProfilePage() {
           </form>
         </div>
 
-        <div className="form-panel">
+        <div className="form-panel" id="address-team">
           <h2>Address &amp; Team Notifications</h2>
-          <p className="form-intro">Mailing address, favorite team, and text alerts.</p>
+          <p className="form-intro">Mailing address, favorite teams, and text alerts.</p>
           {!loadingProfile && (
             <form className="form-grid" onSubmit={handleUpdateProfile}>
               <div className="field full">
-                <label htmlFor="address">Address</label>
+                <label htmlFor="address">
+                  Address <span className="optional-tag">(optional)</span>
+                </label>
                 <input type="text" id="address" name="address" defaultValue={profile?.address ?? ""} />
               </div>
               <div className="field">
-                <label htmlFor="city">City</label>
+                <label htmlFor="city">
+                  City <span className="optional-tag">(optional)</span>
+                </label>
                 <input type="text" id="city" name="city" defaultValue={profile?.city ?? ""} />
               </div>
               <div className="field">
-                <label htmlFor="state">State</label>
+                <label htmlFor="state">
+                  State <span className="optional-tag">(optional)</span>
+                </label>
                 <input type="text" id="state" name="state" maxLength={2} defaultValue={profile?.state ?? ""} />
               </div>
               <div className="field full">
-                <label htmlFor="zip">Zip Code</label>
+                <label htmlFor="zip">
+                  Zip Code <span className="optional-tag">(optional)</span>
+                </label>
                 <input type="text" id="zip" name="zip" defaultValue={profile?.zip ?? ""} />
               </div>
               <div className="field full">
-                <label htmlFor="favoriteTeam">Favorite Team</label>
+                <label htmlFor="favoriteTeam">Favorite NFL Team</label>
                 <select id="favoriteTeam" name="favoriteTeam" defaultValue={profile?.favorite_team ?? ""}>
                   <option value="">No preference</option>
                   {TEAMS.map((t) => (
+                    <option key={t.alias} value={t.alias}>
+                      {t.market} {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field full">
+                <label htmlFor="favoriteNbaTeam">Favorite NBA Team</label>
+                <select id="favoriteNbaTeam" name="favoriteNbaTeam" defaultValue={profile?.favorite_nba_team ?? ""}>
+                  <option value="">No preference</option>
+                  {NBA_TEAMS.map((t) => (
                     <option key={t.alias} value={t.alias}>
                       {t.market} {t.name}
                     </option>
@@ -552,7 +595,7 @@ export default function ProfilePage() {
         </div>
 
         {saveNote && (
-          <p className="form-footer-note" style={{ marginTop: "1.5rem" }}>
+          <p className="form-footer-note form-footer-note-save" style={{ marginTop: "1.5rem" }}>
             {saveNote}
           </p>
         )}

@@ -7,7 +7,7 @@ import SocialSignInButtons from "@/components/SocialSignInButtons";
 
 const initialState: SignupState = {};
 
-export default function SignupForm() {
+export default function SignupForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(signup, initialState);
 
   const errors = state.fieldErrors ?? {};
@@ -22,8 +22,8 @@ export default function SignupForm() {
               <h3>Check Your Email</h3>
               <p>
                 We sent a confirmation link to finish creating your account.
-                Click it, and you&apos;ll land on your predictions dashboard,
-                signed in.
+                Click it, and you&apos;ll land{" "}
+                {next === "/profile" ? "on My Profile" : "on your predictions dashboard"}, signed in.
               </p>
             </div>
           </div>
@@ -42,7 +42,7 @@ export default function SignupForm() {
             pricing when paid tiers launch — no credit card required now.
           </p>
 
-          <SocialSignInButtons />
+          <SocialSignInButtons next={next} />
           <div className="or-divider">OR SIGN UP WITH EMAIL</div>
 
           <form action={formAction}>
@@ -53,6 +53,7 @@ export default function SignupForm() {
             )}
 
             <div className="form-grid">
+              {next && <input type="hidden" name="next" value={next} />}
               <div className="field">
                 <label htmlFor="firstName">First Name</label>
                 <input id="firstName" name="firstName" autoComplete="given-name" className={errors.firstName ? "invalid" : ""} />
@@ -104,7 +105,7 @@ export default function SignupForm() {
 
               <p className="form-footer-note form-footer-note-lg">
                 Already have an account?{" "}
-                <Link href="/login" className="gold-cta-link">
+                <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="gold-cta-link">
                   Log in
                 </Link>
               </p>

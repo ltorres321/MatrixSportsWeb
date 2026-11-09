@@ -228,6 +228,112 @@ export async function getAvailableSeasons(): Promise<number[]> {
   return Array.from(seasons).sort((a, b) => b - a);
 }
 
+export interface ConfidenceRecord {
+  wins: number;
+  losses: number;
+}
+
+// How often the model's pick has been right, restricted to games
+// where it favored a side at least `minProb` confidence -- same
+// favored-side/tie-exclusion rules as computeCorrect() above, just
+// aggregated across a whole season instead of per-game. Used for the
+// "70%+ picks" / "80%+ picks" record tiles on the home dashboard
+// (user, 2026-11-09).
+async function computeConfidenceRecordLive(season: number, minProb: number): Promise<ConfidenceRecord> {
+  const rows = await query<{ correct: string; incorrect: string }>(
+    `SELECT
+       COUNT(*) FILTER (WHERE pick_correct) AS correct,
+       COUNT(*) FILTER (WHERE NOT pick_correct) AS incorrect
+     FROM (
+       SELECT
+         CASE WHEN home_win_probability >= 0.5 THEN home_win_probability ELSE 1 - home_win_probability END AS pick_prob,
+         CASE WHEN home_win_probability >= 0.5 THEN (actual_home_score > actual_away_score)
+              ELSE (actual_away_score > actual_home_score) END AS pick_correct
+       FROM latest_predictions
+       WHERE season = $1 AND actual_home_score IS NOT NULL AND actual_away_score IS NOT NULL
+         AND actual_home_score <> actual_away_score
+     ) t
+     WHERE pick_prob >= $2`,
+    [season, minProb]
+  );
+  const row = rows[0];
+  return { wins: row ? Number(row.correct) : 0, losses: row ? Number(row.incorrect) : 0 };
+}
+
+// Reads confidence_record_cache (sql/016_confidence_record_cache.sql),
+// kept fresh hourly by netlify/functions/refresh-confidence-records.mts,
+// instead of recomputing this aggregate on every dashboard load (user,
+// 2026-11-09: "these records should not change too often so these
+// games should be stored in a table for fast access"). Falls back to
+// computing it live for any reason the cache can't answer -- the table
+// not existing yet, no row for this exact (season, minProb) yet (a new
+// threshold, or before the first scheduled run), or a query error --
+// so the tile never just breaks because the cache job hasn't caught up.
+export async function getConfidenceRecord(season: number, minProb: number): Promise<ConfidenceRecord> {
+  try {
+    const rows = await query<{ wins: number; losses: number }>(
+      `SELECT wins, losses FROM confidence_record_cache WHERE league = 'nfl' AND season = $1 AND min_prob = $2`,
+      [season, minProb]
+    );
+    if (rows[0]) return { wins: rows[0].wins, losses: rows[0].losses };
+  } catch (error) {
+    console.error("confidence_record_cache read failed, falling back to live:", error instanceof Error ? error.message : error);
+  }
+  return computeConfidenceRecordLive(season, minProb);
+}
+
+export interface ConfidenceGame {
+  week: number;
+  gameDate: Date;
+  matchup: Matchup;
+}
+
+// The actual games behind a getConfidenceRecord() number -- same exact
+// filter (favored-side probability >= minProb, graded, no tie), so the
+// list a user clicks into always matches the record they clicked from.
+// Spans every week of the season (these games aren't all from one
+// week), so each one carries its own week number alongside the
+// Matchup -- rowToMatchup's own "Final" kickoff text drops the actual
+// calendar date, which is why gameDate is returned separately here.
+// live/priorHomeWinProbability/scheduleFinal are all irrelevant for an
+// already-graded historical game (rowToMatchup's resolveGameState
+// takes the DB's actual_home_score branch first, unconditionally), so
+// every one of those is just undefined.
+export async function getConfidenceGames(season: number, minProb: number): Promise<ConfidenceGame[]> {
+  const rows = await query<PredictionRow>(
+    `SELECT ${PREDICTION_COLUMNS} FROM latest_predictions
+     WHERE season = $1 AND actual_home_score IS NOT NULL AND actual_away_score IS NOT NULL
+       AND actual_home_score <> actual_away_score
+       AND (CASE WHEN home_win_probability >= 0.5 THEN home_win_probability ELSE 1 - home_win_probability END) >= $2
+     ORDER BY game_date DESC`,
+    [season, minProb]
+  );
+
+  const weeks = Array.from(new Set(rows.map((r) => r.week)));
+  const recordsByWeek = new Map<number, Map<string, string>>();
+  for (const week of weeks) {
+    recordsByWeek.set(week, await getTeamRecords(season, week));
+  }
+
+  return rows.map((row) => {
+    const matchup = rowToMatchup(row, recordsByWeek.get(row.week) ?? new Map(), undefined, undefined, undefined);
+    // Overridden here only (rowToMatchup's plain "Final" stays as-is
+    // for every other page that reuses it) -- this list's whole point
+    // is games from DIFFERENT weeks side by side, so the card's own
+    // existing .game-meta slot (top-right, otherwise a redundant
+    // "Final") carries the week/date instead of a separate label
+    // outside the card. A sibling label there previously changed the
+    // card's own rendered size (user, 2026-11-09: "go back to
+    // previous size and move the date week inside the square").
+    matchup.kickoff = `Week ${row.week} — ${new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "America/New_York",
+    }).format(row.game_date)}`;
+    return { week: row.week, gameDate: row.game_date, matchup };
+  });
+}
+
 export async function getWeeksForSeason(season: number): Promise<number[]> {
   const rows = await query<{ week: number }>(
     "SELECT DISTINCT week FROM latest_predictions WHERE season = $1 ORDER BY week ASC",

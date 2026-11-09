@@ -47,7 +47,9 @@ export interface WeekParlays {
   parlays: Record<ParlayBookMode, LeagueParlays>;
 }
 
-async function buildWeekParlays(season: number, week: number, hideBannedBooks: boolean): Promise<WeekParlays> {
+// Exported so the home dashboard's "Parlays to Play" preview can reuse
+// the same cached, Postgres-backed build instead of re-deriving it.
+export async function buildWeekParlays(season: number, week: number, hideBannedBooks: boolean): Promise<WeekParlays> {
   return cachedAsync(`nfl-league-parlays:${season}:${week}:${hideBannedBooks}`, CACHE_TTL_MS, async () => {
     const playerProps = await getLeagueBettingEdge(season, week, hideBannedBooks);
     const parlays: Record<ParlayBookMode, LeagueParlays> = {

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
+import { safeNextPath } from "@/lib/safeRedirect";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -38,6 +39,7 @@ export async function signup(
   }
 
   const origin = (await headers()).get("origin");
+  const next = safeNextPath(str(formData, "next"));
   const supabase = await createClient();
 
   // Everything besides email/password rides along as user_metadata --
@@ -48,7 +50,7 @@ export async function signup(
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=/home`,
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
       data: {
         first_name: firstName,
         middle_name: middleName,

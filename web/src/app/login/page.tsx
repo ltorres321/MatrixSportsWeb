@@ -11,6 +11,14 @@ export const metadata = pageMetadata({
   path: "/login",
 });
 
-export default function LoginPage() {
-  return <LoginForm />;
+export default async function LoginPage({
+  searchParams,
+}: {
+  // Where to land after a successful sign-in -- e.g. /profile when
+  // this came from the home dashboard's "Add Favorite Team" flow
+  // (My Profile's own sign-in gate sets this), /home otherwise.
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  return <LoginForm next={next} />;
 }

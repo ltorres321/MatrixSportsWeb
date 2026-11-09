@@ -11,6 +11,13 @@ export const metadata = pageMetadata({
   path: "/signup",
 });
 
-export default function SignupPage() {
-  return <SignupForm />;
+export default async function SignupPage({
+  searchParams,
+}: {
+  // Where to land after signup completes (email confirmed, or OAuth
+  // returns) -- see login/page.tsx's own comment on this.
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  return <SignupForm next={next} />;
 }

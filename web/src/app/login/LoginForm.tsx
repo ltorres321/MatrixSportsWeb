@@ -7,7 +7,7 @@ import SocialSignInButtons from "@/components/SocialSignInButtons";
 
 const initialState: LoginState = {};
 
-export default function LoginForm() {
+export default function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(login, initialState);
 
   return (
@@ -17,7 +17,7 @@ export default function LoginForm() {
           <h1>Sign In</h1>
           <p className="form-intro">Welcome back — pick up right where you left off.</p>
 
-          <SocialSignInButtons />
+          <SocialSignInButtons next={next} />
           <div className="or-divider">OR SIGN IN WITH EMAIL</div>
 
           <form action={formAction}>
@@ -28,6 +28,7 @@ export default function LoginForm() {
             )}
 
             <div className="form-grid">
+              {next && <input type="hidden" name="next" value={next} />}
               <div className="field full">
                 <label htmlFor="email">Email</label>
                 <input id="email" name="email" type="email" autoComplete="email" required />
@@ -52,7 +53,7 @@ export default function LoginForm() {
 
               <p className="form-footer-note form-footer-note-lg">
                 Don&apos;t have an account?{" "}
-                <Link href="/signup" className="gold-cta-link">
+                <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="gold-cta-link">
                   Sign up free
                 </Link>
               </p>

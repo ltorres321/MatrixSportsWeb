@@ -1084,6 +1084,118 @@ h1.glow span {
   background: var(--panel-solid);
 }
 
+/* NFL model-confidence record tiles under "View Full Week N Slate"
+   on the home dashboard (user, 2026-11-09: "Showing 22-7 records for
+   model when model predicts 70%+ and 5-1 when 80%+"). */
+.confidence-tile-row {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.confidence-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  /* Three +10% passes over the original 0.15rem/0.5rem/0.9rem
+     (user, 2026-11-09 x3). */
+  gap: 0.1rem;
+  padding: 0.666rem 1.198rem;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-solid);
+  border-radius: 8px;
+}
+
+/* Three lines now, not two ("Record for NFL games" / "when model
+   predicts 70%+" / the record itself, user, 2026-11-09) -- the record
+   is the payoff, so it gets its own breathing room above it instead
+   of sitting flush under the two context lines. */
+.confidence-tile-record {
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 600;
+  /* Three +10% passes over the original 1.05rem (user, 2026-11-09 x3). */
+  font-size: 1.4rem;
+  color: var(--green);
+  margin-top: 0.3rem;
+}
+
+.confidence-tile-label {
+  /* Three +3px passes over the original 0.68rem (~11px) base
+     (user, 2026-11-09 x3). */
+  font-size: calc(0.68rem + 9px);
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+
+/* A confidence tile with an href (NFL, linking through to the games
+   behind the record -- user, 2026-11-09) is a <Link>, so it needs its
+   own text-decoration/color reset plus a hover cue a plain <div>
+   tile never needed. */
+.confidence-tile-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.confidence-tile-link:hover {
+  border-color: var(--green);
+  box-shadow: 0 0 14px rgba(var(--glow-rgb), 0.25);
+}
+
+
+/* "My Favorites" row (home dashboard), neither favorite set yet --
+   same bright #ecf007 yellow as .btn-primary.btn-gold (the hero's
+   "View All Picks"/"Get Early Access" buttons), just pill-shaped
+   (border-radius 999px, like .premier-ribbon) rather than that
+   class's rounded-rect button shape (user, 2026-11-09: "yellow pill"). */
+.favorites-empty-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.4rem;
+  border-radius: 999px;
+  background: #ecf007;
+  color: #04140a;
+  font-family: 'Chakra Petch', monospace;
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  box-shadow: 0 0 18px rgba(236, 240, 7, 0.35);
+  transition: box-shadow 0.15s;
+}
+
+.favorites-empty-pill:hover {
+  box-shadow: 0 0 28px rgba(236, 240, 7, 0.55);
+}
+
+:root[data-theme="light"] .favorites-empty-pill {
+  background: var(--red);
+  color: #fff;
+}
+
+/* "My Favorites" row (home dashboard): labels a favorite team's card
+   when it's not this week's/today's game but the next one found ahead
+   of it (user, 2026-11-09: show the next game instead of "no game"). */
+.favorite-next-game-tag {
+  text-align: center;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+}
+
+/* Same rain-canvas readability fix as .week-nav .btn-ghost above, for
+   the "View Full Week N Slate" / "View Full NBA Slate" links under
+   the signed-in dashboard's Game of the Week cards (user, 2026-11-09). */
+.btn-ghost.view-slate-btn {
+  background: var(--panel-solid);
+}
+
 /* NBA Parlays week heading's record/percentage (user, 2026-11-08):
    gold in dark theme, blue in light -- not the usual green-flips-to-
    blue pattern (dark theme wants gold here specifically, not green),
@@ -1669,8 +1781,10 @@ h1.glow span {
    .team-row.winner.pred-correct/.pred-wrong above) already carries
    the "was it right" signal, so this stays neutral either way. */
 .team-prob-pregame {
-  font-size: 0.7rem;
-  color: var(--text-dim);
+  /* +2px, gold instead of the dim neutral gray (user, 2026-11-09:
+     "Hard to see and read"). */
+  font-size: calc(0.7rem + 2px);
+  color: var(--gold);
   margin-top: 0.2rem;
 }
 
@@ -1710,8 +1824,13 @@ h1.glow span {
 
 .game-meta {
   text-align: right;
-  font-size: 0.75rem;
-  color: var(--text-dim);
+  /* +1px over the 0.75rem (12px) base (user, 2026-11-09) -- the
+     live clock/FINAL/kickoff-time text in a matchup card's top-right. */
+  font-size: calc(0.75rem + 1px);
+  /* Still too low-contrast at var(--text-dim) even after the size bump
+     (user, 2026-11-09) -- var(--gold) is this site's theme accent
+     yellow, already adapting per theme everywhere else it's used. */
+  color: var(--gold);
 }
 
 /* ---------------------------------------------------------------
@@ -2921,6 +3040,19 @@ h1.glow span {
   background-repeat: no-repeat;
 }
 
+/* The closed <select> box above picks up the page's dark theme fine,
+   but its OPEN options list is painted by the browser/OS itself, not
+   this page -- left unstyled, that defaulted to a plain gray popup
+   with this theme's pale green text still applied, which read as
+   low-contrast gray-on-green (user, 2026-11-09). Explicit background/
+   color on <option> itself is honored by every evergreen browser for
+   exactly this popup, even though most other listbox chrome isn't
+   stylable. */
+.field select option {
+  background: var(--panel-solid);
+  color: var(--text);
+}
+
 .checkbox-row {
   display: flex;
   align-items: flex-start;
@@ -2998,6 +3130,13 @@ h1.glow span {
    override had silently lost to source order the first time. */
 .form-footer-note.form-footer-note-lg {
   font-size: 0.9375rem;
+}
+
+/* +4px over the 0.75rem (12px) base, specifically for the "Preferences
+   saved." confirmation on My Profile -- it was easy to miss at the
+   base size right after pressing Save. */
+.form-footer-note.form-footer-note-save {
+  font-size: 1rem;
 }
 
 .form-success {

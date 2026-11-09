@@ -87,7 +87,9 @@ function SignUpGate() {
 // reads, not a new "shown" event for site_nba_league_parlay_log).
 // Cache key is per week, so a deep link to an already-computed
 // previous week reuses the same cache entry the teaser filled.
-async function loadNbaWeekParlays(
+// Exported so the home dashboard's "Parlays to Play" preview can reuse
+// the same cached, Postgres-backed build instead of re-deriving it.
+export async function loadNbaWeekParlays(
   weekStart: string,
   weekEndExclusive: string,
   hideBannedBooks: boolean,

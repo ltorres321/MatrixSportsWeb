@@ -11,6 +11,7 @@ import {
   FaTwitch,
 } from "react-icons/fa6";
 import { createClient } from "@/lib/supabase/client";
+import { safeNextPath } from "@/lib/safeRedirect";
 
 // Supabase's provider identifiers -- note linkedin_oidc, not linkedin
 // (LinkedIn deprecated the old OAuth API Supabase used to target).
@@ -79,13 +80,13 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
-export default function SocialSignInButtons() {
+export default function SocialSignInButtons({ next }: { next?: string }) {
   async function handleClick(provider: Provider) {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/home`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNextPath(next))}`,
       },
     });
   }
