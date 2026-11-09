@@ -25,7 +25,7 @@ import { NBA_TEAMS } from "@/lib/teamsNba";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
-import { getPublishedStories } from "@/lib/stories";
+import { getPublishedStories, getLatestPerformanceReview } from "@/lib/stories";
 import { pageMetadata } from "@/lib/seo";
 import { ParlayCard } from "@/components/ParlayCard";
 import { NbaParlayCard } from "@/components/NbaParlayCard";
@@ -570,6 +570,15 @@ async function SignedInDashboard({
   }
   const hasNoFavorites = !favoriteNflAlias && !favoriteNbaAlias;
 
+  // Weekly performance review teaser (user, 2026-11-09: "that home
+  // page does not have that weekly performance content so where is
+  // it" -- it's still generated and published to /stories exactly as
+  // before, just no longer given a featured slot up top; this adds a
+  // plain link back to it at the bottom instead). NFL only -- no NBA
+  // equivalent exists yet (thursday-digest.mts/saturday-digest.mts,
+  // the jobs that write these, have no NBA version).
+  const latestNflPerformanceReview = await getLatestPerformanceReview();
+
   // SANDBOX (home layout preview, branch sandbox/home-parlays): the
   // ESPN/site-recap "LATEST NFL COVERAGE" grid that used to live here
   // is swapped out for a "Parlays to Play" section instead, reusing the
@@ -825,6 +834,30 @@ async function SignedInDashboard({
               </p>
               <span className="read-more">Browse All Recaps →</span>
             </Link>
+
+            <Link
+              className="article-card"
+              href={latestNflPerformanceReview ? `/stories/${latestNflPerformanceReview.id}` : "/stories"}
+            >
+              <div className="thumb">📊</div>
+              <h3>{latestNflPerformanceReview ? latestNflPerformanceReview.headline : "Weekly NFL Model Performance Review"}</h3>
+              <p>
+                How the model&apos;s picks actually graded out this week -- wins,
+                misses, and what moved its confidence.
+              </p>
+              <span className="read-more">Read More →</span>
+            </Link>
+
+            {/* No NBA performance review exists yet -- thursday-digest.mts/
+                saturday-digest.mts (the jobs that write these) have no NBA
+                version, so this stays a disabled placeholder rather than a
+                dead/fake link, same convention as .league-chip's disabled
+                MLB tab (user, 2026-11-09: "one for NFL and one for NBA"). */}
+            <div className="article-card disabled">
+              <div className="thumb">🏀</div>
+              <h3>Weekly NBA Model Performance Review</h3>
+              <p>Coming soon -- NBA picks aren&apos;t graded into a weekly review yet.</p>
+            </div>
           </div>
 
           {/* One ad slot per 3 articles -- currently a single group of
