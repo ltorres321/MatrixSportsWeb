@@ -26,6 +26,15 @@
 # not read at runtime, so the already-built ltorres-1 deploy wouldn't
 # pick it up no matter how it's scoped in Netlify -- a real rebuild
 # after adding the var is required, same as always.)
+#
+# (Fifth time -- the home-dashboard redesign's first push (2482f1d)
+# failed Netlify's secrets scan on a Turbopack build-cache false
+# positive for ANTHROPIC_API_KEY, fixed by adding it to
+# SECRETS_SCAN_OMIT_KEYS. The retry/"Trigger deploy" that followed
+# reported success but the live ltorres-1 site still showed the old
+# homepage -- same "Trigger deploy rebuilds production, not this
+# branch" gotcha as the first note above. This comment edit forces an
+# unambiguous real rebuild of the branch itself.)
 [build]
   base = "web"
   command = "npm run build"
