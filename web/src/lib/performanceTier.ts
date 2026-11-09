@@ -1,4 +1,9 @@
-import "server-only";
+// No "server-only" here on purpose -- every function in this file is
+// pure (accuracy math + static asset path lookups, no DB/env access),
+// and StoryCard.tsx (which uses these) is pulled into a client bundle
+// via StoriesInfiniteList.tsx's client-side infinite scroll. The
+// `Story` import below is type-only, so it carries none of
+// stories.ts's own "server-only" side effect along with it.
 import type { Story } from "@/lib/stories";
 
 // Same three tiers as SportsLLM's own generateStory.ts (a separate

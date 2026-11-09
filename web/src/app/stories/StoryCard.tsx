@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Story } from "@/lib/stories";
+import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
 
 // Shared by page.tsx (server-rendered first batch) and
 // StoriesInfiniteList.tsx (client-rendered batches loaded on scroll) --
@@ -19,7 +20,19 @@ function truncateTeaser(text: string, maxChars = 200): string {
 
 export default function StoryCard({ story }: { story: Story }) {
   const href = story.universal_game_id ? `/game/${story.universal_game_id}` : `/stories/${story.id}`;
-  const image = story.universal_game_id ? `/game/${story.universal_game_id}/thumbnail-image` : null;
+  // Per-game recap: the generated matchup thumbnail. Weekly performance
+  // review (no universal_game_id): the tier image matched to that
+  // week's straight-up accuracy -- same helper the story's own detail
+  // page already uses (/stories/[id]/page.tsx), just never wired up
+  // here (user, 2026-11-09: "the image is missing"). Only a story with
+  // neither (accuracy missing/malformed) falls through to the plain
+  // emoji placeholder.
+  const accuracyPct = story.universal_game_id ? null : accuracyPctFromStory(story);
+  const image = story.universal_game_id
+    ? `/game/${story.universal_game_id}/thumbnail-image`
+    : accuracyPct !== null
+      ? performanceTierImagePath(accuracyPct)
+      : null;
   const linkLabel = story.universal_game_id ? "View Game →" : "Read More →";
 
   return (
