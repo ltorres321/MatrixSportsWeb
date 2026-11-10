@@ -96,7 +96,15 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
             <div className="section-label">
               <span className="dot" /> FULL WEEK {story.week} SLATE
             </div>
-            <div className="matchup-grid matchup-grid-slate" style={{ marginBottom: "2rem" }}>
+            {/* Plain .matchup-grid, not .matchup-grid-slate -- that
+                modifier forces exactly 3 equal, zero-minimum-width
+                columns, tuned for /home's much wider content area.
+                This page's .story-page-main caps at 760px for
+                readability, which squeezed those 3 columns down to
+                illegible cards. Plain .matchup-grid's real 340px
+                minimum lets it size itself to however many columns
+                actually fit here instead. */}
+            <div className="matchup-grid" style={{ marginBottom: "2rem" }}>
               {matchups.map((m) => (
                 <MatchupCard key={m.id} matchup={m} />
               ))}
