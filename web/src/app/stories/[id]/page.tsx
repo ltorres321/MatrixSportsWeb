@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoryById } from "@/lib/stories";
+import { getMatchupsForSeasonWeek } from "@/lib/predictions";
 import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
 import { SITE_URL, organizationRef, metaDescription, ORGANIZATION_NAME, TWITTER_SITE } from "@/lib/seo";
+import MatchupCard from "@/components/MatchupCard";
 
 // Standalone article page for a story with no universal_game_id (a
 // weekly performance review, not a per-game recap -- see
@@ -52,6 +54,13 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   const published = story.published_at ? new Date(story.published_at) : null;
   const accuracyPct = accuracyPctFromStory(story);
   const heroImage = accuracyPct !== null ? performanceTierImagePath(accuracyPct) : null;
+  // A performance-review story is always about an already-completed
+  // week -- every game here is final, so this skips the live-refresh/
+  // member-preview-toggle machinery PredictionsView's version of this
+  // same grid carries (neither applies to a backward-looking week),
+  // and renders unlocked -- same "deliberately public" reasoning as
+  // the rest of this page.
+  const matchups = await getMatchupsForSeasonWeek(story.season, story.week);
 
   const articleJsonLd = {
     "@context": "https://schema.org",
@@ -81,6 +90,28 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
         </p>
       </header>
 
+      {/* Deliberately OUTSIDE .story-page-main (which caps at 760px
+          for comfortable prose reading) -- sits directly in .page's
+          own 1200px width instead, same as /home/nba's
+          NbaPredictionsView (also plain .matchup-grid, no narrower
+          wrapper around it). Nesting this grid inside the 760px
+          article column was the real bug in the previous two
+          attempts: swapping grid classes couldn't fix it since the
+          column count was never the problem, the container width
+          was. */}
+      {matchups.length > 0 && (
+        <section style={{ marginBottom: "2rem" }}>
+          <div className="section-label">
+            <span className="dot" /> FULL WEEK {story.week} SLATE
+          </div>
+          <div className="matchup-grid">
+            {matchups.map((m) => (
+              <MatchupCard key={m.id} matchup={m} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <main className="story-page-main">
         {heroImage && (
           // eslint-disable-next-line @next/next/no-img-element -- a
@@ -104,19 +135,14 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
             </p>
           ))}
         </div>
-
-        <p style={{ textAlign: "center", marginTop: "2rem" }}>
-          <Link className="btn btn-primary" href="/home">
-            See This Week&apos;s Full Slate →
-          </Link>
-        </p>
       </main>
 
       <footer className="site-footer">
         <p>
           Every number above comes straight from real, final game results and the model&apos;s own
           pregame predictions -- nothing here is guessed or invented. See{" "}
-          <Link href="/home">the predictions page</Link> for this week&apos;s full slate.
+          <Link href={`/home?season=${story.season}&week=${story.week}`}>the predictions page</Link> to explore
+          other weeks.
         </p>
       </footer>
     </>
