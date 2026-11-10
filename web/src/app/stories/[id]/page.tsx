@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoryById } from "@/lib/stories";
 import { getMatchupsForSeasonWeek } from "@/lib/predictions";
-import { accuracyPctFromStory, performanceTierImagePath } from "@/lib/performanceTier";
+import { accuracyPctFromStory, performanceTier, performanceTierImagePath } from "@/lib/performanceTier";
 import { SITE_URL, organizationRef, metaDescription, ORGANIZATION_NAME, TWITTER_SITE } from "@/lib/seo";
 import MatchupCard from "@/components/MatchupCard";
+import GoldRainTrigger from "@/components/GoldRainTrigger";
 
 // Standalone article page for a story with no universal_game_id (a
 // weekly performance review, not a per-game recap -- see
@@ -80,6 +81,7 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+      {accuracyPct !== null && performanceTier(accuracyPct) === "gold" && <GoldRainTrigger />}
 
       <header className="site-header">
         <h1 className="glow">{story.headline}</h1>

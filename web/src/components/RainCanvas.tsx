@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
 
 interface RainCanvasProps {
   theme?: "dark" | "light";
@@ -13,16 +12,21 @@ interface RainCanvasProps {
 // so the trail fades to white and glyphs stay legible instead of
 // rendering bright green-on-white.
 //
-// Gold on an individual story article (/stories/[id]) -- "like in the
-// movie" (The Matrix Resurrections' own gold-tinted code rain), a
-// one-off cosmetic request for that page specifically, not a new
-// site-wide theme. Checked by path rather than a prop: RainCanvas is
-// rendered once in the root layout, shared by every route, so there's
-// no per-page call site to pass a variant in from.
+// Gold on a "gold tier" (87%+ accuracy, see performanceTier.ts)
+// weekly performance review story -- "like in the movie" (The Matrix
+// Resurrections' own gold-tinted code rain), a one-off cosmetic
+// request for that specific case, not a new site-wide theme. Signaled
+// via document.body.dataset.rainTier (set by GoldRainTrigger, which
+// the story page mounts only when its own tier is "gold") rather than
+// a prop, since RainCanvas is rendered once in the root layout with
+// no per-page call site to pass one in from. Read fresh inside draw()
+// every tick rather than once per effect -- RainCanvas and the
+// trigger mount as siblings in the layout tree, so there's no
+// guaranteed ordering between their two effects; re-checking the DOM
+// each tick (already running every 50ms) sidesteps that race instead
+// of depending on it.
 export default function RainCanvas({ theme = "dark" }: RainCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pathname = usePathname();
-  const isGoldRain = /^\/stories\/[^/]+/.test(pathname ?? "");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -36,8 +40,6 @@ export default function RainCanvas({ theme = "dark" }: RainCanvasProps) {
     let drops: number[] = [];
 
     const fadeColor = theme === "light" ? "rgba(245, 250, 247, 0.12)" : "rgba(3, 6, 3, 0.08)";
-    const glyphColor = isGoldRain ? "#d4af37" : theme === "light" ? "#0d7a2e" : "#00ff41";
-    const glyphHighlightColor = isGoldRain ? "#fff3b0" : theme === "light" ? "#04140a" : "#c8ffd4";
 
     function resize() {
       if (!canvas) return;
@@ -51,6 +53,10 @@ export default function RainCanvas({ theme = "dark" }: RainCanvasProps) {
       if (!ctx || !canvas) return;
       ctx.fillStyle = fadeColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const isGoldRain = document.body.dataset.rainTier === "gold";
+      const glyphColor = isGoldRain ? "#ffd700" : theme === "light" ? "#0d7a2e" : "#00ff41";
+      const glyphHighlightColor = isGoldRain ? "#fffbcc" : theme === "light" ? "#04140a" : "#c8ffd4";
 
       ctx.font = `${fontSize}px monospace`;
       for (let i = 0; i < drops.length; i++) {
@@ -76,7 +82,7 @@ export default function RainCanvas({ theme = "dark" }: RainCanvasProps) {
       window.removeEventListener("resize", resize);
       clearInterval(interval);
     };
-  }, [theme, isGoldRain]);
+  }, [theme]);
 
   return (
     <>
