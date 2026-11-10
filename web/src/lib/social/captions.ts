@@ -76,7 +76,13 @@ function siteLink(platform: Platform, campaign: string, content: string, path = 
     // rather than only the "Link in bio" phrase with no URL at all.
     return "🐇 https://matrixsports.net — Link in bio";
   }
-  const url = `https://matrixsports.net${path}?utm_source=${platform}&utm_medium=social&utm_campaign=${campaign}&utm_content=${content}`;
+  // `path` is usually just a bare route ("/parlays"), but
+  // performanceReviewCaption's results link passes one that already
+  // carries its own query string ("/home?season=&week=") -- `&`, not
+  // `?`, joins the UTM params onto that without producing an invalid
+  // double "?" in the URL.
+  const separator = path.includes("?") ? "&" : "?";
+  const url = `https://matrixsports.net${path}${separator}utm_source=${platform}&utm_medium=social&utm_campaign=${campaign}&utm_content=${content}`;
   return `🐇 ${url}`;
 }
 
@@ -231,6 +237,27 @@ export function performanceReviewCaption(story: Story, platform: Platform): stri
     `${story.season}-w${story.week}`,
     `/stories/${story.id}`
   );
+  // /home?season=&week= is the same predictions page every other
+  // caption's default link already points at -- just pinned to this
+  // story's own week instead of whatever week happens to be current
+  // by the time someone clicks. Its own footer carries the "100,000
+  // Monte Carlo simulations" methodology blurb, which is why this
+  // links there rather than just restating that explanation here.
+  const resultsLink = siteLink(
+    platform,
+    "weekly_performance_results",
+    `${story.season}-w${story.week}`,
+    `/home?season=${story.season}&week=${story.week}`
+  );
 
-  return [`📈 ${story.headline}`, "", hook, "", `Read the full breakdown → ${link}`].join("\n");
+  const lines = [`📈 ${story.headline}`, "", hook, "", `Read the full breakdown → ${link}`];
+  // Instagram's siteLink collapses to the same static "Link in bio"
+  // text regardless of path (see siteLink's own instagram branch) --
+  // a second call here would just repeat that exact line, so skip it
+  // there. Every other platform gets its own distinct, UTM-tagged
+  // link to this week's results.
+  if (platform !== "instagram") {
+    lines.push("", `See this week's full results → ${resultsLink}`);
+  }
+  return lines.join("\n");
 }
