@@ -90,28 +90,29 @@ export default async function StoryPage({ params }: { params: Promise<{ id: stri
         </p>
       </header>
 
-      <main className="story-page-main">
-        {matchups.length > 0 && (
-          <>
-            <div className="section-label">
-              <span className="dot" /> FULL WEEK {story.week} SLATE
-            </div>
-            {/* Plain .matchup-grid, not .matchup-grid-slate -- that
-                modifier forces exactly 3 equal, zero-minimum-width
-                columns, tuned for /home's much wider content area.
-                This page's .story-page-main caps at 760px for
-                readability, which squeezed those 3 columns down to
-                illegible cards. Plain .matchup-grid's real 340px
-                minimum lets it size itself to however many columns
-                actually fit here instead. */}
-            <div className="matchup-grid" style={{ marginBottom: "2rem" }}>
-              {matchups.map((m) => (
-                <MatchupCard key={m.id} matchup={m} />
-              ))}
-            </div>
-          </>
-        )}
+      {/* Deliberately OUTSIDE .story-page-main (which caps at 760px
+          for comfortable prose reading) -- sits directly in .page's
+          own 1200px width instead, same as /home/nba's
+          NbaPredictionsView (also plain .matchup-grid, no narrower
+          wrapper around it). Nesting this grid inside the 760px
+          article column was the real bug in the previous two
+          attempts: swapping grid classes couldn't fix it since the
+          column count was never the problem, the container width
+          was. */}
+      {matchups.length > 0 && (
+        <section style={{ marginBottom: "2rem" }}>
+          <div className="section-label">
+            <span className="dot" /> FULL WEEK {story.week} SLATE
+          </div>
+          <div className="matchup-grid">
+            {matchups.map((m) => (
+              <MatchupCard key={m.id} matchup={m} />
+            ))}
+          </div>
+        </section>
+      )}
 
+      <main className="story-page-main">
         {heroImage && (
           // eslint-disable-next-line @next/next/no-img-element -- a
           // static designer-provided asset, not something next/image
