@@ -1025,6 +1025,25 @@ a {
   filter: grayscale(0.3);
 }
 
+/* `.social-btn { display: flex }` would otherwise beat the hidden
+   attribute's UA display:none. */
+.social-btn[hidden] {
+  display: none;
+}
+
+/* Google's own rendered button (an iframe Google sizes itself);
+   centered in the same 48px slot as the other provider icons. */
+.social-btn-google-direct {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+}
+
+.social-btn-google-direct:empty {
+  display: none;
+}
+
 .social-btn-icon {
   font-size: 1.3rem;
 }

@@ -3,6 +3,7 @@
 import Script from "next/script";
 import { useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getPostSignInPath, markGsiReady } from "@/lib/googleIdentity";
 
 // Google's identity script attaches this global -- not worth pulling
 // in @types/google.accounts for one callback shape.
@@ -13,6 +14,7 @@ declare global {
         id: {
           initialize: (config: Record<string, unknown>) => void;
           prompt: () => void;
+          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
         };
       };
     };
@@ -73,7 +75,7 @@ export default function GoogleOneTap() {
         // client-side route change doesn't make Next.js re-run that --
         // same reasoning as the Server Action login flow (see
         // layout.tsx's getAppearance comment).
-        if (!error) window.location.assign("/home");
+        if (!error) window.location.assign(getPostSignInPath());
       },
       nonce: hashedNonce,
       // Chrome is retiring the old third-party-cookie-based prompt in
@@ -81,6 +83,10 @@ export default function GoogleOneTap() {
       // no-click "Continue as ..." prompt other sites show.
       use_fedcm_for_prompt: true,
     });
+    // Lets the login/signup "Continue with Google" button render
+    // Google's own button against this same initialized client (see
+    // SocialSignInButtons) instead of redirecting through Supabase.
+    markGsiReady();
     window.google.accounts.id.prompt();
   }, []);
 

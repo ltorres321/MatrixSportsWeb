@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { IconType } from "react-icons";
 import {
@@ -12,6 +13,7 @@ import {
 } from "react-icons/fa6";
 import { createClient } from "@/lib/supabase/client";
 import { safeNextPath } from "@/lib/safeRedirect";
+import { GSI_READY_EVENT, isGsiReady, setPostSignInPath } from "@/lib/googleIdentity";
 
 // Supabase's provider identifiers -- note linkedin_oidc, not linkedin
 // (LinkedIn deprecated the old OAuth API Supabase used to target).
@@ -80,7 +82,46 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
+// Google's own rendered button, signing in straight from this site
+// (ID token -> supabase.auth.signInWithIdToken, handled by the callback
+// GoogleOneTap registers). The redirect flow below would instead show
+// Google's "to continue to <project-ref>.supabase.co" screen, which
+// reads as an unrelated site to visitors. Renders nothing until
+// Google's script is initialized, so the caller keeps showing the
+// redirect button as a fallback (script blocked, client ID unset).
+function GoogleDirectButton({ onReady }: { onReady: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function render() {
+      if (!ref.current || !window.google) return;
+      window.google.accounts.id.renderButton(ref.current, {
+        type: "icon",
+        theme: "outline",
+        size: "large",
+        shape: "rectangular",
+      });
+      onReady();
+    }
+    if (isGsiReady()) {
+      render();
+      return;
+    }
+    window.addEventListener(GSI_READY_EVENT, render);
+    return () => window.removeEventListener(GSI_READY_EVENT, render);
+  }, [onReady]);
+
+  return <div ref={ref} className="social-btn-google-direct" />;
+}
+
 export default function SocialSignInButtons({ next }: { next?: string }) {
+  const [googleDirect, setGoogleDirect] = useState(false);
+  const handleGoogleReady = useCallback(() => setGoogleDirect(true), []);
+
+  useEffect(() => {
+    setPostSignInPath(safeNextPath(next));
+  }, [next]);
+
   async function handleClick(provider: Provider) {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
@@ -93,11 +134,13 @@ export default function SocialSignInButtons({ next }: { next?: string }) {
 
   return (
     <div className="social-buttons">
+      <GoogleDirectButton onReady={handleGoogleReady} />
       {PROVIDERS.map(({ provider, label, Icon, enabled, style }) => (
         <button
           key={provider}
           type="button"
           className="social-btn"
+          hidden={provider === "google" && googleDirect}
           style={style}
           disabled={!enabled}
           title={enabled ? label : `${label} — coming soon`}
