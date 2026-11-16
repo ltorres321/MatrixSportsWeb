@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { PARLAY_POOL_SIZE } from "@/lib/parlayHelper";
 import { ParlayCard } from "@/components/ParlayCard";
+import type { PropEditRow } from "@/lib/propEditMath";
+import type { OddsFormat } from "@/lib/oddsFormat";
 import type { WeekParlays } from "./page";
-import { BannedBooksToggle } from "@/components/BannedBooksToggle";
 
 // League-wide sibling of GameDetailView.tsx's ParlayHelperView -- same
 // card, same notice copy, same Hit/Missed grading (ParlayCard reads
@@ -15,6 +16,8 @@ function WeekSection({
   subtitle,
   data,
   isCurrent,
+  propEdits,
+  oddsFormat,
 }: {
   title: string;
   subtitle: string;
@@ -28,7 +31,13 @@ function WeekSection({
   // :not(.parlay-card-hit):not(.parlay-card-missed), not just by which
   // section it's in.
   isCurrent: boolean;
+  propEdits: Record<string, PropEditRow>;
+  oddsFormat: OddsFormat;
 }) {
+  // Line Edit's pick-key scope for this whole week -- see
+  // propEditMath.ts's buildPickKey for why league pages scope by
+  // season+week instead of by game.
+  const scope = `week:${data.season}-${data.week}`;
   // Mixed-book mode is hidden, not removed -- same reasoning as
   // GameDetailView.tsx's ParlayHelperView, with an extra wrinkle here:
   // a league-wide single-book parlay can span several different games,
@@ -72,13 +81,40 @@ function WeekSection({
   return (
     <div className="stat-section">
       <h2>{title}</h2>
-      <p className="stat-sub parlay-week-subtitle">{subtitle}</p>
+      <p className="stat-sub parlay-week-subtitle">
+        {subtitle}
+        {isCurrent && (
+          <>
+            <br />
+            <span className="parlay-book-pref-line">
+              If you don&apos;t see lines from your preferred Bookie,{" "}
+              <Link href="/profile#my-bookies">Change Bookie Preference</Link>
+            </span>
+          </>
+        )}
+      </p>
       <div className={`parlay-grid${isCurrent ? " parlay-grid-current" : ""}`}>
         {twoLeg.map((parlay, i) => (
-          <ParlayCard key={`2-${i}`} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+          <ParlayCard
+            key={`2-${i}`}
+            title={`2-Leg Parlay ${i + 1}`}
+            parlay={parlay}
+            showMatchup
+            scope={scope}
+            propEdits={propEdits}
+            oddsFormat={oddsFormat}
+          />
         ))}
         {threeLeg.map((parlay, i) => (
-          <ParlayCard key={`3-${i}`} title={`3-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+          <ParlayCard
+            key={`3-${i}`}
+            title={`3-Leg Parlay ${i + 1}`}
+            parlay={parlay}
+            showMatchup
+            scope={scope}
+            propEdits={propEdits}
+            oddsFormat={oddsFormat}
+          />
         ))}
       </div>
     </div>
@@ -89,6 +125,8 @@ export default function ParlaysView({
   season,
   currentWeek,
   weeks,
+  propEdits,
+  oddsFormat,
 }: {
   season: number;
   currentWeek: number | null;
@@ -96,6 +134,8 @@ export default function ParlaysView({
   // current) -- see page.tsx's own note on why weeks 1-3 are included
   // rather than filtered out.
   weeks: WeekParlays[];
+  propEdits: Record<string, PropEditRow>;
+  oddsFormat: OddsFormat;
 }) {
   return (
     <>
@@ -114,9 +154,6 @@ export default function ParlaysView({
       </div>
 
       <main>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-          <BannedBooksToggle />
-        </div>
         <div className="parlay-notice" role="note">
           <p>
             <strong>Play responsibly.</strong> Gambling carries real risk, and parlays are long shots that lose far
@@ -146,6 +183,8 @@ export default function ParlaysView({
               }
               data={data}
               isCurrent={isCurrent}
+              propEdits={propEdits}
+              oddsFormat={oddsFormat}
             />
           );
         })}

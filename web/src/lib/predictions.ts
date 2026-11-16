@@ -1179,25 +1179,34 @@ function rowToGameStat(
 // view was paying that full cost TWICE. cache() scopes the dedup to
 // one request/render pass, not across requests, so this never risks
 // serving one visitor another's stale data.
-export const getGameDetail = cache(async function getGameDetail(
-  universalGameId: string,
-  hideBannedBooks: boolean = true
+//
+// SPLIT IN TWO (2026-11-16): the dedup above silently stopped working
+// once the page body started passing sportsbook arguments that
+// generateMetadata doesn't -- cache() only matches calls with identical
+// arguments (and a fresh array never matches), so the whole load was
+// running twice per page view again (measured: ~32 queries per view,
+// half of them duplicates, all queued through the site's single
+// Postgres connection). getGameDetailBase is everything that depends
+// only on the game id, cached on that one argument; getGameDetail adds
+// the betting edge, the only part the sportsbook arguments affect.
+// generateMetadata calls the base directly.
+export const getGameDetailBase = cache(async function getGameDetailBase(
+  universalGameId: string
 ): Promise<GameStat | null> {
-  const rows = await query<PredictionRow>(
-    `SELECT ${PREDICTION_COLUMNS} FROM latest_predictions WHERE universal_game_id = $1`,
+  // The previous prediction run's win probability rides along as a
+  // subselect instead of its own query (one fewer round trip).
+  const rows = await query<PredictionRow & { prior_home_win_probability: number | null }>(
+    `SELECT ${PREDICTION_COLUMNS},
+            (SELECT p.home_win_probability FROM predictions p
+             WHERE p.universal_game_id = $1
+             ORDER BY p.generated_at DESC OFFSET 1 LIMIT 1) AS prior_home_win_probability
+     FROM latest_predictions WHERE universal_game_id = $1`,
     [universalGameId]
   );
   if (rows.length === 0) return null;
   const row = rows[0];
   const records = await getTeamRecords(row.season, row.week);
   const live = (await isScheduleEnabledSeason(row.season)) ? await getLiveScore(row.away_team, row.home_team) : null;
-
-  const priorRows = await query<{ home_win_probability: number }>(
-    `SELECT home_win_probability FROM predictions
-     WHERE universal_game_id = $1
-     ORDER BY generated_at DESC OFFSET 1 LIMIT 1`,
-    [universalGameId]
-  );
 
   // Same freeze as getMatchupsForSeasonWeek -- once kickoff has
   // passed, always show the last pre-kickoff prediction instead of
@@ -1206,7 +1215,7 @@ export const getGameDetail = cache(async function getGameDetail(
   const now = await getEffectiveNow();
   const kickedOff = row.game_date.getTime() <= now.getTime();
   const effectiveRow = kickedOff ? withFrozenProjections(row, await getFrozenProjection(universalGameId)) : row;
-  const priorHomeWinProbability = kickedOff ? undefined : priorRows[0]?.home_win_probability;
+  const priorHomeWinProbability = kickedOff ? undefined : (row.prior_home_win_probability ?? undefined);
 
   // Same last-resort fallback as getMatchupsForSeasonWeek -- see
   // resolveGameState's comment for why this is needed at all (ESPN's
@@ -1225,7 +1234,7 @@ export const getGameDetail = cache(async function getGameDetail(
     game.lockOfWeek = premier.probability !== undefined && premier.probability >= LOCK_OF_WEEK_THRESHOLD;
   }
 
-  const [injuryReport, playerGrades, qbMatchup, efficiency, teamPressure, teamGrades, lineup, bettingEdge] =
+  const [injuryReport, playerGrades, qbMatchup, efficiency, teamPressure, teamGrades, lineup] =
     await Promise.all([
       getGameInjuryReport(row.season, row.week, row.home_team, row.away_team),
       getGamePlayerGrades(row.season, row.home_team, row.away_team),
@@ -1233,8 +1242,7 @@ export const getGameDetail = cache(async function getGameDetail(
       getGameEfficiency(row.season, row.home_team, row.away_team),
       getGameTeamPressure(row.season, row.home_team, row.away_team),
       getGameTeamGrades(row.season, row.home_team, row.away_team),
-      getGameLineup(row.season, row.home_team, row.away_team),
-      getGameBettingEdge(row.universal_game_id, hideBannedBooks),
+      getGameLineup(row.season, row.week, row.home_team, row.away_team),
     ]);
   if (injuryReport) game.injuryReport = injuryReport;
   if (playerGrades) game.playerGrades = playerGrades;
@@ -1243,7 +1251,24 @@ export const getGameDetail = cache(async function getGameDetail(
   if (teamPressure) game.teamPressure = teamPressure;
   if (teamGrades) game.teamGrades = teamGrades;
   if (lineup) game.lineup = lineup;
-  if (bettingEdge) game.bettingEdge = bettingEdge;
 
   return game;
 });
+
+export async function getGameDetail(
+  universalGameId: string,
+  // Suppressed, not deleted (user, 2026-11-14) -- see pffBettingEdge.ts's
+  // BANNED_US_BOOKS comment. "My Bookies" now owns this decision per user.
+  hideBannedBooks: boolean = false,
+  // WIRED TO "MY BOOKIES": forwarded straight to getGameBettingEdge
+  // below -- see that function's (pffBettingEdge.ts) comment.
+  userExcludedBooks: string[] = []
+): Promise<GameStat | null> {
+  const [base, bettingEdge] = await Promise.all([
+    getGameDetailBase(universalGameId),
+    getGameBettingEdge(universalGameId, hideBannedBooks, userExcludedBooks),
+  ]);
+  if (!base) return null;
+  // A copy, never a mutation: `base` is the request-wide cached object.
+  return bettingEdge ? { ...base, bettingEdge } : { ...base };
+}

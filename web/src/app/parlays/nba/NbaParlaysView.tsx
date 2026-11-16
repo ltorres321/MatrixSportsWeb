@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { LEAGUE_TWO_LEG_COUNT, LEAGUE_THREE_LEG_COUNT, type NbaLeagueParlays } from "@/lib/nbaLeagueParlayHelper";
 import { NbaParlayCard, parlayOutcome } from "@/components/NbaParlayCard";
-import { BannedBooksToggle } from "@/components/BannedBooksToggle";
 import { nextNbaWeekStart, previousNbaWeekStart } from "@/lib/nbaSchedule";
+import type { PropEditRow } from "@/lib/propEditMath";
+import type { OddsFormat } from "@/lib/oddsFormat";
 
 // NBA sibling of ../ParlaysView.tsx (NFL) -- same card, same notice
 // copy/structure. NFL stacks one block per week; NBA has no week numbers
@@ -15,6 +16,11 @@ import { nextNbaWeekStart, previousNbaWeekStart } from "@/lib/nbaSchedule";
 export interface NbaDayParlays {
   dayKey: string; // "YYYY-MM-DD", ET calendar date
   parlays: NbaLeagueParlays;
+  // True when My Bookies filtering found nothing at the user's own
+  // books for this day and fell back to the day's unfiltered best picks
+  // instead of showing a blank day (page.tsx's filterDaysToEnabledBooks).
+  // Undefined/false on pages that never filter by book preference.
+  usedFallback?: boolean;
 }
 
 // "YYYY-MM-DD" (ET calendar date) -> "Nov 1" (or "Wed, Nov 4") -- parsed as
@@ -80,7 +86,23 @@ function WeekNav({ weekStart }: { weekStart: string }) {
   );
 }
 
-function DaySection({ day, tag }: { day: NbaDayParlays; tag?: string }) {
+function DaySection({
+  day,
+  tag,
+  enabledBooks,
+  propEdits,
+  oddsFormat,
+}: {
+  day: NbaDayParlays;
+  tag?: string;
+  enabledBooks: string[];
+  propEdits: Record<string, PropEditRow>;
+  oddsFormat: OddsFormat;
+}) {
+  // Line Edit's pick-key scope for this whole day -- see
+  // propEditMath.ts's buildPickKey for why league pages scope by day
+  // instead of by game.
+  const scope = `day:${day.dayKey}`;
   return (
     <div className="stat-section">
       <h2>
@@ -88,6 +110,12 @@ function DaySection({ day, tag }: { day: NbaDayParlays; tag?: string }) {
         {tag ? ` — ${tag}` : ""}
       </h2>
       <p className="stat-sub parlay-week-subtitle">{recordLabel(record([day.parlays]))}</p>
+      {day.usedFallback && (
+        <p className="parlay-fallback-note" role="note">
+          None of today&apos;s parlays matched your My Bookies picks, so these are the model&apos;s best overall
+          picks instead -- check the book shown on each before you bet. <Link href="/profile#my-bookies">Change Bookie Preference</Link>
+        </p>
+      )}
       <div className="parlay-grid parlay-grid-current">
         {day.parlays.twoLeg.map((parlay, i) => (
           <NbaParlayCard
@@ -95,6 +123,10 @@ function DaySection({ day, tag }: { day: NbaDayParlays; tag?: string }) {
             title={`2-Leg Parlay ${i + 1}`}
             parlay={parlay}
             showMatchup
+            enabledBooks={enabledBooks}
+            scope={scope}
+            propEdits={propEdits}
+            oddsFormat={oddsFormat}
           />
         ))}
         {day.parlays.threeLeg.map((parlay, i) => (
@@ -103,6 +135,10 @@ function DaySection({ day, tag }: { day: NbaDayParlays; tag?: string }) {
             title={`3-Leg Parlay ${i + 1}`}
             parlay={parlay}
             showMatchup
+            enabledBooks={enabledBooks}
+            scope={scope}
+            propEdits={propEdits}
+            oddsFormat={oddsFormat}
           />
         ))}
       </div>
@@ -124,6 +160,9 @@ export default function NbaParlaysView({
   days,
   builtAt,
   pastWeeks,
+  enabledBooks,
+  propEdits,
+  oddsFormat,
 }: {
   todayKey: string;
   weekStart: string;
@@ -131,6 +170,9 @@ export default function NbaParlaysView({
   days: NbaDayParlays[];
   builtAt: string | null;
   pastWeeks?: PastNbaWeekRecord[];
+  enabledBooks: string[];
+  propEdits: Record<string, PropEditRow>;
+  oddsFormat: OddsFormat;
 }) {
   const weekLabel = `${formatDate(weekStart)} – ${formatDate(weekEndInclusive)}`;
   const weekRecord = record(days.map((day) => day.parlays));
@@ -156,9 +198,6 @@ export default function NbaParlaysView({
       </div>
 
       <main>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-          <BannedBooksToggle />
-        </div>
         <div className="parlay-notice" role="note">
           <p>
             <strong>Play responsibly.</strong> Gambling carries real risk, and parlays are long shots that lose far
@@ -207,25 +246,56 @@ export default function NbaParlaysView({
         ) : null}
 
         {today.map((day) => (
-          <DaySection key={day.dayKey} day={day} tag="Today" />
+          <DaySection
+            key={day.dayKey}
+            day={day}
+            tag="Today"
+            enabledBooks={enabledBooks}
+            propEdits={propEdits}
+            oddsFormat={oddsFormat}
+          />
         ))}
         {upcoming.map((day) => (
-          <DaySection key={day.dayKey} day={day} tag="Upcoming" />
+          <DaySection
+            key={day.dayKey}
+            day={day}
+            tag="Upcoming"
+            enabledBooks={enabledBooks}
+            propEdits={propEdits}
+            oddsFormat={oddsFormat}
+          />
         ))}
         {earlier.map((day) => (
-          <DaySection key={day.dayKey} day={day} />
+          <DaySection
+            key={day.dayKey}
+            day={day}
+            enabledBooks={enabledBooks}
+            propEdits={propEdits}
+            oddsFormat={oddsFormat}
+          />
         ))}
 
         {pastWeeks && pastWeeks.length > 0 ? (
           <div className="stat-section">
-            {pastWeeks.map((w) => (
-              <p key={w.weekStart} className="stat-sub parlay-week-subtitle">
-                <Link href={`/parlays/nba?week=${w.weekStart}`}>
+            {/* Same 3-across grid as the parlay cards above (user,
+                2026-11-16: "groups of 3 just like the parlays") instead
+                of stacking plain text links, which ran together on one
+                line with no real spacing. */}
+            <div className="parlay-grid">
+              {pastWeeks.map((w) => (
+                <Link key={w.weekStart} href={`/parlays/nba?week=${w.weekStart}`} className="nba-past-week-card">
                   {formatDate(w.weekStart)} – {formatDate(w.weekEndInclusive)}: {w.hit}-{w.hit + w.missed} (
                   {((w.hit / (w.hit + w.missed)) * 100).toFixed(1)}% correct)
                 </Link>
-              </p>
-            ))}
+              ))}
+              {/* Pads a non-multiple-of-3 count out to a full row so the
+                  real tiles above stay 3-columns-wide instead of
+                  stretching to fill the gap -- see .nba-past-week-filler's
+                  own comment in globals.css. */}
+              {Array.from({ length: (3 - (pastWeeks.length % 3)) % 3 }).map((_, i) => (
+                <div key={`filler-${i}`} className="nba-past-week-filler" aria-hidden="true" />
+              ))}
+            </div>
           </div>
         ) : null}
 

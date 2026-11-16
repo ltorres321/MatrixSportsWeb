@@ -78,16 +78,6 @@ function rowToGrades(row: PffTeamGradesRow): TeamPositionGrades {
   };
 }
 
-async function getTeamGrades(season: number, team: string): Promise<TeamPositionGrades | null> {
-  const rows = await query<PffTeamGradesRow>(
-    `SELECT ${TEAM_GRADES_COLUMNS}
-     FROM etl.pff_team_grades
-     WHERE season = $1 AND team = $2`,
-    [season, team]
-  );
-  return rows.length > 0 ? rowToGrades(rows[0]) : null;
-}
-
 // The full league's current-season grades, for ranking one team's
 // grade against the other 31 -- e.g. "5th of 32" next to a value.
 // Small table (one row per team), fine to pull in full rather than
@@ -163,11 +153,12 @@ export async function getGameTeamGrades(
   homeTeam: string,
   awayTeam: string
 ): Promise<TeamGradeRow[] | null> {
-  const [homeGrades, awayGrades, league] = await Promise.all([
-    getTeamGrades(season, homeTeam),
-    getTeamGrades(season, awayTeam),
-    getLeagueGrades(season),
-  ]);
+  // One query, not three: the league pull (one row per team) already
+  // contains both of these teams' rows, and the site's Postgres pool is
+  // a single connection, so every extra round trip is paid in full.
+  const league = await getLeagueGrades(season);
+  const homeGrades = league.find((t) => t.team === homeTeam) ?? null;
+  const awayGrades = league.find((t) => t.team === awayTeam) ?? null;
   if (!homeGrades || !awayGrades) return null;
   const home = homeGrades;
   const away = awayGrades;

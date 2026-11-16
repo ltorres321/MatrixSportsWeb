@@ -12,8 +12,9 @@ import { teamLogoPath } from "@/lib/teamsNba";
 import { teamPrimaryColorNba } from "@/lib/teamColorsNba";
 import { PickResultIcon, SportsbookLink } from "@/components/ParlayCard";
 import { NbaParlayCard } from "@/components/NbaParlayCard";
-import { BannedBooksToggle } from "@/components/BannedBooksToggle";
 import { PARLAY_POOL_SIZE, THREE_LEG_PRANK_CAP } from "@/lib/nbaParlayHelper";
+import type { PropEditRow } from "@/lib/propEditMath";
+import type { OddsFormat } from "@/lib/oddsFormat";
 import NbaLineupSection from "./NbaLineupSection";
 
 // Same polling interval as GameDetailView.tsx's LIVE_REFRESH_MS --
@@ -1284,16 +1285,23 @@ function BettingEdgeTab({ game }: { game: NbaGameDetail }) {
 // instead of football's PFF-sourced ones. Single-book only (no
 // NFL-style mixed-book toggle) -- see nbaParlayHelper.ts's own header
 // for why.
-function ParlayHelperTab({ game }: { game: NbaGameDetail }) {
+function ParlayHelperTab({
+  game,
+  scope,
+  propEdits,
+  oddsFormat,
+}: {
+  game: NbaGameDetail;
+  scope: string;
+  propEdits: Record<string, PropEditRow>;
+  oddsFormat: OddsFormat;
+}) {
   const { twoLeg, threeLeg } = game.parlays;
 
   if (twoLeg.length === 0) {
     return (
       <div className="page-edge-section">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <h3>Parlay Helper</h3>
-          <BannedBooksToggle />
-        </div>
+        <h3>Parlay Helper</h3>
         <div className="lineup-unavailable">
           No parlay with every leg at one sportsbook for this game yet.
         </div>
@@ -1303,10 +1311,7 @@ function ParlayHelperTab({ game }: { game: NbaGameDetail }) {
 
   return (
     <div className="page-edge-section">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <h3>Parlay Helper</h3>
-        <BannedBooksToggle />
-      </div>
+      <h3>Parlay Helper</h3>
       <p className="stat-sub">
         Same-game parlays built from this game&apos;s top {PARLAY_POOL_SIZE} player props by pRank, using our
         model&apos;s estimate of how likely each pick is to hit based on historical results. One leg per player.
@@ -1336,9 +1341,18 @@ function ParlayHelperTab({ game }: { game: NbaGameDetail }) {
 
       <div className="parlay-grid">
         {twoLeg.map((parlay, i) => (
-          <NbaParlayCard key={i} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} />
+          <NbaParlayCard
+            key={i}
+            title={`2-Leg Parlay ${i + 1}`}
+            parlay={parlay}
+            scope={scope}
+            propEdits={propEdits}
+            oddsFormat={oddsFormat}
+          />
         ))}
-        {threeLeg && <NbaParlayCard title="3-Leg Parlay" parlay={threeLeg} />}
+        {threeLeg && (
+          <NbaParlayCard title="3-Leg Parlay" parlay={threeLeg} scope={scope} propEdits={propEdits} oddsFormat={oddsFormat} />
+        )}
       </div>
       {!threeLeg && (
         <p className="parlay-note">
@@ -1358,6 +1372,9 @@ function ParlayHelperTab({ game }: { game: NbaGameDetail }) {
 export default function NbaGameDetailView({
   game,
   initialView,
+  scope,
+  propEdits,
+  oddsFormat,
 }: {
   game: NbaGameDetail;
   // "radar" (from ?view=radar, see page.tsx) lands straight on the
@@ -1366,6 +1383,13 @@ export default function NbaGameDetailView({
   // nbaSpotlightCaption.ts in SportsContentCreation), instead of making
   // someone navigate there themselves from the default Overview tab.
   initialView?: "radar";
+  // Line Edit's pick-key scope + saved overrides (page.tsx) -- only the
+  // Parlay Helper tab uses these, see ParlayHelperTab/propEditMath.ts.
+  scope: string;
+  propEdits: Record<string, PropEditRow>;
+  // "Site Odds Preference" (profile page) -- only the Parlay Helper tab
+  // uses this today.
+  oddsFormat: OddsFormat;
 }) {
   const [activeTab, setActiveTab] = useState<PageTab>(initialView === "radar" ? "matchups" : "overview");
   const router = useRouter();
@@ -1414,7 +1438,7 @@ export default function NbaGameDetailView({
       ) : activeTab === "bettingEdge" ? (
         <BettingEdgeTab game={game} />
       ) : (
-        <ParlayHelperTab game={game} />
+        <ParlayHelperTab game={game} scope={scope} propEdits={propEdits} oddsFormat={oddsFormat} />
       )}
     </>
   );

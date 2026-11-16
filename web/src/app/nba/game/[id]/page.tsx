@@ -1,4 +1,8 @@
 import { getNbaGameDetail } from "@/lib/nbaGameDetail";
+import { createClient } from "@/lib/supabase/server";
+import { getUserEnabledBooks, booksExcludedByUserPref } from "@/lib/sportsbookPrefs";
+import { getUserPropEdits } from "@/lib/propEdits";
+import { getUserOddsFormat } from "@/lib/oddsFormatPrefs";
 import NbaGameDetailView from "./NbaGameDetailView";
 import { pageMetadata } from "@/lib/seo";
 
@@ -22,7 +26,16 @@ export default async function NbaGamePage({
 }) {
   const { id } = await params;
   const { view, hideBanned } = await searchParams;
-  const game = await getNbaGameDetail(id, hideBanned !== "0");
+  // Anonymous visitors get userId undefined -> getUserEnabledBooks
+  // returns [] -> no restriction, same as before this feature existed.
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const enabledBooks = await getUserEnabledBooks(supabase, userData.user?.id);
+  const userExcludedBooks = booksExcludedByUserPref(enabledBooks);
+  const propEdits = await getUserPropEdits(supabase, userData.user?.id);
+  const oddsFormat = await getUserOddsFormat(supabase, userData.user?.id);
+  // Default flipped to "show everything" (user, 2026-11-14) -- ?hideBanned=1 opts back in.
+  const game = await getNbaGameDetail(id, hideBanned === "1", userExcludedBooks);
 
   if (!game) {
     return (
@@ -38,5 +51,13 @@ export default async function NbaGamePage({
   // Chart mode, for social/promo links that want to drop someone right
   // on the chart instead of the default Overview tab. See
   // NbaGameDetailView.tsx's own initialView prop.
-  return <NbaGameDetailView game={game} initialView={view === "radar" ? "radar" : undefined} />;
+  return (
+    <NbaGameDetailView
+      game={game}
+      initialView={view === "radar" ? "radar" : undefined}
+      scope={`game:${id}`}
+      propEdits={propEdits}
+      oddsFormat={oddsFormat}
+    />
+  );
 }

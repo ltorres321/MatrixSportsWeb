@@ -23,7 +23,6 @@ import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
 import { TrendingUpArrow } from "@/components/MatchupCard";
-import { BannedBooksToggle } from "@/components/BannedBooksToggle";
 import {
   SportsbookLink,
   formatOdds,
@@ -31,6 +30,8 @@ import {
   PickResultIcon,
   ParlayCard,
 } from "@/components/ParlayCard";
+import type { PropEditRow } from "@/lib/propEditMath";
+import type { OddsFormat } from "@/lib/oddsFormat";
 
 const LIVE_REFRESH_MS = 20_000;
 
@@ -1350,7 +1351,10 @@ function LineupPositionBox({
   const isTop5 = player.gradeRank !== null && player.gradeRank <= 5;
   return (
     <div className="lineup-box" style={{ left: `${pos.xPct}%`, top: `${topPct}%` }}>
-      <span className="lineup-box-position">{player.alignment}</span>
+      <span className="lineup-box-position">
+        {player.alignment}
+        {player.rosterNote && <span className="lineup-box-roster-note"> · {player.rosterNote}</span>}
+      </span>
       <div className="lineup-box-card">
         <div className="lineup-box-namebar" style={{ background: edgeAccentColor(alias) }}>
           {player.jersey && <span className="lineup-box-jersey">#{player.jersey}</span>}
@@ -1777,7 +1781,7 @@ function epaCellStyle(
   };
 }
 
-function GameLinesSection({ game }: { game: GameStat }) {
+function GameLinesSection({ game, oddsFormat }: { game: GameStat; oddsFormat: OddsFormat }) {
   const markets = game.bettingEdge?.bestGameBets ?? [];
   if (markets.length === 0) return null;
 
@@ -1827,7 +1831,7 @@ function GameLinesSection({ game }: { game: GameStat }) {
                         title="This side hit"
                       />
                     </span>
-                    <span className="betting-line-odds">{formatOdds(side.odds)}</span>
+                    <span className="betting-line-odds">{formatOdds(side.odds, oddsFormat)}</span>
                   </span>
                   <span className="betting-line-market">{PROP_TYPE_LABELS[m.propType] ?? m.propType}</span>
                 </div>
@@ -1892,7 +1896,7 @@ function GameLinesSection({ game }: { game: GameStat }) {
                       title="This side hit"
                     />
                   </span>
-                  <span className="betting-line-odds">{formatOdds(side.odds)}</span>
+                  <span className="betting-line-odds">{formatOdds(side.odds, oddsFormat)}</span>
                 </div>
                 <div className="gl-card-side-edge">
                   <EdgeBar pct={side.edge} />
@@ -1986,7 +1990,7 @@ function InfoTooltip({ text }: { text: string }) {
   );
 }
 
-function FirstTouchdownSection({ game }: { game: GameStat }) {
+function FirstTouchdownSection({ game, oddsFormat }: { game: GameStat; oddsFormat: OddsFormat }) {
   const entries = game.bettingEdge?.firstTouchdown ?? [];
   if (entries.length === 0) return null;
 
@@ -2052,7 +2056,7 @@ function FirstTouchdownSection({ game }: { game: GameStat }) {
                   {e.position && <span className="betting-player-position">({e.position})</span>}
                   <HitCheckmark hit={e.isActualFirstScorer} title="First TD scorer" />
                 </td>
-                <td>{formatOdds(e.firstTdOdds)}</td>
+                <td>{formatOdds(e.firstTdOdds, oddsFormat)}</td>
                 <td style={epaCellStyle(e.epaPerPlay, "high", 0.5)}>
                   {e.epaPerPlay != null ? e.epaPerPlay.toFixed(3) : "—"}
                 </td>
@@ -2086,14 +2090,22 @@ function FirstTouchdownSection({ game }: { game: GameStat }) {
           table above. */}
       <div className="betting-mobile-only">
         {entries.map((e) => (
-          <TdCard key={e.playerName} entry={e} game={game} />
+          <TdCard key={e.playerName} entry={e} game={game} oddsFormat={oddsFormat} />
         ))}
       </div>
     </div>
   );
 }
 
-function TdCard({ entry: e, game }: { entry: FirstTouchdownEntry; game: GameStat }) {
+function TdCard({
+  entry: e,
+  game,
+  oddsFormat,
+}: {
+  entry: FirstTouchdownEntry;
+  game: GameStat;
+  oddsFormat: OddsFormat;
+}) {
   const isHome = e.playerTeam === game.teamB.alias;
 
   return (
@@ -2112,7 +2124,7 @@ function TdCard({ entry: e, game }: { entry: FirstTouchdownEntry; game: GameStat
           </div>
         </div>
         <div className="td-card-odds-wrap">
-          <span className="td-card-odds">{formatOdds(e.firstTdOdds)}</span>
+          <span className="td-card-odds">{formatOdds(e.firstTdOdds, oddsFormat)}</span>
           <SportsbookLink sportsbook={e.sportsbook} />
         </div>
       </div>
@@ -2214,7 +2226,7 @@ function HitRateCell({ record, hitType }: { record: string | null; hitType: stri
   );
 }
 
-function PlayerPropsSection({ game }: { game: GameStat }) {
+function PlayerPropsSection({ game, oddsFormat }: { game: GameStat; oddsFormat: OddsFormat }) {
   const entries = game.bettingEdge?.playerProps ?? [];
   if (entries.length === 0) return null;
 
@@ -2349,7 +2361,7 @@ function PlayerPropsSection({ game }: { game: GameStat }) {
                       {e.pickOdds != null && (
                         <>
                           <br />
-                          <span className="betting-player-team">{formatOdds(e.pickOdds)}</span>
+                          <span className="betting-player-team">{formatOdds(e.pickOdds, oddsFormat)}</span>
                         </>
                       )}
                     </span>
@@ -2462,7 +2474,7 @@ function PropCard({ entry: e, game }: { entry: PlayerPropEntry; game: GameStat }
   );
 }
 
-function BettingEdgeView({ game }: { game: GameStat }) {
+function BettingEdgeView({ game, oddsFormat }: { game: GameStat; oddsFormat: OddsFormat }) {
   if (!game.bettingEdge) {
     return (
       <div className="stat-section">
@@ -2474,18 +2486,25 @@ function BettingEdgeView({ game }: { game: GameStat }) {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-        <BannedBooksToggle />
-      </div>
-      <GameLinesSection game={game} />
-      <FirstTouchdownSection game={game} />
+      <GameLinesSection game={game} oddsFormat={oddsFormat} />
+      <FirstTouchdownSection game={game} oddsFormat={oddsFormat} />
       <KeyInsightsSection game={game} />
-      <PlayerPropsSection game={game} />
+      <PlayerPropsSection game={game} oddsFormat={oddsFormat} />
     </>
   );
 }
 
-function ParlayHelperView({ game }: { game: GameStat }) {
+function ParlayHelperView({
+  game,
+  scope,
+  propEdits,
+  oddsFormat,
+}: {
+  game: GameStat;
+  scope: string;
+  propEdits: Record<string, PropEditRow>;
+  oddsFormat: OddsFormat;
+}) {
   // Mixed-book mode is hidden, not removed -- with this many books now
   // covering a game's props (see pffBettingEdge.ts's matchingLine* line-
   // shopping), a single-book parlay is almost always findable, so the
@@ -2509,10 +2528,7 @@ function ParlayHelperView({ game }: { game: GameStat }) {
 
   return (
     <div className="stat-section">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <h2>Parlay Helper</h2>
-        <BannedBooksToggle />
-      </div>
+      <h2>Parlay Helper</h2>
       <p className="stat-sub">
         Same-game parlays built from this game&apos;s top {PARLAY_POOL_SIZE} player props by pRank, using our model&apos;s
         estimate of how likely each pick is to hit based on historical results. One leg per player.
@@ -2538,9 +2554,18 @@ function ParlayHelperView({ game }: { game: GameStat }) {
       ) : (
         <div className="parlay-grid">
           {twoLeg.map((parlay, i) => (
-            <ParlayCard key={i} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} />
+            <ParlayCard
+              key={i}
+              title={`2-Leg Parlay ${i + 1}`}
+              parlay={parlay}
+              scope={scope}
+              propEdits={propEdits}
+              oddsFormat={oddsFormat}
+            />
           ))}
-          {threeLeg && <ParlayCard title="3-Leg Parlay" parlay={threeLeg} />}
+          {threeLeg && (
+            <ParlayCard title="3-Leg Parlay" parlay={threeLeg} scope={scope} propEdits={propEdits} oddsFormat={oddsFormat} />
+          )}
         </div>
       )}
       {twoLeg.length > 0 && !threeLeg && (
@@ -2612,6 +2637,8 @@ function PageTabStrip({
 }
 
 const INJURY_STATUS_CLASS: Record<string, string> = {
+  IR: "injury-out",
+  Reserve: "injury-out",
   Out: "injury-out",
   Doubtful: "injury-doubtful",
   Questionable: "injury-questionable",
@@ -2721,7 +2748,24 @@ function GameRecap({ story }: { story: Story | null }) {
   );
 }
 
-export default function GameDetailView({ game, story = null }: { game: GameStat; story?: Story | null }) {
+export default function GameDetailView({
+  game,
+  story = null,
+  scope,
+  propEdits,
+  oddsFormat,
+}: {
+  game: GameStat;
+  story?: Story | null;
+  // Line Edit's pick-key scope + saved overrides (page.tsx) -- only
+  // ParlayHelperView uses these.
+  scope: string;
+  propEdits: Record<string, PropEditRow>;
+  // "Site Odds Preference" (profile page) -- threaded into every odds
+  // display on this page: ParlayHelperView and the Betting Edge tab's
+  // GameLinesSection/FirstTouchdownSection(+TdCard)/PlayerPropsSection.
+  oddsFormat: OddsFormat;
+}) {
   const { isMember, toggle } = useMemberPreview();
   const router = useRouter();
   const locked = !game.premier && !isMember;
@@ -2952,11 +2996,11 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
               </div>
             ) : activeTab === "bettingEdge" ? (
               <div className="page-edge-section">
-                <BettingEdgeView game={game} />
+                <BettingEdgeView game={game} oddsFormat={oddsFormat} />
               </div>
             ) : (
               <div className="page-edge-section">
-                <ParlayHelperView game={game} />
+                <ParlayHelperView game={game} scope={scope} propEdits={propEdits} oddsFormat={oddsFormat} />
               </div>
             )}
           </div>
@@ -2997,11 +3041,11 @@ export default function GameDetailView({ game, story = null }: { game: GameStat;
         </div>
       ) : activeTab === "bettingEdge" ? (
         <div className="page-edge-section">
-          <BettingEdgeView game={game} />
+          <BettingEdgeView game={game} oddsFormat={oddsFormat} />
         </div>
       ) : (
         <div className="page-edge-section">
-          <ParlayHelperView game={game} />
+          <ParlayHelperView game={game} scope={scope} propEdits={propEdits} oddsFormat={oddsFormat} />
         </div>
       )}
     </>

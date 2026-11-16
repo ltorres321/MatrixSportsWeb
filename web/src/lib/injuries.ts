@@ -87,14 +87,29 @@ function rowToEntry(row: InjuryRow): InjuryEntry | null {
 // is the one injury-report line most readers actually care about),
 // then by how serious the designation reads.
 const STATUS_RANK: Record<string, number> = {
-  Out: 0,
-  Doubtful: 1,
-  Questionable: 2,
-  DNP: 3,
-  Limited: 4,
-  Full: 5,
+  IR: 0,
+  Reserve: 1,
+  Out: 2,
+  Doubtful: 3,
+  Questionable: 4,
+  DNP: 5,
+  Limited: 6,
+  Full: 7,
 };
 
+// The official weekly report above only covers the ACTIVE roster: a
+// player placed on injured reserve is removed from it entirely, so
+// without this second source the most serious injuries vanish from the
+// section (confirmed live: Malik Willis/MIA, on the report through
+// week 9, gone in week 10 once on IR). etl.roster_status is nflverse's
+// weekly roster file (SportsPipelines' nflverse_injuries/
+// poll_roster_status.py). Only status_code R01 (Reserve/Injured) is
+// labelled "IR"; every other reserve-list code is shown as the plain
+// "Reserve" rather than guessing at its exact meaning.
+//
+// The roster file can trail the schedule by a few days, so this reads
+// each team's most recent week at or before the game's week instead of
+// requiring an exact week match.
 function sortEntries(entries: InjuryEntry[]): InjuryEntry[] {
   return [...entries].sort((a, b) => {
     const aIsQb = a.position === "QB" ? 0 : 1;
@@ -113,19 +128,49 @@ export async function getGameInjuryReport(
   homeTeam: string,
   awayTeam: string
 ): Promise<GameInjuryReport | null> {
-  const rows = await query<InjuryRow>(
-    `SELECT team, player, position, report_status, report_primary_injury, practice_status, practice_primary_injury
+  // ONE query for both sources (the site's Postgres pool is a single
+  // connection, so each extra round trip is paid in full): the weekly
+  // report rows, plus the reserve-list rows tagged by a non-null
+  // reserve_code.
+  const allRows = await query<InjuryRow & { reserve_code: string | null }>(
+    `SELECT team, player, position, report_status, report_primary_injury,
+            practice_status, practice_primary_injury, NULL::text AS reserve_code
      FROM etl.injury_reports
-     WHERE season = $1 AND week = $2 AND team IN ($3, $4)`,
+     WHERE season = $1 AND week = $2 AND team IN ($3, $4)
+     UNION ALL
+     SELECT rs.team, rs.player, rs.position, NULL, NULL, NULL, NULL, COALESCE(rs.status_code, '')
+     FROM etl.roster_status rs
+     WHERE rs.season = $1 AND rs.team IN ($3, $4) AND rs.status = 'RES'
+       AND rs.week = (
+         SELECT max(w.week) FROM etl.roster_status w
+         WHERE w.season = $1 AND w.team = rs.team AND w.week <= $2
+       )`,
     [season, week, homeTeam, awayTeam]
   );
-  if (rows.length === 0) return null;
+  const rows = allRows.filter((r) => r.reserve_code === null);
+  const reserveRows = allRows.filter((r) => r.reserve_code !== null);
+  if (rows.length === 0 && reserveRows.length === 0) return null;
+
+  // A reserve-list player wins over any stale weekly-report row of his.
+  const reserveNames = new Set(reserveRows.map((r) => `${r.team}|${r.player.toLowerCase()}`));
 
   const home: InjuryEntry[] = [];
   const away: InjuryEntry[] = [];
   for (const row of rows) {
+    if (reserveNames.has(`${row.team}|${row.player.toLowerCase()}`)) continue;
     const entry = rowToEntry(row);
     if (!entry) continue;
+    if (row.team === homeTeam) home.push(entry);
+    else if (row.team === awayTeam) away.push(entry);
+  }
+  for (const row of reserveRows) {
+    const entry: InjuryEntry = {
+      player: row.player,
+      position: row.position,
+      status: row.reserve_code === "R01" ? "IR" : "Reserve",
+      isOfficial: true,
+      injury: null,
+    };
     if (row.team === homeTeam) home.push(entry);
     else if (row.team === awayTeam) away.push(entry);
   }

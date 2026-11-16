@@ -46,9 +46,61 @@ function MoreMenu({
   onNavigate: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [shareLabel, setShareLabel] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const close = () => setOpen(false);
+
+  // navigator.share opens the OS's own native share sheet (same one
+  // Safari's share-icon button triggers) -- only this exact page's
+  // title/url, nothing else, and only ever in response to a real click
+  // (browsers refuse to fire it from a timer or on load). Most desktop
+  // browsers (and a user with a mouse, not a touch share sheet to go
+  // to) don't implement it at all, so the fallback just copies the
+  // link and flashes the button's own label rather than popping a
+  // toast -- there's no toast system elsewhere in this nav to reuse.
+  async function handleShare() {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: document.title, url });
+        close();
+        onNavigate();
+      } catch {
+        // Cancelled the native sheet -- leave the menu open, nothing to recover.
+      }
+      return;
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(url);
+      setShareLabel("Link Copied!");
+      setTimeout(() => setShareLabel(null), 1500);
+      return;
+    }
+    // Both the Web Share API and the Clipboard API require a secure
+    // context (HTTPS, or localhost) -- neither exists when this is
+    // opened over the LAN by IP (e.g. a phone on the same network
+    // hitting the dev server at its 192.168.x.x address, per
+    // next.config.ts's allowedDevOrigins), so without this the button
+    // did nothing at all there. The old execCommand trick still works
+    // on an insecure origin.
+    const textarea = document.createElement("textarea");
+    textarea.value = url;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      document.execCommand("copy");
+      setShareLabel("Link Copied!");
+    } catch {
+      setShareLabel("Couldn't Copy");
+    } finally {
+      document.body.removeChild(textarea);
+      setTimeout(() => setShareLabel(null), 1500);
+    }
+  }
 
   // Same pattern as profile/page.tsx's handleSignOut -- duplicated
   // rather than imported from there since that file isn't a shared
@@ -182,6 +234,12 @@ function MoreMenu({
         >
           Contact Us
         </Link>
+        <button type="button" onClick={handleShare}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+            <ShareIcon />
+            {shareLabel ?? "Share"}
+          </span>
+        </button>
         {signedIn ? (
           <button type="button" className="nav-more-signout" onClick={handleSignOut}>
             Sign Out
@@ -415,6 +473,19 @@ function RecapsIcon() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="5" y="3.5" width="14" height="17" rx="1.5" />
       <path d="M8.5 8h7M8.5 12h7M8.5 16h4" />
+    </svg>
+  );
+}
+
+// The standard "square with an arrow out the top" share glyph (same
+// shape as Safari's own share button) -- box open at the top, arrow
+// passing through it, matching what the user pointed at on their phone.
+function ShareIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M12 16V4" />
+      <path d="M7 8l5-5 5 5" />
+      <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
     </svg>
   );
 }

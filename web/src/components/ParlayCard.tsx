@@ -1,5 +1,8 @@
 import type { PlayerPropEntry } from "@/lib/pffBettingEdge";
 import type { Parlay } from "@/lib/parlayHelper";
+import { applyLineEdit, buildPickKey, buildTileEditKey, resolveSavedEdit, type EditScope, type PropEditRow } from "@/lib/propEditMath";
+import { PropEditButton } from "@/components/PropEditButton";
+import { formatOdds, DEFAULT_ODDS_FORMAT, type OddsFormat } from "@/lib/oddsFormat";
 
 // Shared by the per-game "Parlay Helper" tab (GameDetailView.tsx) and the
 // league-wide "Parlays" page (app/parlays) -- both build the same Parlay
@@ -73,6 +76,38 @@ export const SPORTSBOOK_INFO: Record<string, { name: string; url?: string; logo?
     name: "Bovada",
     url: "https://www.bovada.lv/",
     logo: "/assets/favicons/bovada.png",
+  },
+  // Offshore, like bovada/bet99 -- real retail wagering accounts, just
+  // not US-licensed -- but confirmed by the user (2026-11-16) as usable
+  // by US bettors in practice, so this one stays OUT of BANNED_US_BOOKS
+  // (unlike bet99). No logo asset on hand yet, so this falls back to
+  // SportsbookLink's plain-text label (see this file's own header
+  // comment) until one's added.
+  betonlineag: {
+    name: "BetOnline.ag",
+    url: "https://www.betonline.ag/",
+  },
+  // Same offshore-but-usable category as betonlineag above (user,
+  // 2026-11-16: "seem legit sites, they reside outside us but I can
+  // create account"). No logo asset yet -- plain-text fallback.
+  lowvig: {
+    name: "LowVig.ag",
+    url: "https://www.lowvig.ag/",
+  },
+  // Confirmed by the user (2026-11-16: "looks like I can place parlays
+  // for real money and create an account") -- a normal real-money book
+  // here, not NON_RETAIL_BOOKS/pick6's DFS-pick'em category. No logo
+  // asset yet -- plain-text fallback.
+  parlayplay: {
+    name: "ParlayPlay",
+    url: "https://parlayplay.io/",
+  },
+  // Licensed US real-money sportsbook (Penn Entertainment/theScore
+  // brand) -- a normal selectable book, no different category from
+  // draftkings/fanduel/etc. No logo asset yet -- plain-text fallback.
+  thescorebet: {
+    name: "theScore Bet",
+    url: "https://www.thescore.bet/",
   },
   // Canada-only -- not legally available to US bettors (confirmed by the
   // user, 2026-11), so also added to pffBettingEdge.ts's BANNED_US_BOOKS.
@@ -223,9 +258,11 @@ export function SportsbookLink({ sportsbook }: { sportsbook: string }) {
   );
 }
 
-export function formatOdds(odds: number): string {
-  return odds > 0 ? `+${odds}` : `${odds}`;
-}
+// Re-exported so existing importers (NbaParlayCard.tsx, GameDetailView.tsx)
+// don't need their own import line change -- the canonical definition
+// (and the OddsFormat type/ODDS_FORMATS list) now lives in oddsFormat.ts
+// since it's a pure value, not UI, and the profile page needs it too.
+export { formatOdds, type OddsFormat };
 
 // matchupPosition is "No Matchup" for backups PFF didn't run a
 // matchup analysis on -- that's a real, honest signal about matchup
@@ -277,9 +314,17 @@ export function formatPercent(p: number): string {
   return `${(p * 100).toFixed(1)}%`;
 }
 
-function parlayLegLabel(e: PlayerPropEntry): string {
+function parlayLegLabel(e: PlayerPropEntry, side?: string, line?: number): string {
   if (e.consensusStat === "Anytime TD") return "Anytime TD";
-  return `${e.pickSide ?? ""} ${e.pickLine ?? ""} ${e.consensusStat}`.trim();
+  return `${side ?? e.pickSide ?? ""} ${line ?? e.pickLine ?? ""} ${e.consensusStat}`.trim();
+}
+
+// Line Edit (user, 2026-11-15) only applies to a real over/under line --
+// "Anytime TD" is a binary yes/no market with no line/side to edit, and
+// a leg missing pickLine/pickSide has nothing for recomputeProbability
+// to work from. Those legs just don't get an Edit button.
+function isEditableLeg(e: PlayerPropEntry): e is PlayerPropEntry & { pickLine: number; pickSide: "over" | "under" } {
+  return e.consensusStat !== "Anytime TD" && e.pickLine != null && (e.pickSide === "over" || e.pickSide === "under");
 }
 
 // What the player actually did, once the game is final -- null pre-game
@@ -311,20 +356,85 @@ export function ParlayCard({
   // The league-wide Parlays page sets this since its legs can come from
   // different games.
   showMatchup = false,
+  // Disambiguates this parlay's picks for Line Edit's per-user edit
+  // table (propEditMath.ts's buildPickKey) -- a per-game page passes
+  // `game:${universalGameId}`, the league-wide Parlays page passes
+  // `week:${season}-${week}`. Required: an edit saved under the wrong
+  // scope would silently never show up again.
+  scope,
+  // The signed-in user's saved Line Edit overrides, keyed by
+  // buildPickKey's own key -- omitted/empty means no edits, same as
+  // before this feature existed.
+  propEdits = {},
+  // "Site Odds Preference" (profile page) -- defaults to American so
+  // every call site that hasn't been updated to pass this yet keeps
+  // rendering exactly as it did before this feature existed.
+  oddsFormat = DEFAULT_ODDS_FORMAT,
 }: {
   title: string;
   parlay: Parlay;
   showMatchup?: boolean;
+  scope: string;
+  propEdits?: Record<string, PropEditRow>;
+  oddsFormat?: OddsFormat;
 }) {
   const outcome = parlayOutcome(parlay);
+
+  // Display-only overlay: apply any saved Line Edit per leg (only legs
+  // isEditableLeg allows), then recompute the tile's own combined
+  // probability/payout from whatever is actually displayed. The site's
+  // own `parlay` object (which legs make this tile, its graded outcome)
+  // is never touched -- see propEditMath.ts's own header.
+  const displayLegs = parlay.legs.map((leg) => {
+    const e = leg.entry;
+    if (!isEditableLeg(e)) {
+      return {
+        leg,
+        pickKeyAll: null as string | null,
+        pickKeyTile: null as string | null,
+        activeScope: null as EditScope | null,
+        display: {
+          line: e.pickLine ?? undefined,
+          side: e.pickSide ?? undefined,
+          odds: leg.odds,
+          probability: leg.probability,
+          decimalOdds: leg.decimalOdds,
+          edited: false,
+        },
+      };
+    }
+    const pickKeyAll = buildPickKey({
+      league: "nfl",
+      scope,
+      player: e.playerName,
+      stat: e.consensusStat,
+      originalLine: e.pickLine,
+      originalSide: e.pickSide,
+    });
+    const pickKeyTile = buildTileEditKey(pickKeyAll, title);
+    const resolved = resolveSavedEdit(propEdits, pickKeyAll, pickKeyTile);
+    const display = applyLineEdit(
+      { projection: e.projValue, originalLine: e.pickLine, originalSide: e.pickSide, originalProbability: leg.probability, originalOdds: leg.odds },
+      resolved?.row
+    );
+    return { leg, pickKeyAll, pickKeyTile, activeScope: resolved?.appliesTo ?? null, display };
+  });
+  const anyEdited = displayLegs.some((l) => l.display.edited);
+  const displayProbability = displayLegs.reduce((prod, l) => prod * l.display.probability, 1);
+  const displayDecimalOdds = displayLegs.reduce((prod, l) => prod * l.display.decimalOdds, 1);
+
   return (
-    <div className={`parlay-card${outcome ? ` parlay-card-${outcome}` : ""}`}>
+    <div className={`parlay-card${outcome && !anyEdited ? ` parlay-card-${outcome}` : ""}`}>
       <div className="parlay-card-head">
         <div className="parlay-card-titles">
           <span className="parlay-card-title">
             {title}
-            {outcome && (
-              <span className={`parlay-outcome parlay-outcome-${outcome}`}>{outcome === "hit" ? "Hit" : "Missed"}</span>
+            {anyEdited ? (
+              <span className="parlay-outcome parlay-outcome-customized">Customized</span>
+            ) : (
+              outcome && (
+                <span className={`parlay-outcome parlay-outcome-${outcome}`}>{outcome === "hit" ? "Hit" : "Missed"}</span>
+              )
             )}
           </span>
           <span className="parlay-card-book">
@@ -340,18 +450,18 @@ export function ParlayCard({
         </div>
         <div className="parlay-card-stats">
           <div className="parlay-stat">
-            <span className="parlay-stat-value">{formatPercent(parlay.probability)}</span>
+            <span className="parlay-stat-value">{formatPercent(displayProbability)}</span>
             <span className="parlay-stat-label">chance to hit</span>
           </div>
           <div className="parlay-stat">
-            <span className="parlay-stat-value parlay-stat-payout">${parlay.decimalOdds.toFixed(2)}</span>
+            <span className="parlay-stat-value parlay-stat-payout">${displayDecimalOdds.toFixed(2)}</span>
             <span className="parlay-stat-label">payout on a $1 bet</span>
-            <span className="parlay-stat-sub">(${(parlay.decimalOdds - 1).toFixed(2)} profit)</span>
+            <span className="parlay-stat-sub">(${(displayDecimalOdds - 1).toFixed(2)} profit)</span>
           </div>
         </div>
       </div>
       <ul className="parlay-legs">
-        {parlay.legs.map((leg) => {
+        {displayLegs.map(({ leg, pickKeyAll, pickKeyTile, activeScope, display }) => {
           const e = leg.entry;
           const actualLabel = parlayLegActualLabel(e);
           return (
@@ -363,7 +473,7 @@ export function ParlayCard({
                 <div className="parlay-leg-player">
                   <span className="betting-player-team">{e.playerTeam}</span> {e.playerName}
                   {displayPosition(e) && <span className="betting-player-position">({displayPosition(e)})</span>}
-                  <PickResultIcon result={e.pickResult} />
+                  {display.edited ? <span className="parlay-leg-edited-tag">Edited</span> : <PickResultIcon result={e.pickResult} />}
                 </div>
                 {showMatchup && (
                   <div className="parlay-leg-matchup">
@@ -371,14 +481,25 @@ export function ParlayCard({
                     {e.gameDay && ` (${e.gameDay})`}
                   </div>
                 )}
-                <div className="parlay-leg-pick">{parlayLegLabel(e)}</div>
+                <div className="parlay-leg-pick">{parlayLegLabel(e, display.side, display.line)}</div>
                 {actualLabel && <div className="parlay-leg-actual">{actualLabel}</div>}
               </div>
               <div className="parlay-leg-odds">
                 {leg.sportsbook && <SportsbookLink sportsbook={leg.sportsbook} />}
-                <span>{formatOdds(leg.odds)}</span>
+                <span>{formatOdds(display.odds, oddsFormat)}</span>
               </div>
-              <div className="parlay-leg-prob">{formatPercent(leg.probability)}</div>
+              <div className="parlay-leg-prob">{formatPercent(display.probability)}</div>
+              {pickKeyAll && pickKeyTile && (
+                <PropEditButton
+                  pickKeyAll={pickKeyAll}
+                  pickKeyTile={pickKeyTile}
+                  currentLine={display.line as number}
+                  currentSide={display.side as "over" | "under"}
+                  currentOdds={display.odds}
+                  hasEdit={display.edited}
+                  activeScope={activeScope}
+                />
+              )}
             </li>
           );
         })}
