@@ -1193,21 +1193,20 @@ function rowToGameStat(
 export const getGameDetailBase = cache(async function getGameDetailBase(
   universalGameId: string
 ): Promise<GameStat | null> {
-  const rows = await query<PredictionRow>(
-    `SELECT ${PREDICTION_COLUMNS} FROM latest_predictions WHERE universal_game_id = $1`,
+  // The previous prediction run's win probability rides along as a
+  // subselect instead of its own query (one fewer round trip).
+  const rows = await query<PredictionRow & { prior_home_win_probability: number | null }>(
+    `SELECT ${PREDICTION_COLUMNS},
+            (SELECT p.home_win_probability FROM predictions p
+             WHERE p.universal_game_id = $1
+             ORDER BY p.generated_at DESC OFFSET 1 LIMIT 1) AS prior_home_win_probability
+     FROM latest_predictions WHERE universal_game_id = $1`,
     [universalGameId]
   );
   if (rows.length === 0) return null;
   const row = rows[0];
   const records = await getTeamRecords(row.season, row.week);
   const live = (await isScheduleEnabledSeason(row.season)) ? await getLiveScore(row.away_team, row.home_team) : null;
-
-  const priorRows = await query<{ home_win_probability: number }>(
-    `SELECT home_win_probability FROM predictions
-     WHERE universal_game_id = $1
-     ORDER BY generated_at DESC OFFSET 1 LIMIT 1`,
-    [universalGameId]
-  );
 
   // Same freeze as getMatchupsForSeasonWeek -- once kickoff has
   // passed, always show the last pre-kickoff prediction instead of
@@ -1216,7 +1215,7 @@ export const getGameDetailBase = cache(async function getGameDetailBase(
   const now = await getEffectiveNow();
   const kickedOff = row.game_date.getTime() <= now.getTime();
   const effectiveRow = kickedOff ? withFrozenProjections(row, await getFrozenProjection(universalGameId)) : row;
-  const priorHomeWinProbability = kickedOff ? undefined : priorRows[0]?.home_win_probability;
+  const priorHomeWinProbability = kickedOff ? undefined : (row.prior_home_win_probability ?? undefined);
 
   // Same last-resort fallback as getMatchupsForSeasonWeek -- see
   // resolveGameState's comment for why this is needed at all (ESPN's

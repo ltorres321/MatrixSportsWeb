@@ -30,7 +30,13 @@ function getPool(): Pool {
     const newPool = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false },
-      max: 1,
+      // Still 1 unless PG_POOL_MAX is set (see the comment above for why
+      // 1 is the safe default). The knob exists so a larger pool can be
+      // tried on ONE deploy context (e.g. the ltorres-1 branch deploy)
+      // without changing production: with max 1, every query on a page
+      // waits for the previous one, so a page's server time is roughly
+      // (number of queries) x (one round trip).
+      max: Math.max(1, Number(process.env.PG_POOL_MAX) || 1),
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 10_000,
     });

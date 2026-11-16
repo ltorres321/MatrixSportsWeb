@@ -110,32 +110,6 @@ const STATUS_RANK: Record<string, number> = {
 // The roster file can trail the schedule by a few days, so this reads
 // each team's most recent week at or before the game's week instead of
 // requiring an exact week match.
-interface ReserveRow {
-  team: string;
-  player: string;
-  position: string | null;
-  status_code: string | null;
-}
-
-async function getReserveRows(season: number, week: number, homeTeam: string, awayTeam: string): Promise<ReserveRow[]> {
-  try {
-    return await query<ReserveRow>(
-      `SELECT rs.team, rs.player, rs.position, rs.status_code
-       FROM etl.roster_status rs
-       WHERE rs.season = $1 AND rs.team IN ($3, $4) AND rs.status = 'RES'
-         AND rs.week = (
-           SELECT max(w.week) FROM etl.roster_status w
-           WHERE w.season = $1 AND w.team = rs.team AND w.week <= $2
-         )`,
-      [season, week, homeTeam, awayTeam]
-    );
-  } catch (err) {
-    // Never let this extra source take the whole injury section down.
-    console.error("roster_status lookup failed", err);
-    return [];
-  }
-}
-
 function sortEntries(entries: InjuryEntry[]): InjuryEntry[] {
   return [...entries].sort((a, b) => {
     const aIsQb = a.position === "QB" ? 0 : 1;
@@ -154,15 +128,27 @@ export async function getGameInjuryReport(
   homeTeam: string,
   awayTeam: string
 ): Promise<GameInjuryReport | null> {
-  const [rows, reserveRows] = await Promise.all([
-    query<InjuryRow>(
-      `SELECT team, player, position, report_status, report_primary_injury, practice_status, practice_primary_injury
-       FROM etl.injury_reports
-       WHERE season = $1 AND week = $2 AND team IN ($3, $4)`,
-      [season, week, homeTeam, awayTeam]
-    ),
-    getReserveRows(season, week, homeTeam, awayTeam),
-  ]);
+  // ONE query for both sources (the site's Postgres pool is a single
+  // connection, so each extra round trip is paid in full): the weekly
+  // report rows, plus the reserve-list rows tagged by a non-null
+  // reserve_code.
+  const allRows = await query<InjuryRow & { reserve_code: string | null }>(
+    `SELECT team, player, position, report_status, report_primary_injury,
+            practice_status, practice_primary_injury, NULL::text AS reserve_code
+     FROM etl.injury_reports
+     WHERE season = $1 AND week = $2 AND team IN ($3, $4)
+     UNION ALL
+     SELECT rs.team, rs.player, rs.position, NULL, NULL, NULL, NULL, COALESCE(rs.status_code, '')
+     FROM etl.roster_status rs
+     WHERE rs.season = $1 AND rs.team IN ($3, $4) AND rs.status = 'RES'
+       AND rs.week = (
+         SELECT max(w.week) FROM etl.roster_status w
+         WHERE w.season = $1 AND w.team = rs.team AND w.week <= $2
+       )`,
+    [season, week, homeTeam, awayTeam]
+  );
+  const rows = allRows.filter((r) => r.reserve_code === null);
+  const reserveRows = allRows.filter((r) => r.reserve_code !== null);
   if (rows.length === 0 && reserveRows.length === 0) return null;
 
   // A reserve-list player wins over any stale weekly-report row of his.
@@ -181,7 +167,7 @@ export async function getGameInjuryReport(
     const entry: InjuryEntry = {
       player: row.player,
       position: row.position,
-      status: row.status_code === "R01" ? "IR" : "Reserve",
+      status: row.reserve_code === "R01" ? "IR" : "Reserve",
       isOfficial: true,
       injury: null,
     };
