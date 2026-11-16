@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getGameDetail, formatKickoff } from "@/lib/predictions";
+import { getGameDetail, getGameDetailBase, formatKickoff } from "@/lib/predictions";
 import { getScheduledGame } from "@/lib/schedule";
 import { getStoryForGame } from "@/lib/stories";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
@@ -29,7 +29,10 @@ function teamDisplay(alias: string): string {
 // openGraph.siteName (set once in the root layout).
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const game = await getGameDetail(id);
+  // The base load only (no betting edge) -- shared with the page body's
+  // own getGameDetail call through React's cache(), so the title costs
+  // no extra database work. See getGameDetailBase's comment.
+  const game = await getGameDetailBase(id);
   if (!game) return {};
 
   const a = teamDisplay(game.teamA.alias);
@@ -67,10 +70,13 @@ export default async function GameDetailPage({
   // returns [] -> no restriction, same as before this feature existed.
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
-  const enabledBooks = await getUserEnabledBooks(supabase, userData.user?.id);
+  // Three independent per-user reads -- run together, not one after another.
+  const [enabledBooks, propEdits, oddsFormat] = await Promise.all([
+    getUserEnabledBooks(supabase, userData.user?.id),
+    getUserPropEdits(supabase, userData.user?.id),
+    getUserOddsFormat(supabase, userData.user?.id),
+  ]);
   const userExcludedBooks = booksExcludedByUserPref(enabledBooks);
-  const propEdits = await getUserPropEdits(supabase, userData.user?.id);
-  const oddsFormat = await getUserOddsFormat(supabase, userData.user?.id);
   const game = await getGameDetail(id, hideBannedBooks, userExcludedBooks);
   if (game) {
     const story = game.finalResult ? await getStoryForGame(id) : null;

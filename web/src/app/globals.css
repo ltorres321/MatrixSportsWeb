@@ -3345,6 +3345,20 @@ h1.glow span {
   background: var(--green-faint);
 }
 
+/* Room between the Edit button and the odds/percent (user, 2026-11-16:
+   "the edit button too close to percent give it some room"). The button
+   stays in the row's top-right corner; on rows that have one, the odds
+   and percent drop to the bottom of the row and the row gets enough
+   height that the two never touch. */
+.parlay-leg:has(.prop-edit-btn) {
+  min-height: 4.6rem;
+}
+
+.parlay-leg:has(.prop-edit-btn) .parlay-leg-odds,
+.parlay-leg:has(.prop-edit-btn) .parlay-leg-prob {
+  align-self: flex-end;
+}
+
 .prop-edit-overlay {
   position: fixed;
   inset: 0;
