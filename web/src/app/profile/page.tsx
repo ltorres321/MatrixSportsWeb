@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useMemberPreview } from "@/lib/useMemberPreview";
 import { TEAMS } from "@/lib/teams";
 import { NBA_TEAMS } from "@/lib/teamsNba";
+import { SPORTSBOOKS, COIN_BASED_BOOK_IDS } from "@/lib/sportsbooks";
+import { SportsbookPickerModal } from "@/components/SportsbookPickerModal";
+import { PillPickerModal } from "@/components/PillPickerModal";
+import { ODDS_FORMATS, DEFAULT_ODDS_FORMAT, type OddsFormat } from "@/lib/oddsFormat";
 
 interface ProfileRow {
   first_name: string;
@@ -25,6 +29,8 @@ interface ProfileRow {
   notify_teams: string[];
   theme: "dark" | "light";
   matrix_rain_enabled: boolean;
+  enabled_sportsbooks: string[];
+  odds_format: OddsFormat;
 }
 
 // Supabase/Twilio require E.164 (+<country code><number>, digits
@@ -38,6 +44,13 @@ interface ProfileRow {
 // null when the domestic digit count doesn't look like a real US
 // number, so the caller can ask the user to check the box instead of
 // silently sending something wrong.
+// TEAMS/NBA_TEAMS entries are {alias, name, market} -- every display
+// spot and picker option below shows the full "Arizona Cardinals" form,
+// not just "Cardinals", so this is the one place that formatting lives.
+function teamLabel(t: { market: string; name: string }): string {
+  return `${t.market} ${t.name}`;
+}
+
 function normalizePhoneNumber(raw: string, international: boolean): string | null {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return null;
@@ -64,6 +77,27 @@ export default function ProfilePage() {
   const [cellOtpSent, setCellOtpSent] = useState(false);
   const [cellOtpCode, setCellOtpCode] = useState("");
   const [cellNote, setCellNote] = useState("");
+  const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
+  const [bookPickerOpen, setBookPickerOpen] = useState(false);
+  const [bookiesNote, setBookiesNote] = useState("");
+  // "Coin Based Books" gate (user, 2026-11-16) -- derived from whether
+  // the saved profile already has one of COIN_BASED_BOOK_IDS selected,
+  // not its own DB column; see toggleCoinBooks's own comment for why.
+  const [coinBooksEnabled, setCoinBooksEnabled] = useState(false);
+  // "Site Odds Preference" (user, 2026-11-16: "American Odds, Decimal,
+  // Fractional ... this will change how odds are displayed across
+  // site") -- profiles.odds_format (sql/019), default American.
+  const [oddsFormat, setOddsFormat] = useState<OddsFormat>(DEFAULT_ODDS_FORMAT);
+  const [oddsFormatNote, setOddsFormatNote] = useState("");
+  const [favoriteTeam, setFavoriteTeam] = useState<string | null>(null);
+  const [favoriteTeamPickerOpen, setFavoriteTeamPickerOpen] = useState(false);
+  const [favoriteTeamNote, setFavoriteTeamNote] = useState("");
+  const [favoriteNbaTeam, setFavoriteNbaTeam] = useState<string | null>(null);
+  const [favoriteNbaTeamPickerOpen, setFavoriteNbaTeamPickerOpen] = useState(false);
+  const [favoriteNbaTeamNote, setFavoriteNbaTeamNote] = useState("");
+  const [notifyTeams, setNotifyTeams] = useState<string[]>([]);
+  const [notifyTeamsPickerOpen, setNotifyTeamsPickerOpen] = useState(false);
+  const [notifyTeamsNote, setNotifyTeamsNote] = useState("");
 
   useEffect(() => {
     if (!isRealMember || !user) return;
@@ -77,6 +111,12 @@ export default function ProfilePage() {
         const row = data as ProfileRow | null;
         setProfile(row);
         setCellInput(row?.cell ?? "");
+        setSelectedBooks(row?.enabled_sportsbooks ?? []);
+        setCoinBooksEnabled((row?.enabled_sportsbooks ?? []).some((b) => COIN_BASED_BOOK_IDS.includes(b)));
+        setOddsFormat(row?.odds_format ?? DEFAULT_ODDS_FORMAT);
+        setFavoriteTeam(row?.favorite_team ?? null);
+        setFavoriteNbaTeam(row?.favorite_nba_team ?? null);
+        setNotifyTeams(row?.notify_teams ?? []);
         setLoadingProfile(false);
       });
   }, [isRealMember, user]);
@@ -84,15 +124,19 @@ export default function ProfilePage() {
   // The browser's own "scroll to #hash on load" only fires once, right
   // after the initial navigation -- but this whole page returns null
   // until the auth check resolves (the `if (!loaded) return null`
-  // below), so #address-team doesn't exist in the DOM yet at that
+  // below), so the target section doesn't exist in the DOM yet at that
   // moment and the native behavior finds nothing to scroll to. Redoing
-  // it manually once the real content (and that section) has actually
-  // mounted is what makes a link like "Add Favorite Team ->
-  // /profile#address-team" actually land there instead of the page top.
+  // it manually once the real content has actually mounted is what
+  // makes a link like "Add Favorite Team -> /profile#favorite-nfl-team"
+  // actually land there instead of the page top. Generic over whatever
+  // hash is present (not hardcoded to one section id) now that there
+  // are several deep-linkable panels (address-team, favorite-nfl-team,
+  // favorite-nba-team, notify-teams, my-bookies).
   useEffect(() => {
     if (!isRealMember || loadingProfile) return;
-    if (window.location.hash !== "#address-team") return;
-    document.getElementById("address-team")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return;
+    document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [isRealMember, loadingProfile]);
 
   // A verified cell is only trustworthy for whatever number Supabase
@@ -233,10 +277,7 @@ export default function ProfilePage() {
       city: (String(formData.get("city") ?? "").trim() || null) as string | null,
       state: (String(formData.get("state") ?? "").trim() || null) as string | null,
       zip: (String(formData.get("zip") ?? "").trim() || null) as string | null,
-      favorite_team: (String(formData.get("favoriteTeam") ?? "").trim() || null) as string | null,
-      favorite_nba_team: (String(formData.get("favoriteNbaTeam") ?? "").trim() || null) as string | null,
       notify_win_prob: formData.get("notify") === "on",
-      notify_teams: formData.getAll("notifyTeams").map(String),
     };
 
     const supabase = createClient();
@@ -247,7 +288,89 @@ export default function ProfilePage() {
     }
   }
 
+  // Shared by every Add/Edit pill section below (My Bookies, Favorite
+  // NFL/NBA Team, Teams to Notify) -- pressing Done both closes that
+  // section's panel and persists immediately, unlike Address & Team
+  // Notifications' one big form with its own "Save Preferences" click.
+  async function saveProfileField<K extends keyof ProfileRow>(
+    column: K,
+    value: ProfileRow[K],
+    setNote: (note: string) => void
+  ) {
+    if (!user) return;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ [column]: value } as Partial<ProfileRow>)
+      .eq("id", user.id);
+    setNote(error ? error.message : "Saved.");
+    if (!error) {
+      setProfile((prev) => (prev ? { ...prev, [column]: value } : prev));
+    }
+  }
+
+  function toggleBook(id: string) {
+    setSelectedBooks((prev) => (prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]));
+  }
+  // No separate DB column -- this gate's "on" state IS "the user has a
+  // coin-based book selected" (set from the saved profile on load,
+  // above). Turning it off here also drops any coin books currently
+  // selected, so a pill never shows both greyed-out AND active at once,
+  // and Done/Save correctly persists the opt-out.
+  function toggleCoinBooks() {
+    setCoinBooksEnabled((prev) => {
+      const next = !prev;
+      if (!next) {
+        setSelectedBooks((books) => books.filter((b) => !COIN_BASED_BOOK_IDS.includes(b)));
+      }
+      return next;
+    });
+  }
+  async function handleSaveBookies() {
+    setBookPickerOpen(false);
+    await saveProfileField("enabled_sportsbooks", selectedBooks, setBookiesNote);
+  }
+
+  // Saved immediately on click, no separate "Done" step -- there's no
+  // modal here, just 3 always-visible options, so there's nothing left
+  // to confirm first.
+  async function handleOddsFormatChange(format: OddsFormat) {
+    setOddsFormat(format);
+    await saveProfileField("odds_format", format, setOddsFormatNote);
+  }
+
+  // Single-select: picking a team replaces the current one; tapping
+  // the already-selected pill again clears it (matches PillPickerModal's
+  // own "tap again to clear" copy for a non-multiple picker).
+  function toggleFavoriteTeam(id: string) {
+    setFavoriteTeam((prev) => (prev === id ? null : id));
+  }
+  async function handleSaveFavoriteTeam() {
+    setFavoriteTeamPickerOpen(false);
+    await saveProfileField("favorite_team", favoriteTeam, setFavoriteTeamNote);
+  }
+
+  function toggleFavoriteNbaTeam(id: string) {
+    setFavoriteNbaTeam((prev) => (prev === id ? null : id));
+  }
+  async function handleSaveFavoriteNbaTeam() {
+    setFavoriteNbaTeamPickerOpen(false);
+    await saveProfileField("favorite_nba_team", favoriteNbaTeam, setFavoriteNbaTeamNote);
+  }
+
+  function toggleNotifyTeam(id: string) {
+    setNotifyTeams((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
+  }
+  async function handleSaveNotifyTeams() {
+    setNotifyTeamsPickerOpen(false);
+    await saveProfileField("notify_teams", notifyTeams, setNotifyTeamsNote);
+  }
+
   const isLightTheme = (profile?.theme ?? "dark") === "light";
+  const nflTeamOptions = TEAMS.map((t) => ({ id: t.alias, name: teamLabel(t) }));
+  const nbaTeamOptions = NBA_TEAMS.map((t) => ({ id: t.alias, name: teamLabel(t) }));
+  const favoriteTeamLabel = TEAMS.find((t) => t.alias === favoriteTeam);
+  const favoriteNbaTeamLabel = NBA_TEAMS.find((t) => t.alias === favoriteNbaTeam);
 
   if (!loaded) return null;
 
@@ -538,52 +661,12 @@ export default function ProfilePage() {
                 </label>
                 <input type="text" id="zip" name="zip" defaultValue={profile?.zip ?? ""} />
               </div>
-              <div className="field full">
-                <label htmlFor="favoriteTeam">Favorite NFL Team</label>
-                <select id="favoriteTeam" name="favoriteTeam" defaultValue={profile?.favorite_team ?? ""}>
-                  <option value="">No preference</option>
-                  {TEAMS.map((t) => (
-                    <option key={t.alias} value={t.alias}>
-                      {t.market} {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field full">
-                <label htmlFor="favoriteNbaTeam">Favorite NBA Team</label>
-                <select id="favoriteNbaTeam" name="favoriteNbaTeam" defaultValue={profile?.favorite_nba_team ?? ""}>
-                  <option value="">No preference</option>
-                  {NBA_TEAMS.map((t) => (
-                    <option key={t.alias} value={t.alias}>
-                      {t.market} {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="checkbox-row">
                 <input type="checkbox" id="notify" name="notify" defaultChecked={profile?.notify_win_prob ?? false} />
                 <label htmlFor="notify">
                   Notify me when a selected team&apos;s win probability changes
                   <span className="sub">Requires a verified cell number (see the Cell Number section above).</span>
                 </label>
-              </div>
-              <div className="field full">
-                <label>
-                  Teams to Notify Me About <span className="optional-tag">(select any number)</span>
-                </label>
-                <div className="team-checklist">
-                  {TEAMS.map((t) => (
-                    <label key={t.alias} className="team-checklist-item">
-                      <input
-                        type="checkbox"
-                        name="notifyTeams"
-                        value={t.alias}
-                        defaultChecked={profile?.notify_teams?.includes(t.alias) ?? false}
-                      />
-                      {t.market} {t.name}
-                    </label>
-                  ))}
-                </div>
               </div>
               <div className="field full">
                 <button type="submit" className="btn btn-primary btn-block">
@@ -593,6 +676,183 @@ export default function ProfilePage() {
             </form>
           )}
         </div>
+
+        <div className="form-panel" id="favorite-nfl-team" style={{ marginTop: "1.5rem" }}>
+          <h2>Favorite NFL Team</h2>
+          <p className="form-intro">One team, or none -- shown on your dashboard.</p>
+          {favoriteTeam === null ? (
+            <p className="profile-pill-empty">No preference set.</p>
+          ) : (
+            <div className="profile-pill-list">
+              <span className="profile-pill">
+                {favoriteTeamLabel ? teamLabel(favoriteTeamLabel) : favoriteTeam}
+              </span>
+            </div>
+          )}
+          <button
+            type="button"
+            className="favorites-empty-pill"
+            onClick={() => setFavoriteTeamPickerOpen(true)}
+          >
+            + {favoriteTeam === null ? "Add Favorite Team" : "Edit Favorite Team"}
+          </button>
+          {favoriteTeamNote && (
+            <p className="form-footer-note form-footer-note-save" style={{ marginTop: "1rem" }}>
+              {favoriteTeamNote}
+            </p>
+          )}
+        </div>
+
+        <div className="form-panel" id="favorite-nba-team" style={{ marginTop: "1.5rem" }}>
+          <h2>Favorite NBA Team</h2>
+          <p className="form-intro">One team, or none -- shown on your dashboard.</p>
+          {favoriteNbaTeam === null ? (
+            <p className="profile-pill-empty">No preference set.</p>
+          ) : (
+            <div className="profile-pill-list">
+              <span className="profile-pill">
+                {favoriteNbaTeamLabel ? teamLabel(favoriteNbaTeamLabel) : favoriteNbaTeam}
+              </span>
+            </div>
+          )}
+          <button
+            type="button"
+            className="favorites-empty-pill"
+            onClick={() => setFavoriteNbaTeamPickerOpen(true)}
+          >
+            + {favoriteNbaTeam === null ? "Add Favorite Team" : "Edit Favorite Team"}
+          </button>
+          {favoriteNbaTeamNote && (
+            <p className="form-footer-note form-footer-note-save" style={{ marginTop: "1rem" }}>
+              {favoriteNbaTeamNote}
+            </p>
+          )}
+        </div>
+
+        <div className="form-panel" id="notify-teams" style={{ marginTop: "1.5rem" }}>
+          <h2>Teams to Notify Me About</h2>
+          <p className="form-intro">
+            Any number of NFL teams -- requires a verified cell number (see the Cell Number section above).
+          </p>
+          {notifyTeams.length === 0 ? (
+            <p className="profile-pill-empty">No teams selected yet.</p>
+          ) : (
+            <div className="profile-pill-list">
+              {notifyTeams.map((id) => {
+                const t = TEAMS.find((t) => t.alias === id);
+                return (
+                  <span key={id} className="profile-pill">
+                    {t ? teamLabel(t) : id}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <button
+            type="button"
+            className="favorites-empty-pill"
+            onClick={() => setNotifyTeamsPickerOpen(true)}
+          >
+            + {notifyTeams.length === 0 ? "Add Teams to Notify" : "Edit Teams to Notify"}
+          </button>
+          {notifyTeamsNote && (
+            <p className="form-footer-note form-footer-note-save" style={{ marginTop: "1rem" }}>
+              {notifyTeamsNote}
+            </p>
+          )}
+        </div>
+
+        <div className="form-panel" id="my-bookies" style={{ marginTop: "1.5rem" }}>
+          <h2>My Bookies</h2>
+          <p className="form-intro">
+            Pick the sportsbooks you actually have accounts at, so parlays and prop picks only ever show
+            books you can act on.
+          </p>
+          {selectedBooks.length === 0 ? (
+            <p className="profile-pill-empty">No sportsbooks selected yet.</p>
+          ) : (
+            <div className="profile-pill-list">
+              {selectedBooks.map((id) => {
+                const book = SPORTSBOOKS.find((b) => b.id === id);
+                return (
+                  <span key={id} className="profile-pill">
+                    {book?.name ?? id}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <button type="button" className="favorites-empty-pill" onClick={() => setBookPickerOpen(true)}>
+            + {selectedBooks.length === 0 ? "Add Sportsbooks" : "Edit Sportsbooks"}
+          </button>
+          {bookiesNote && (
+            <p className="form-footer-note form-footer-note-save" style={{ marginTop: "1rem" }}>
+              {bookiesNote}
+            </p>
+          )}
+        </div>
+
+        <div className="form-panel" id="odds-preference" style={{ marginTop: "1.5rem" }}>
+          <h2>Site Odds Preference</h2>
+          <p className="form-intro">Choose how odds are displayed across the site.</p>
+          <div className="odds-format-row">
+            {ODDS_FORMATS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`odds-format-pill${oddsFormat === f.id ? " active" : ""}`}
+                aria-pressed={oddsFormat === f.id}
+                onClick={() => handleOddsFormatChange(f.id)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {oddsFormatNote && (
+            <p className="form-footer-note form-footer-note-save" style={{ marginTop: "1rem" }}>
+              {oddsFormatNote}
+            </p>
+          )}
+        </div>
+
+        <SportsbookPickerModal
+          open={bookPickerOpen}
+          selected={selectedBooks}
+          onToggle={toggleBook}
+          onDone={handleSaveBookies}
+          coinBooksEnabled={coinBooksEnabled}
+          onCoinBooksToggle={toggleCoinBooks}
+        />
+
+        <PillPickerModal
+          open={favoriteTeamPickerOpen}
+          title="Select Your Favorite NFL Team"
+          options={nflTeamOptions}
+          selected={favoriteTeam ? [favoriteTeam] : []}
+          multiple={false}
+          onToggle={toggleFavoriteTeam}
+          onDone={handleSaveFavoriteTeam}
+        />
+
+        <PillPickerModal
+          open={favoriteNbaTeamPickerOpen}
+          title="Select Your Favorite NBA Team"
+          options={nbaTeamOptions}
+          selected={favoriteNbaTeam ? [favoriteNbaTeam] : []}
+          multiple={false}
+          onToggle={toggleFavoriteNbaTeam}
+          onDone={handleSaveFavoriteNbaTeam}
+        />
+
+        <PillPickerModal
+          open={notifyTeamsPickerOpen}
+          title="Select Teams to Notify Me About"
+          options={nflTeamOptions}
+          selected={notifyTeams}
+          multiple
+          onToggle={toggleNotifyTeam}
+          onDone={handleSaveNotifyTeams}
+        />
 
         {saveNote && (
           <p className="form-footer-note form-footer-note-save" style={{ marginTop: "1.5rem" }}>

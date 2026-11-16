@@ -1181,7 +1181,12 @@ function rowToGameStat(
 // serving one visitor another's stale data.
 export const getGameDetail = cache(async function getGameDetail(
   universalGameId: string,
-  hideBannedBooks: boolean = true
+  // Suppressed, not deleted (user, 2026-11-14) -- see pffBettingEdge.ts's
+  // BANNED_US_BOOKS comment. "My Bookies" now owns this decision per user.
+  hideBannedBooks: boolean = false,
+  // WIRED TO "MY BOOKIES": forwarded straight to getGameBettingEdge
+  // below -- see that function's (pffBettingEdge.ts) comment.
+  userExcludedBooks: string[] = []
 ): Promise<GameStat | null> {
   const rows = await query<PredictionRow>(
     `SELECT ${PREDICTION_COLUMNS} FROM latest_predictions WHERE universal_game_id = $1`,
@@ -1233,8 +1238,8 @@ export const getGameDetail = cache(async function getGameDetail(
       getGameEfficiency(row.season, row.home_team, row.away_team),
       getGameTeamPressure(row.season, row.home_team, row.away_team),
       getGameTeamGrades(row.season, row.home_team, row.away_team),
-      getGameLineup(row.season, row.home_team, row.away_team),
-      getGameBettingEdge(row.universal_game_id, hideBannedBooks),
+      getGameLineup(row.season, row.week, row.home_team, row.away_team),
+      getGameBettingEdge(row.universal_game_id, hideBannedBooks, userExcludedBooks),
     ]);
   if (injuryReport) game.injuryReport = injuryReport;
   if (playerGrades) game.playerGrades = playerGrades;

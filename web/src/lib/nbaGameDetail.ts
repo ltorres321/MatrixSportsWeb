@@ -8,7 +8,7 @@ import { getGameEfficiencyScoring, type GameEfficiencyScoring } from "@/lib/nbaE
 import { getGameFourFactors, type GameFourFactors } from "@/lib/nbaFourFactors";
 import { getGameLineup, type GameLineup } from "@/lib/nbaLineup";
 import { getGameShotChart, type GameShotChart } from "@/lib/nbaShotChart";
-import { BANNED_US_BOOKS, NON_RETAIL_BOOKS } from "@/lib/pffBettingEdge";
+import { NON_RETAIL_BOOKS } from "@/lib/pffBettingEdge";
 import { buildGameParlays, type NbaGameParlays, type NbaParlayPick } from "@/lib/nbaParlayHelper";
 
 // NBA equivalent of predictions.ts's getGameDetail(), scoped to just
@@ -237,8 +237,15 @@ function spreadDisplay(spread: number, homeTeamName: string, awayTeamName: strin
 // twice.
 export const getNbaGameDetail = cache(async function getNbaGameDetail(
   gameId: string,
-  hideBannedBooks: boolean = true
+  // SUPPRESSED, NOT DELETED (user, 2026-11-14, ignored entirely as of
+  // 2026-11-15) -- see pffBettingEdge.ts's BANNED_US_BOOKS comment.
+  // "My Bookies" now owns this decision per user.
+  hideBannedBooks: boolean = false,
+  // WIRED TO "MY BOOKIES": see getGameBettingEdge's (pffBettingEdge.ts)
+  // identical param for the full comment.
+  userExcludedBooks: string[] = []
 ): Promise<NbaGameDetail | null> {
+  void hideBannedBooks;
   const games = await query<GameRow>(
     `SELECT universal_game_id, season, home_team, home_team_name,
             away_team, away_team_name, game_date, home_win_probability,
@@ -325,7 +332,7 @@ export const getNbaGameDetail = cache(async function getNbaGameDetail(
   // "ranked" computes pRank over the FULL pool (unfiltered by book), so
   // a pick's rank reflects its true standing in this game's props
   // regardless of which book ends up quoting it.
-  const excludedParlayBooks = [...NON_RETAIL_BOOKS, ...(hideBannedBooks ? BANNED_US_BOOKS : [])];
+  const excludedParlayBooks = [...NON_RETAIL_BOOKS, ...new Set(userExcludedBooks)];
   const parlayPickRows = await query<{
     player_name: string; team: string; opponent: string; stat: string;
     line: number; side: string; projection: number; cover_probability: number;

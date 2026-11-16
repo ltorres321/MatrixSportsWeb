@@ -10,6 +10,9 @@ import { buildLeagueParlays, type LeagueParlays } from "@/lib/leagueParlayHelper
 import type { ParlayBookMode } from "@/lib/parlayHelper";
 import { recordDisplayedLeagueParlays } from "@/lib/parlayLog";
 import { createClient } from "@/lib/supabase/server";
+import { getUserEnabledBooks, booksExcludedByUserPref } from "@/lib/sportsbookPrefs";
+import { getUserPropEdits } from "@/lib/propEdits";
+import { getUserOddsFormat } from "@/lib/oddsFormatPrefs";
 import { cachedAsync } from "@/lib/memoCache";
 import ParlaysView from "./ParlaysView";
 import { pageMetadata } from "@/lib/seo";
@@ -49,9 +52,24 @@ export interface WeekParlays {
 
 // Exported so the home dashboard's "Parlays to Play" preview can reuse
 // the same cached, Postgres-backed build instead of re-deriving it.
-export async function buildWeekParlays(season: number, week: number, hideBannedBooks: boolean): Promise<WeekParlays> {
-  return cachedAsync(`nfl-league-parlays:${season}:${week}:${hideBannedBooks}`, CACHE_TTL_MS, async () => {
-    const playerProps = await getLeagueBettingEdge(season, week, hideBannedBooks);
+//
+// userExcludedBooks flows into the live query itself (getLeagueBettingEdge
+// already does the real "best remaining allowed book" pricing per leg --
+// see pffBettingEdge.ts), so it MUST be part of the cache key below, not
+// just the hideBannedBooks toggle -- cachedAsync is a shared, cross-
+// request/cross-user cache (see memoCache.ts), and skipping this would
+// serve one user's personalized "My Bookies" result to a different user
+// with a different (or no) book selection. Sorted/joined so the same
+// set of books always hashes to the same key regardless of pick order.
+export async function buildWeekParlays(
+  season: number,
+  week: number,
+  hideBannedBooks: boolean,
+  userExcludedBooks: string[] = []
+): Promise<WeekParlays> {
+  const bookKey = [...userExcludedBooks].sort().join(",");
+  return cachedAsync(`nfl-league-parlays:${season}:${week}:${hideBannedBooks}:${bookKey}`, CACHE_TTL_MS, async () => {
+    const playerProps = await getLeagueBettingEdge(season, week, hideBannedBooks, userExcludedBooks);
     const parlays: Record<ParlayBookMode, LeagueParlays> = {
       single: buildLeagueParlays(playerProps, "single"),
       mixed: buildLeagueParlays(playerProps, "mixed"),
@@ -137,12 +155,17 @@ export default async function ParlaysPage({
 }: {
   searchParams: Promise<{ hideBanned?: string }>;
 }) {
-  const hideBannedBooks = (await searchParams).hideBanned !== "0";
+  // Default OFF (user, 2026-11-14) -- "My Bookies" now owns this decision per user.
+  const hideBannedBooks = (await searchParams).hideBanned === "1";
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
     return <SignUpGate />;
   }
+  const enabledBooks = await getUserEnabledBooks(supabase, userData.user.id);
+  const userExcludedBooks = booksExcludedByUserPref(enabledBooks);
+  const propEdits = await getUserPropEdits(supabase, userData.user.id);
+  const oddsFormat = await getUserOddsFormat(supabase, userData.user.id);
 
   const season = await getCurrentSeasonYear();
   const seasons = await getAvailableSeasons();
@@ -159,7 +182,28 @@ export default async function ParlaysPage({
   const weeksToShow =
     currentWeek == null ? [] : weeks.filter((w) => w >= FIRST_PARLAY_WEEK && w <= currentWeek).sort((a, b) => b - a);
 
-  const weekParlays = await Promise.all(weeksToShow.map((w) => buildWeekParlays(activeSeason, w, hideBannedBooks)));
+  // "My Bookies" only applies to the current, still-open week (user,
+  // 2026-11-16: "historical can not change... rules will be going
+  // forward") -- a past week's picks/grading already happened at
+  // whatever book the model actually used, so re-filtering it by a
+  // preference that didn't exist yet (or has since changed) can only
+  // ever remove real graded history, never correct it. Historical weeks
+  // always build with no exclusion, same as before "My Bookies" existed;
+  // buildWeekParlays' own cache key already covers this ([] is a
+  // distinct, shared bookKey every user hits the same way).
+  const weekParlays = await Promise.all(
+    weeksToShow.map((w) =>
+      buildWeekParlays(activeSeason, w, hideBannedBooks, w === currentWeek ? userExcludedBooks : [])
+    )
+  );
 
-  return <ParlaysView season={activeSeason} currentWeek={currentWeek} weeks={weekParlays} />;
+  return (
+    <ParlaysView
+      season={activeSeason}
+      currentWeek={currentWeek}
+      weeks={weekParlays}
+      propEdits={propEdits}
+      oddsFormat={oddsFormat}
+    />
+  );
 }

@@ -31,6 +31,9 @@ import { ParlayCard } from "@/components/ParlayCard";
 import { NbaParlayCard } from "@/components/NbaParlayCard";
 import { buildWeekParlays } from "@/app/parlays/page";
 import { loadNbaWeekParlays } from "@/app/parlays/nba/page";
+import { getUserPropEdits } from "@/lib/propEdits";
+import { getUserOddsFormat } from "@/lib/oddsFormatPrefs";
+import { DEFAULT_ODDS_FORMAT } from "@/lib/oddsFormat";
 import { getCurrentNbaWeek, etDateKey } from "@/lib/nbaSchedule";
 import { formatDate } from "@/app/parlays/nba/NbaParlaysView";
 
@@ -68,13 +71,17 @@ function truncateTeaser(text: string, maxChars = 160): string {
 // sit in the same matchup-grid column a real MatchupCard/NbaMatchupCard
 // would occupy.
 function AddFavoriteCard({ league }: { league: "NFL" | "NBA" }) {
+  // Favorite NFL/NBA Team moved into its own profile panel (2026-11-14,
+  // one Add/Edit-pill section per league) -- route each card to its own
+  // panel rather than the old shared #address-team anchor.
+  const anchor = league === "NFL" ? "favorite-nfl-team" : "favorite-nba-team";
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
       <div className="unlock-card">
         <span className="lock-icon">⭐</span>
         <h3>Pick a Favorite {league} Team</h3>
         <p>Choose a favorite {league} team on My Profile and we&apos;ll surface their game right here.</p>
-        <Link className="btn btn-primary btn-block" href="/profile#address-team">
+        <Link className="btn btn-primary btn-block" href={`/profile#${anchor}`}>
           Add Favorite Team
         </Link>
       </div>
@@ -89,13 +96,14 @@ function AddFavoriteCard({ league }: { league: "NFL" | "NBA" }) {
 // picking a team; this one would be lying if it said the same thing
 // to someone who already has.
 function NoFavoriteGameCard({ league, note }: { league: "NFL" | "NBA"; note: string }) {
+  const anchor = league === "NFL" ? "favorite-nfl-team" : "favorite-nba-team";
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
       <div className="unlock-card">
         <span className="lock-icon">⭐</span>
         <h3>No {league} Game Today</h3>
         <p>{note}</p>
-        <Link className="btn btn-ghost btn-block" href="/profile#address-team">
+        <Link className="btn btn-ghost btn-block" href={`/profile#${anchor}`}>
           Change Favorite Team
         </Link>
       </div>
@@ -592,6 +600,12 @@ async function SignedInDashboard({
   const todayKey = etDateKey(new Date());
   const nbaDayParlays = nbaDays.find((d) => d.dayKey === todayKey) ?? nbaDays[0] ?? null;
 
+  // Line Edit (user, 2026-11-15) -- same scope convention as the
+  // dedicated /parlays and /parlays/nba pages, so an edit made from
+  // either place shows up here too.
+  const parlaysPreviewPropEdits = userId ? await getUserPropEdits(await createClient(), userId) : {};
+  const parlaysPreviewOddsFormat = userId ? await getUserOddsFormat(await createClient(), userId) : DEFAULT_ODDS_FORMAT;
+
   return (
     <>
       <header className="site-header">
@@ -701,7 +715,10 @@ async function SignedInDashboard({
                 Once either favorite is picked, the grid below takes over. */}
             {hasNoFavorites && (
               <div style={{ textAlign: "center" }}>
-                <Link className="favorites-empty-pill" href="/profile#address-team">
+                {/* Lands on the NFL panel; the NBA one sits right below it
+                    now that each league has its own Add/Edit-pill section
+                    (2026-11-14) rather than one shared #address-team anchor. */}
+                <Link className="favorites-empty-pill" href="/profile#favorite-nfl-team">
                   ⭐ Add My Favorite Teams
                 </Link>
               </div>
@@ -760,13 +777,34 @@ async function SignedInDashboard({
                   <p className="stat-sub parlay-week-subtitle">
                     This week&apos;s games haven&apos;t been played yet -- these are the model&apos;s current best
                     picks, not graded results.
+                    <br />
+                    <span className="parlay-book-pref-line">
+                      If you don&apos;t see lines from your preferred Bookie,{" "}
+                      <Link href="/profile#my-bookies">Change Bookie Preference</Link>
+                    </span>
                   </p>
                   <div className="parlay-grid parlay-grid-current">
                     {nflWeekParlays.parlays.single.twoLeg.map((parlay, i) => (
-                      <ParlayCard key={`nfl-2-${i}`} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+                      <ParlayCard
+                        key={`nfl-2-${i}`}
+                        title={`2-Leg Parlay ${i + 1}`}
+                        parlay={parlay}
+                        showMatchup
+                        scope={`week:${nflWeekParlays.season}-${nflWeekParlays.week}`}
+                        propEdits={parlaysPreviewPropEdits}
+                        oddsFormat={parlaysPreviewOddsFormat}
+                      />
                     ))}
                     {nflWeekParlays.parlays.single.threeLeg.map((parlay, i) => (
-                      <ParlayCard key={`nfl-3-${i}`} title={`3-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+                      <ParlayCard
+                        key={`nfl-3-${i}`}
+                        title={`3-Leg Parlay ${i + 1}`}
+                        parlay={parlay}
+                        showMatchup
+                        scope={`week:${nflWeekParlays.season}-${nflWeekParlays.week}`}
+                        propEdits={parlaysPreviewPropEdits}
+                        oddsFormat={parlaysPreviewOddsFormat}
+                      />
                     ))}
                   </div>
                   <div style={{ textAlign: "center", marginTop: "1.25rem" }}>
@@ -785,10 +823,26 @@ async function SignedInDashboard({
                   </p>
                   <div className="parlay-grid parlay-grid-current">
                     {nbaDayParlays.parlays.twoLeg.map((parlay, i) => (
-                      <NbaParlayCard key={`nba-2-${i}`} title={`2-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+                      <NbaParlayCard
+                        key={`nba-2-${i}`}
+                        title={`2-Leg Parlay ${i + 1}`}
+                        parlay={parlay}
+                        showMatchup
+                        scope={`day:${nbaDayParlays.dayKey}`}
+                        propEdits={parlaysPreviewPropEdits}
+                        oddsFormat={parlaysPreviewOddsFormat}
+                      />
                     ))}
                     {nbaDayParlays.parlays.threeLeg.map((parlay, i) => (
-                      <NbaParlayCard key={`nba-3-${i}`} title={`3-Leg Parlay ${i + 1}`} parlay={parlay} showMatchup />
+                      <NbaParlayCard
+                        key={`nba-3-${i}`}
+                        title={`3-Leg Parlay ${i + 1}`}
+                        parlay={parlay}
+                        showMatchup
+                        scope={`day:${nbaDayParlays.dayKey}`}
+                        propEdits={parlaysPreviewPropEdits}
+                        oddsFormat={parlaysPreviewOddsFormat}
+                      />
                     ))}
                   </div>
                   <div style={{ textAlign: "center", marginTop: "1.25rem" }}>

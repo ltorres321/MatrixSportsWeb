@@ -4,9 +4,63 @@ import { buildNbaLeagueParlays, type NbaLeagueParlays } from "@/lib/nbaLeaguePar
 import { recordDisplayedNbaLeagueParlays } from "@/lib/parlayLog";
 import { etDateKey, getCurrentNbaWeek, nbaWeekWindow, previousNbaWeekStart } from "@/lib/nbaSchedule";
 import { createClient } from "@/lib/supabase/server";
+import { getUserEnabledBooks, filterParlaysToEnabledBooksWithFallback } from "@/lib/sportsbookPrefs";
+import { BANNED_US_BOOKS, DEFAULT_OFF_BOOKS } from "@/lib/pffBettingEdge";
+import { getUserPropEdits } from "@/lib/propEdits";
+import { getUserOddsFormat } from "@/lib/oddsFormatPrefs";
 import { cachedAsync } from "@/lib/memoCache";
 import NbaParlaysView, { record, type NbaDayParlays, type PastNbaWeekRecord } from "./NbaParlaysView";
 import { pageMetadata } from "@/lib/seo";
+
+// NBA league parlays read a table SportsAnalytics materializes hourly
+// for only two fixed book variants (hide_banned true/false -- see
+// nbaLeagueBettingEdge.ts's own comment), so a per-user book list can't
+// reach that query the way it reaches the live-queried pages (game/[id],
+// nba/game/[id], /parlays). Best available fix: drop whole parlays that
+// use a book outside the user's picks AFTER the (still shared, still
+// cached) fetch -- no per-leg re-pricing to a different allowed book,
+// since this table stores one bookmaker per pick, not alternatives.
+// loadNbaWeekParlays' own cache key is deliberately untouched by this --
+// the cached value is the same for every user, this just filters the
+// copy returned to this one request.
+//
+// NEVER returns a blank day (user, 2026-11-15): one book can hold the
+// single best price on the large majority of a day's top-ranked picks
+// (seen in practice up to ~95% of a day's picks on one book), so a user
+// whose own books exclude that one book could otherwise lose the whole
+// day to the filter above. filterParlaysToEnabledBooksWithFallback falls
+// back to a US-legal-book pick first (see that function's own comment
+// for why it needs `usAllowedDays` -- a separately loaded, independently
+// re-ranked pool, not a post-filter of `days` -- to actually find one),
+// then to the day's unfiltered best picks if even that's empty; either
+// way usedFallback flags it so NbaParlaysView can tell the user these
+// particular picks aren't necessarily at one of their own books.
+function filterDaysToEnabledBooks(
+  days: NbaDayParlays[],
+  usAllowedDays: NbaDayParlays[],
+  enabledBooks: string[],
+): NbaDayParlays[] {
+  if (enabledBooks.length === 0) return days;
+  const usAllowedByDay = new Map(usAllowedDays.map((d) => [d.dayKey, d]));
+  return days.map((day) => {
+    const usDay = usAllowedByDay.get(day.dayKey);
+    const twoLeg = filterParlaysToEnabledBooksWithFallback(
+      day.parlays.twoLeg,
+      enabledBooks,
+      usDay?.parlays.twoLeg,
+    );
+    const threeLeg = filterParlaysToEnabledBooksWithFallback(
+      day.parlays.threeLeg,
+      enabledBooks,
+      usDay?.parlays.threeLeg,
+    );
+    return {
+      ...day,
+      parlays: { twoLeg: twoLeg.items, threeLeg: threeLeg.items },
+      usedFallback: twoLeg.usedFallback || threeLeg.usedFallback,
+    };
+  });
+}
 
 // Only accepts an already-computed Sunday (every link this page
 // generates points at one) -- not a general date parser, just enough
@@ -94,14 +148,36 @@ export async function loadNbaWeekParlays(
   weekEndExclusive: string,
   hideBannedBooks: boolean,
   log: boolean,
+  // Which of DEFAULT_OFF_BOOKS (sportzino, fliff) the signed-in user has
+  // actually put in their own My Bookies picks -- empty by default (user,
+  // 2026-11-16: "filter those games out by default", then "create a
+  // toggle ... enable/disable coin based books", covering both the same
+  // way). nba/page.tsx passes `enabledBooks.filter((b) =>
+  // DEFAULT_OFF_BOOKS.includes(b))`; any other coin book a user has NOT
+  // enabled stays excluded even if this list is non-empty for a
+  // different one. Filtered here, before buildNbaLeagueParlays picks its
+  // top N, for the same reason loadUsAllowedNbaWeekParlays rebuilds
+  // instead of post-filtering -- a coin book can otherwise win most of a
+  // day's top-ranked picks outright (confirmed live: 5 of 6 home-page
+  // preview parlays were "All legs at Sportzino"), and a post-filter of
+  // an already-capped top-N can't recover what it would have picked
+  // instead. The home page's NBA preview has no per-user book awareness
+  // at all, so it always calls this with the default ([]) -- coin books
+  // are simply never part of that teaser, by design, not a gap to close
+  // there.
+  enabledCoinBooks: string[] = [],
 ): Promise<{ days: NbaDayParlays[]; builtAt: string | null }> {
-  return cachedAsync(`nba-league-parlays:${weekStart}:${hideBannedBooks}`, CACHE_TTL_MS, async () => {
+  const coinKey = [...enabledCoinBooks].sort().join(",");
+  return cachedAsync(`nba-league-parlays:${weekStart}:${hideBannedBooks}:${coinKey}`, CACHE_TTL_MS, async () => {
     const { picks, builtAt } = await getNbaLeagueParlayPicks(hideBannedBooks, weekStart, weekEndExclusive);
+    const eligiblePicks = picks.filter(
+      (p) => p.bookmaker == null || !DEFAULT_OFF_BOOKS.includes(p.bookmaker) || enabledCoinBooks.includes(p.bookmaker),
+    );
 
     // Each ET day is its own pool -- p_rank is already per-day, so the
     // builder's top-N three-leg cap applies within a day, not the week.
     const picksByDay = new Map<string, NbaDayPick[]>();
-    for (const pick of picks) {
+    for (const pick of eligiblePicks) {
       picksByDay.set(pick.dayKey, [...(picksByDay.get(pick.dayKey) ?? []), pick]);
     }
     const days: NbaDayParlays[] = [...picksByDay.entries()]
@@ -129,18 +205,67 @@ export async function loadNbaWeekParlays(
   });
 }
 
+// Tier 2's candidate pool for filterParlaysToEnabledBooksWithFallback
+// (user, 2026-11-16: "the US filter not being applied here... lets lean
+// on US books next", then "sportzino is not real money games... filter
+// those games out by default"). Deliberately does NOT reuse
+// nbaLeagueBettingEdge.ts's hide_banned=true table variant: that variant
+// only strips tonybet/stoiximan/bet99 (not elabet or sportzino), AND it
+// still stores just one row per pick -- the single best-priced book for
+// that pick among whatever it allows -- so a day whose best price for a
+// given stat already landed on elabet/sportzino has no OTHER book's
+// price for that same pick to fall back to; post-filtering its own
+// already-picked top-N can come up empty even when a real US book has a
+// usable combo further down the full ranking (confirmed live: a day's
+// top 2 three-leg slots can both be elabet/sportzino even under
+// hide_banned=true). Rebuilding from the FULL hide_banned=false picks
+// pool, with every excluded book's picks dropped BEFORE ranking/
+// selecting the top N (not after), finds the actual best combo among
+// everything that's left -- same buildNbaLeagueParlays the primary pool
+// uses, just fed a pre-trimmed picks list.
+const US_FALLBACK_EXCLUDED_BOOKS = [...BANNED_US_BOOKS, ...DEFAULT_OFF_BOOKS];
+
+async function loadUsAllowedNbaWeekParlays(
+  weekStart: string,
+  weekEndExclusive: string,
+): Promise<{ days: NbaDayParlays[] }> {
+  return cachedAsync(`nba-league-parlays-us-allowed:${weekStart}`, CACHE_TTL_MS, async () => {
+    const { picks } = await getNbaLeagueParlayPicks(false, weekStart, weekEndExclusive);
+    const usAllowedPicks = picks.filter((p) => p.bookmaker == null || !US_FALLBACK_EXCLUDED_BOOKS.includes(p.bookmaker));
+
+    const picksByDay = new Map<string, NbaDayPick[]>();
+    for (const pick of usAllowedPicks) {
+      picksByDay.set(pick.dayKey, [...(picksByDay.get(pick.dayKey) ?? []), pick]);
+    }
+    const days: NbaDayParlays[] = [...picksByDay.entries()].map(([dayKey, dayPicks]) => ({
+      dayKey,
+      parlays: buildNbaLeagueParlays(dayPicks),
+    }));
+
+    return { days };
+  });
+}
+
 export default async function NbaParlaysPage({
   searchParams,
 }: {
   searchParams: Promise<{ hideBanned?: string; week?: string }>;
 }) {
   const params = await searchParams;
-  const hideBannedBooks = params.hideBanned !== "0";
+  // Default OFF (user, 2026-11-14) -- "My Bookies" now owns this decision per user.
+  const hideBannedBooks = params.hideBanned === "1";
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) {
     return <SignUpGate />;
   }
+  const enabledBooks = await getUserEnabledBooks(supabase, userData.user.id);
+  // Which coin-based books (if any) this user actually opted into --
+  // loadNbaWeekParlays' own param comment covers why this is passed
+  // through rather than a single-book boolean.
+  const enabledCoinBooks = enabledBooks.filter((b) => DEFAULT_OFF_BOOKS.includes(b));
+  const propEdits = await getUserPropEdits(supabase, userData.user.id);
+  const oddsFormat = await getUserOddsFormat(supabase, userData.user.id);
 
   const currentWeek = getCurrentNbaWeek();
   const requestedWeekStart = params.week && WEEK_PARAM_RE.test(params.week) ? params.week : null;
@@ -150,7 +275,19 @@ export default async function NbaParlaysPage({
     : nbaWeekWindow(requestedWeekStart);
   const todayKey = etDateKey(new Date());
 
-  const { days, builtAt } = await loadNbaWeekParlays(weekStart, weekEndExclusive, hideBannedBooks, isCurrentWeek);
+  const loaded = await loadNbaWeekParlays(
+    weekStart,
+    weekEndExclusive,
+    hideBannedBooks,
+    isCurrentWeek,
+    enabledCoinBooks,
+  );
+  // Tier 2's candidate pool -- see loadUsAllowedNbaWeekParlays's own
+  // comment for why this is an independent rebuild, not the hideBanned
+  // toggle's own pool.
+  const usAllowedLoaded = await loadUsAllowedNbaWeekParlays(weekStart, weekEndExclusive);
+  const days = filterDaysToEnabledBooks(loaded.days, usAllowedLoaded.days, enabledBooks);
+  const builtAt = loaded.builtAt;
 
   // Only the current week's own view carries the full past-weeks list --
   // a past week's page (?week=) doesn't recursively show one too. Newest
@@ -172,11 +309,19 @@ export default async function NbaParlaysPage({
         weekStarts.push(cursor);
       }
 
+      // Every week in this loop is already in the past (it only runs
+      // for weeks before currentWeek) -- no "My Bookies" filtering here
+      // at all (user, 2026-11-16: "historical can not change... rules
+      // will be going forward"), same reasoning as the NFL page's
+      // identical fix: a past week's picks/grading already happened at
+      // whatever book the model actually used, so re-filtering it by a
+      // preference that didn't exist yet (or has since changed) can
+      // only ever remove real graded history, never correct it.
       const weeks = await Promise.all(
         weekStarts.map(async (ws) => {
           const win = nbaWeekWindow(ws);
-          const { days: weekDays } = await loadNbaWeekParlays(win.weekStart, win.weekEndExclusive, hideBannedBooks, false);
-          const { hit, missed } = record(weekDays.map((day) => day.parlays));
+          const loadedWeek = await loadNbaWeekParlays(win.weekStart, win.weekEndExclusive, hideBannedBooks, false);
+          const { hit, missed } = record(loadedWeek.days.map((day) => day.parlays));
           return { weekStart: win.weekStart, weekEndInclusive: win.weekEndInclusive, hit, missed };
         }),
       );
@@ -193,6 +338,9 @@ export default async function NbaParlaysPage({
       days={days}
       builtAt={builtAt}
       pastWeeks={pastWeeks}
+      enabledBooks={enabledBooks}
+      propEdits={propEdits}
+      oddsFormat={oddsFormat}
     />
   );
 }

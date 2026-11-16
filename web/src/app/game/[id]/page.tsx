@@ -3,6 +3,10 @@ import { getGameDetail, formatKickoff } from "@/lib/predictions";
 import { getScheduledGame } from "@/lib/schedule";
 import { getStoryForGame } from "@/lib/stories";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
+import { createClient } from "@/lib/supabase/server";
+import { getUserEnabledBooks, booksExcludedByUserPref } from "@/lib/sportsbookPrefs";
+import { getUserPropEdits } from "@/lib/propEdits";
+import { getUserOddsFormat } from "@/lib/oddsFormatPrefs";
 import GameDetailView from "./GameDetailView";
 import { SITE_URL, organizationRef, ORGANIZATION_NAME, TWITTER_SITE } from "@/lib/seo";
 
@@ -54,10 +58,20 @@ export default async function GameDetailPage({
   searchParams: Promise<{ hideBanned?: string }>;
 }) {
   const { id } = await params;
-  // Default ON -- only an explicit "0" turns it off. See GameDetailView.tsx's
-  // BannedBooksToggle for the control that sets this query param.
-  const hideBannedBooks = (await searchParams).hideBanned !== "0";
-  const game = await getGameDetail(id, hideBannedBooks);
+  // Default OFF (user, 2026-11-14) -- "My Bookies" now owns this decision
+  // per user; only an explicit "1" turns the old site-wide filter back on.
+  // See GameDetailView.tsx's BannedBooksToggle for the control that sets
+  // this query param.
+  const hideBannedBooks = (await searchParams).hideBanned === "1";
+  // Anonymous visitors get userId undefined -> getUserEnabledBooks
+  // returns [] -> no restriction, same as before this feature existed.
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const enabledBooks = await getUserEnabledBooks(supabase, userData.user?.id);
+  const userExcludedBooks = booksExcludedByUserPref(enabledBooks);
+  const propEdits = await getUserPropEdits(supabase, userData.user?.id);
+  const oddsFormat = await getUserOddsFormat(supabase, userData.user?.id);
+  const game = await getGameDetail(id, hideBannedBooks, userExcludedBooks);
   if (game) {
     const story = game.finalResult ? await getStoryForGame(id) : null;
     const a = teamDisplay(game.teamA.alias);
@@ -114,7 +128,7 @@ export default async function GameDetailPage({
         {articleJsonLd && (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
         )}
-        <GameDetailView game={game} story={story} />
+        <GameDetailView game={game} story={story} scope={`game:${id}`} propEdits={propEdits} oddsFormat={oddsFormat} />
       </>
     );
   }

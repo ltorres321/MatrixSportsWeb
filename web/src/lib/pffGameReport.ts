@@ -1,5 +1,6 @@
 import "server-only";
 import { query } from "@/lib/db";
+import { getGameLineup, type LineupPlayer } from "@/lib/lineup";
 
 // Read layer over the four tables added by SportsPipelines/sql/
 // 006_pff_game_report.sql (etl.pff_team_efficiency, pff_player_grades,
@@ -287,7 +288,17 @@ export async function getGameQbMatchup(
             m.pressure_grade, m.pressure_rank, m.big_time_throw_pct, m.big_time_throw_rank,
             m.turnover_worthy_pct, m.turnover_worthy_rank, m.avg_time_to_throw, m.avg_time_to_throw_rank,
             m.avg_depth_of_target, m.avg_depth_of_target_rank,
-            ir.report_status AS injury_status
+            COALESCE(
+              (SELECT CASE WHEN rs.status_code = 'R01' THEN 'IR' ELSE 'Reserve' END
+               FROM etl.roster_status rs
+               WHERE rs.season = m.season AND rs.team = m.team
+                 AND lower(rs.player) = lower(m.player_name)
+                 AND rs.status = 'RES'
+                 AND rs.week = (SELECT max(w.week) FROM etl.roster_status w
+                                WHERE w.season = m.season AND w.team = m.team AND w.week <= $4)
+               LIMIT 1),
+              ir.report_status
+            ) AS injury_status
      FROM etl.pff_qb_matchup_stats m
      LEFT JOIN etl.injury_reports ir
        ON ir.season = m.season
@@ -301,7 +312,39 @@ export async function getGameQbMatchup(
   const home = rows.find((r) => r.team === homeTeam);
   const away = rows.find((r) => r.team === awayTeam);
   if (!home || !away) return null;
-  return { home: rowToQbStat(home), away: rowToQbStat(away) };
+
+  // etl.pff_qb_matchup_stats holds ONE quarterback per team, picked the
+  // last time the PFF poller ran. If that quarterback has since gone on
+  // IR or left the team, getGameLineup (which cross-checks the weekly
+  // roster file) already knows who the next available quarterback is --
+  // show him instead. His passing splits were never pulled, so only his
+  // overall grade (from the depth chart) is filled in; the rest read
+  // "—", which is honest: there is no data for him yet. When the lineup
+  // has no replacement (or still lists the same man), the original row
+  // stays, with its injury badge.
+  const lineup = await getGameLineup(season, week, homeTeam, awayTeam);
+  function resolve(row: QbMatchupRow, offense: LineupPlayer[] | undefined): QbMatchupStat {
+    const stat = rowToQbStat(row);
+    const qbs = (offense ?? []).filter((p) => p.position === "QB");
+    if (qbs.length === 0) return stat;
+    if (qbs.some((p) => p.pffPlayerId === row.pff_player_id || p.rosterNote !== null)) return stat;
+    const next = qbs[0];
+    return {
+      playerId: next.pffPlayerId,
+      name: next.playerName,
+      espnId: next.espnId,
+      qualifyingCount: stat.qualifyingCount,
+      overall: statOrNull(next.grade, null),
+      cleanPocket: null,
+      pressure: null,
+      bigTimeThrowPct: null,
+      turnoverWorthyPct: null,
+      avgTimeToThrow: null,
+      avgDepthOfTarget: null,
+      injuryStatus: null,
+    };
+  }
+  return { home: resolve(home, lineup?.home.offense), away: resolve(away, lineup?.away.offense) };
 }
 
 // ----------------------------------------------------------------------

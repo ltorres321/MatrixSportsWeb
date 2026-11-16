@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { getScheduledGame, gameDayAbbrev } from "@/lib/schedule";
 import { buildGameParlays, type GameParlays, type ParlayBookMode } from "@/lib/parlayHelper";
 import { recordDisplayedParlays } from "@/lib/parlayLog";
+import { COIN_BASED_BOOK_IDS } from "@/lib/sportsbooks";
 
 // Read layer over the four tables SportsPipelines/sql/010-013 added
 // (etl.pff_best_bets, pff_first_touchdown, pff_player_props,
@@ -25,8 +26,18 @@ import { recordDisplayedParlays } from "@/lib/parlayLog";
 // exchanges/DFS/prediction-markets, never a real retail book for ANYONE;
 // these ARE real retail books, just not ones a US user can place a bet
 // at). Toggled, not hardcoded out permanently -- the data stays valid
-// for a non-US context, so hideBannedBooks defaults true but can be
-// turned off to see everything PFF/the line pollers actually have.
+// for a non-US context, so this can be turned back on to hide them.
+//
+// SUPPRESSED, NOT DELETED (user, 2026-11-14, tightened further
+// 2026-11-15): a blanket US-legality rule can't actually account for
+// one user's own state, let alone a non-US user, and "My Bookies"
+// (profile page) now lets each user pick exactly which books they see
+// for themselves -- a better fit than a single site-wide legality
+// guess, which no longer applies at all: every function below now
+// ignores hideBannedBooks entirely (never mixes BANNED_US_BOOKS into
+// its exclusion list, regardless of the param's value), not just
+// defaults it off. This array, the param, and the toggle plumbing all
+// stay in place in case a site-wide floor is ever needed again.
 export const BANNED_US_BOOKS = ["tonybet", "stoiximan", "bet99", "elabet"];
 
 // Exchanges/prediction markets/DFS pick'em -- never a parlay-combinable
@@ -36,6 +47,31 @@ export const BANNED_US_BOOKS = ["tonybet", "stoiximan", "bet99", "elabet"];
 // own parlay-leg book selection -- same real-world books, same
 // never-parlay-combinable fact, not sport-specific.
 export const NON_RETAIL_BOOKS = ["novig", "prophetx", "kalshi", "polymarket_us", "pick6", "dst_propbuilder"];
+
+// Sportzino and Fliff show real-money-style lines/odds on this site
+// (same SPORTSBOOK_INFO entries, same picker, as any other book) but run
+// as sweepstakes social-casino/sportsbooks under the hood -- Sportzino
+// pays out in Gold Coins/Sweeps Coins, Fliff in Fliff Coins/Fliff Cash,
+// neither an actual cash wager the way the rest of sportsbooks.ts's
+// SELECTABLE_BOOK_IDS are (user, 2026-11-16: "sportzino is not real
+// money games ... lets filter those games out by default and user can
+// enable Sportzino from the profile page", then confirmed Fliff is "the
+// same type" and asked for one shared "enable/disable coin based books"
+// toggle covering both). Different from NON_RETAIL_BOOKS above (never
+// shown at all, no opt-in) -- these STAY pickable in "My Bookies"
+// (profile page, gated behind SportsbookPickerModal's coin-books toggle
+// so they can't be selected at all until a user flips it on); they're
+// just off by default, including for a user who's never opened the
+// picker at all (enabledBooks === [] otherwise means "no preference,
+// show everything" -- these are the two books excluded from that
+// default too), until a user explicitly adds one to their own
+// enabled_sportsbooks. sportsbookPrefs.ts's booksExcludedByUserPref /
+// filterParlaysToEnabledBooks / filterParlaysToEnabledBooksWithFallback
+// and nba/page.tsx's loadNbaWeekParlays all apply this list. Reuses
+// sportsbooks.ts's COIN_BASED_BOOK_IDS (same array, not a second copy)
+// so the picker's gating and this server-side filtering can never drift
+// apart.
+export const DEFAULT_OFF_BOOKS = COIN_BASED_BOOK_IDS;
 
 // ----------------------------------------------------------------------
 // Game Lines (etl.pff_best_bets)
@@ -319,13 +355,28 @@ export interface GameBettingEdge {
 
 export async function getGameBettingEdge(
   universalGameId: string,
-  hideBannedBooks: boolean = true
+  // SUPPRESSED (user, 2026-11-15): ignored below -- kept in the
+  // signature (callers still pass it) rather than ripped out, in case
+  // a site-wide legality floor is ever needed again. See
+  // BANNED_US_BOOKS's own comment above for the full reasoning.
+  hideBannedBooks: boolean = false,
+  // WIRED TO "MY BOOKIES" (user, 2026-11-14): every SPORTSBOOKS entry
+  // the signed-in user did NOT pick on their profile (see
+  // sportsbookPrefs.ts's booksExcludedByUserPref) -- empty when they
+  // have no preference set, or aren't signed in, same "exclude
+  // nothing" default as before this param existed. Merged below into
+  // the exact same bannedBooks/excludedLineShopBooks arrays the
+  // legality toggle used to feed every query with, so no query text
+  // below changes -- a user's own book list is the only remaining
+  // source feeding this exclusion list now.
+  userExcludedBooks: string[] = []
 ): Promise<GameBettingEdge | null> {
   // Empty array makes `!= ALL($n::text[])` vacuously true for every row
-  // (no filtering) -- so passing [] when the toggle is off, rather than a
-  // separate boolean param, keeps every query below a single uniform
-  // shape regardless of toggle state.
-  const bannedBooks = hideBannedBooks ? BANNED_US_BOOKS : [];
+  // (no filtering) -- so passing [] when nothing's excluded, rather
+  // than a separate boolean param, keeps every query below a single
+  // uniform shape regardless of exclusion state.
+  void hideBannedBooks;
+  const bannedBooks = [...new Set(userExcludedBooks)];
   const excludedLineShopBooks = [...NON_RETAIL_BOOKS, ...bannedBooks];
 
   const [bestGameBetRows, scheduledGame, firstTouchdownRows, playerPropRows, keyInsightRows] = await Promise.all([
@@ -386,10 +437,23 @@ export async function getGameBettingEdge(
                 -- exists. Falls through to PFF's original pick untouched
                 -- when it's already a legal book, or when bannedBooks is
                 -- empty (toggle off).
-                CASE WHEN pp.pick_sportsbook = ANY($2::text[]) THEN market.bookmaker ELSE pp.pick_sportsbook END
+                -- LOWER() on both sides (user, 2026-11-16, caught live via
+                -- "My Bookies" leaking excluded books into league parlays):
+                -- etl.pff_player_props.pick_sportsbook stores at least one
+                -- book's id in a different case than every catalog id in
+                -- sportsbooks.ts (confirmed live: 'draftKings' here vs.
+                -- 'draftkings' everywhere else), so a plain ANY(...) string
+                -- comparison silently never matched it -- that book could
+                -- never be excluded by a user's My Bookies picks. The outer
+                -- LOWER() also normalizes the OUTPUT value itself, not just
+                -- the comparison, so a downstream consumer (SPORTSBOOK_INFO
+                -- lookups, any future enabledBooks.includes() check) always
+                -- sees the canonical lowercase id instead of the raw
+                -- upstream casing, whichever branch of the CASE is taken.
+                LOWER(CASE WHEN LOWER(pp.pick_sportsbook) = ANY($2::text[]) THEN market.bookmaker ELSE pp.pick_sportsbook END)
                   AS pick_sportsbook,
                 pp.pick_side, pp.pick_line,
-                CASE WHEN pp.pick_sportsbook = ANY($2::text[]) THEN market.price ELSE pp.pick_odds END
+                CASE WHEN LOWER(pp.pick_sportsbook) = ANY($2::text[]) THEN market.price ELSE pp.pick_odds END
                   AS pick_odds,
                 -- Derived fallback for when SportsPipelines' grading job has
                 -- filled in actual_value but hasn't (yet, or at all -- a
@@ -474,6 +538,21 @@ export async function getGameBettingEdge(
          -- single-book mode; pick6 is DFS pick'em, same issue. Fine as a
          -- model/probability signal elsewhere, not fine as "place this
          -- parlay here."
+         -- "OR (pick_side IS NULL AND side = 'over')" (user, 2026-11-16,
+         -- caught live via My Bookies: "all Anytime TD, no books") --
+         -- Anytime TD has no real over/under side, so pp.pick_side is
+         -- NULL for it; a plain l.side = pp.pick_side equality check
+         -- compares against NULL, which SQL NEVER treats as a match, so this
+         -- join could never find an alternative-book price for an
+         -- Anytime TD leg no matter how many other books actually quote
+         -- it (confirmed live: 947 rows for this exact game). That's
+         -- invisible with no book exclusions (the swap below never even
+         -- runs then), which is why every earlier check of this passed
+         -- -- it only shows up once a real "My Bookies" list excludes
+         -- the TD leg's own recommended book and the swap actually has
+         -- to find a replacement. etl.player_prop_lines_current stores
+         -- every Anytime TD line as side='over' (confirmed live), so
+         -- that's the side this falls back to matching for a NULL pick.
          LEFT JOIN LATERAL (
            SELECT l.bookmaker, l.price, l.last_seen_at,
                   (SELECT COUNT(DISTINCT l2.bookmaker)
@@ -482,15 +561,15 @@ export async function getGameBettingEdge(
                       AND l2.player_name = pp.player_name
                       AND l2.stat = pp.consensus_stat
                       AND l2.line = pp.consensus_line
-                      AND l2.side = pp.pick_side
-                      AND l2.bookmaker != ALL($3::text[])) AS book_count
+                      AND (l2.side = pp.pick_side OR (pp.pick_side IS NULL AND l2.side = 'over'))
+                      AND LOWER(l2.bookmaker) != ALL($3::text[])) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = pp.universal_game_id
               AND l.player_name = pp.player_name
               AND l.stat = pp.consensus_stat
               AND l.line = pp.consensus_line
-              AND l.side = pp.pick_side
-              AND l.bookmaker != ALL($3::text[])
+              AND (l.side = pp.pick_side OR (pp.pick_side IS NULL AND l.side = 'over'))
+              AND LOWER(l.bookmaker) != ALL($3::text[])
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
@@ -512,10 +591,10 @@ export async function getGameBettingEdge(
                 COALESCE(lu.position, ec.position) AS lineup_position,
                 np.consensus_stat, np.consensus_line,
                 -- Same banned-book swap as pff_props above.
-                CASE WHEN np.pick_sportsbook = ANY($2::text[]) THEN market.bookmaker ELSE np.pick_sportsbook END
+                LOWER(CASE WHEN LOWER(np.pick_sportsbook) = ANY($2::text[]) THEN market.bookmaker ELSE np.pick_sportsbook END)
                   AS pick_sportsbook,
                 np.pick_side, np.pick_line,
-                CASE WHEN np.pick_sportsbook = ANY($2::text[]) THEN market.price ELSE np.pick_odds END
+                CASE WHEN LOWER(np.pick_sportsbook) = ANY($2::text[]) THEN market.price ELSE np.pick_odds END
                   AS pick_odds,
                 np.pick_result, np.actual_value, np.proj_value,
                 NULL::text AS proj_direction, np.l10_avg, np.cov_prob_pct, np.edge_pct,
@@ -554,6 +633,8 @@ export async function getGameBettingEdge(
            LIMIT 1
          ) lu ON true
          LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = np.player_name
+         -- Same NULL-side (Anytime TD) fallback as pff_props' own
+         -- market join above -- see that one's own comment for why.
          LEFT JOIN LATERAL (
            SELECT l.bookmaker, l.price, l.last_seen_at,
                   (SELECT COUNT(DISTINCT l2.bookmaker)
@@ -562,15 +643,15 @@ export async function getGameBettingEdge(
                       AND l2.player_name = np.player_name
                       AND l2.stat = np.consensus_stat
                       AND l2.line = np.consensus_line
-                      AND l2.side = np.pick_side
-                      AND l2.bookmaker != ALL($3::text[])) AS book_count
+                      AND (l2.side = np.pick_side OR (np.pick_side IS NULL AND l2.side = 'over'))
+                      AND LOWER(l2.bookmaker) != ALL($3::text[])) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = np.universal_game_id
               AND l.player_name = np.player_name
               AND l.stat = np.consensus_stat
               AND l.line = np.consensus_line
-              AND l.side = np.pick_side
-              AND l.bookmaker != ALL($3::text[])
+              AND (l.side = np.pick_side OR (np.pick_side IS NULL AND l.side = 'over'))
+              AND LOWER(l.bookmaker) != ALL($3::text[])
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
@@ -578,7 +659,16 @@ export async function getGameBettingEdge(
            AND NOT EXISTS (
              SELECT 1 FROM etl.pff_player_props pp2
              WHERE pp2.universal_game_id = np.universal_game_id
-               AND pp2.player_name = np.player_name
+               -- REPLACE(LOWER(...), '.', '') on both sides (user,
+               -- 2026-11-16, caught live: "a lot of anytime TD without
+               -- a book" on PIT vs CIN -- confirmed it was really just
+               -- ONE duplicate row, 'DK Metcalf' with no odds alongside
+               -- the real 'D.K. Metcalf' pff_player_props row). A plain
+               -- equality check here is punctuation-sensitive, so the two sources'
+               -- own spelling of the same player's initials ("D.K." vs
+               -- "DK") never matched, letting this bookless own_props
+               -- duplicate through for every such player.
+               AND REPLACE(LOWER(pp2.player_name), '.', '') = REPLACE(LOWER(np.player_name), '.', '')
                AND pp2.consensus_stat = np.consensus_stat
            )
        ),
@@ -744,9 +834,13 @@ export async function getGameBettingEdge(
 export async function getLeagueBettingEdge(
   season: number,
   week: number,
-  hideBannedBooks: boolean = true
+  // SUPPRESSED (user, 2026-11-15) -- see getGameBettingEdge's identical param above.
+  hideBannedBooks: boolean = false,
+  // Same "My Bookies" wiring as getGameBettingEdge above -- see its comment.
+  userExcludedBooks: string[] = []
 ): Promise<PlayerPropEntry[]> {
-  const bannedBooks = hideBannedBooks ? BANNED_US_BOOKS : [];
+  void hideBannedBooks;
+  const bannedBooks = [...new Set(userExcludedBooks)];
   const excludedLineShopBooks = [...NON_RETAIL_BOOKS, ...bannedBooks];
 
   const rows = await query<PlayerPropRow>(
@@ -756,10 +850,10 @@ export async function getLeagueBettingEdge(
               COALESCE(lu.position, ec.position) AS lineup_position,
               pp.consensus_stat, pp.consensus_line,
               -- Same banned-book swap as getGameBettingEdge's pff_props.
-              CASE WHEN pp.pick_sportsbook = ANY($3::text[]) THEN market.bookmaker ELSE pp.pick_sportsbook END
+              LOWER(CASE WHEN LOWER(pp.pick_sportsbook) = ANY($3::text[]) THEN market.bookmaker ELSE pp.pick_sportsbook END)
                 AS pick_sportsbook,
               pp.pick_side, pp.pick_line,
-              CASE WHEN pp.pick_sportsbook = ANY($3::text[]) THEN market.price ELSE pp.pick_odds END
+              CASE WHEN LOWER(pp.pick_sportsbook) = ANY($3::text[]) THEN market.price ELSE pp.pick_odds END
                 AS pick_odds,
               -- See getGameBettingEdge's identical derivation above for why.
               COALESCE(
@@ -806,6 +900,8 @@ export async function getLeagueBettingEdge(
              AND pred.consensus_stat = pp.consensus_stat
            LIMIT 1
          ) pred ON true
+         -- Same NULL-side (Anytime TD) fallback as getGameBettingEdge's
+         -- identical market join -- see that one's own comment for why.
          LEFT JOIN LATERAL (
            SELECT l.bookmaker, l.price, l.last_seen_at,
                   (SELECT COUNT(DISTINCT l2.bookmaker)
@@ -814,15 +910,15 @@ export async function getLeagueBettingEdge(
                       AND l2.player_name = pp.player_name
                       AND l2.stat = pp.consensus_stat
                       AND l2.line = pp.consensus_line
-                      AND l2.side = pp.pick_side
-                      AND l2.bookmaker != ALL($4::text[])) AS book_count
+                      AND (l2.side = pp.pick_side OR (pp.pick_side IS NULL AND l2.side = 'over'))
+                      AND LOWER(l2.bookmaker) != ALL($4::text[])) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = pp.universal_game_id
               AND l.player_name = pp.player_name
               AND l.stat = pp.consensus_stat
               AND l.line = pp.consensus_line
-              AND l.side = pp.pick_side
-              AND l.bookmaker != ALL($4::text[])
+              AND (l.side = pp.pick_side OR (pp.pick_side IS NULL AND l.side = 'over'))
+              AND LOWER(l.bookmaker) != ALL($4::text[])
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
@@ -837,10 +933,10 @@ export async function getLeagueBettingEdge(
                 COALESCE(lu.position, ec.position) AS lineup_position,
                 np.consensus_stat, np.consensus_line,
                 -- Same banned-book swap as pff_props above.
-                CASE WHEN np.pick_sportsbook = ANY($3::text[]) THEN market.bookmaker ELSE np.pick_sportsbook END
+                LOWER(CASE WHEN LOWER(np.pick_sportsbook) = ANY($3::text[]) THEN market.bookmaker ELSE np.pick_sportsbook END)
                   AS pick_sportsbook,
                 np.pick_side, np.pick_line,
-                CASE WHEN np.pick_sportsbook = ANY($3::text[]) THEN market.price ELSE np.pick_odds END
+                CASE WHEN LOWER(np.pick_sportsbook) = ANY($3::text[]) THEN market.price ELSE np.pick_odds END
                   AS pick_odds,
                 np.pick_result, np.actual_value, np.proj_value,
                 NULL::text AS proj_direction, np.l10_avg, np.cov_prob_pct, np.edge_pct,
@@ -876,6 +972,9 @@ export async function getLeagueBettingEdge(
            LIMIT 1
          ) lu ON true
          LEFT JOIN etl.espn_player_crosswalk ec ON ec.player_name = np.player_name
+         -- Same NULL-side (Anytime TD) fallback as the market joins
+         -- above -- see getGameBettingEdge's pff_props market join for
+         -- the full comment on why.
          LEFT JOIN LATERAL (
            SELECT l.bookmaker, l.price, l.last_seen_at,
                   (SELECT COUNT(DISTINCT l2.bookmaker)
@@ -884,22 +983,25 @@ export async function getLeagueBettingEdge(
                       AND l2.player_name = np.player_name
                       AND l2.stat = np.consensus_stat
                       AND l2.line = np.consensus_line
-                      AND l2.side = np.pick_side
-                      AND l2.bookmaker != ALL($4::text[])) AS book_count
+                      AND (l2.side = np.pick_side OR (np.pick_side IS NULL AND l2.side = 'over'))
+                      AND LOWER(l2.bookmaker) != ALL($4::text[])) AS book_count
              FROM etl.player_prop_lines_current l
             WHERE l.universal_game_id = np.universal_game_id
               AND l.player_name = np.player_name
               AND l.stat = np.consensus_stat
               AND l.line = np.consensus_line
-              AND l.side = np.pick_side
-              AND l.bookmaker != ALL($4::text[])
+              AND (l.side = np.pick_side OR (np.pick_side IS NULL AND l.side = 'over'))
+              AND LOWER(l.bookmaker) != ALL($4::text[])
             ORDER BY l.price DESC
             LIMIT 1
          ) market ON true
          WHERE NOT EXISTS (
            SELECT 1 FROM etl.pff_player_props pp2
            WHERE pp2.universal_game_id = np.universal_game_id
-             AND pp2.player_name = np.player_name
+             -- Same punctuation-insensitive name match as
+             -- getGameBettingEdge's identical own_props dedup above --
+             -- see that one's own comment for why.
+             AND REPLACE(LOWER(pp2.player_name), '.', '') = REPLACE(LOWER(np.player_name), '.', '')
              AND pp2.consensus_stat = np.consensus_stat
          )
        ),

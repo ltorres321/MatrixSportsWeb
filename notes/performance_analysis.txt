@@ -1,0 +1,34 @@
+For this app, I’d use:
+
+- **Cloudflare** in front of `matrixsports.net` for global delivery of images, JavaScript, CSS, and fonts.
+- A **single Node host close to your Supabase database**—such as Railway, Render, or Fly.io—for the Next.js server.
+- **Upstash Redis** in that same region for shared caching.
+
+I would not move the main database to Redshift. Keep Supabase/Postgres as the source of truth; Redis is the speed layer.
+
+The project already has a small in-memory cache, but it only works inside one running server and disappears on restart/deploy. It also isn’t used by the main NFL/NBA prediction pages. Redis would let every app instance reuse cached results.
+
+The main performance issues I found in the code:
+
+- Every page request goes through Supabase auth/session validation, including visitors who are not signed in.
+- The shared layout fetches the user, profile appearance, and admin status on every request.
+- The prediction pages make several direct Postgres queries in sequence. The NBA page repeatedly loads the full season’s rows for the same request.
+- The heaviest game-detail page makes many database and external-score requests. It is deduplicated only within one request—not cached across visitors.
+- Several PNG assets are very large (roughly 1–2.2 MB each). Converting/resizing those to WebP/AVIF and serving responsive sizes will produce a very visible improvement.
+
+My recommended order:
+
+1. Put Cloudflare in front of the site and enable its normal static-asset caching. Cloudflare caches static assets by default at edge locations; HTML should stay uncached until we explicitly separate anonymous/public pages from personalized ones. [Cloudflare cache docs](https://developers.cloudflare.com/cache/get-started/)
+2. Add Redis caching for public data:
+   - NFL matchup slate: 1–5 minutes
+   - NBA season/date lists: 15–60 minutes
+   - game details: short TTL before kickoff, longer after games finish
+   - external schedules/news: existing refresh windows are sensible
+3. Cache or remove the per-request admin check from the site-wide layout; it shouldn’t affect ordinary public visitors.
+4. Refactor public pages so anonymous requests do not need a Supabase session lookup. That unlocks safe page/HTML caching later.
+5. Optimize the oversized graphic assets.
+6. Add real monitoring—Web Vitals plus server request timings—before and after each change.
+
+For Redis, Upstash is a particularly easy match for a Next.js app and can be used from server components and routes. [Upstash’s Next.js setup](https://upstash.com/docs/redis/quickstarts/nextjs-app-router)
+
+I couldn’t load the live domain from this environment, so I can’t give a measured page-speed score or identify the current host. But the code review strongly suggests that caching the public prediction queries and reducing the always-on auth/layout work will matter more than simply changing hosting providers.

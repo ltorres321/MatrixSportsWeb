@@ -3100,32 +3100,366 @@ h1.glow span {
   margin-top: 0.15rem;
 }
 
-.team-checklist {
-  max-height: 220px;
-  overflow-y: auto;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 0.5rem 1rem;
-  background: var(--panel);
+/* ---------------------------------------------------------------
+   Profile page Add/Edit-pill sections (My Bookies 2026-11-13; My
+   Favorite NFL/NBA Team and Teams to Notify generalized to the same
+   pattern 2026-11-14) -- the static pill list shown once a section
+   has picks, and the Add/Edit button that reopens PillPickerModal.
+   Reuses .favorites-empty-pill's yellow-pill look (same "Add Favorite
+   Team" styling the user pointed at) rather than a second button style.
+   One shared set of classes across every section (bookies, favorite
+   team x2, notify teams) -- not re-prefixed per section.
+   --------------------------------------------------------------- */
+
+.profile-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
 }
 
-.team-checklist-item {
+.profile-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--glow-rgb), 0.4);
+  background: var(--green-faint);
+  color: var(--green);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.profile-pill-empty {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+/* Site Odds Preference (profile page, user 2026-11-16) -- single-select,
+   always-visible row of 3 (not a modal picker like My Bookies/Favorite
+   Team, since there's nothing to browse: exactly 3 fixed options). Same
+   pill look/active state as .pill-picker-option for visual consistency
+   with the rest of the profile page's pickers. */
+.odds-format-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.odds-format-pill {
+  flex: 1 1 0;
+  min-width: 100px;
+  text-align: center;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--text);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.odds-format-pill:hover {
+  border-color: var(--green);
+}
+
+.odds-format-pill.active {
+  background: var(--green-faint);
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 12px rgba(var(--glow-rgb), 0.3);
+}
+
+/* ---------------------------------------------------------------
+   PillPickerModal -- full-screen panel of toggleable pills, shared by
+   every Add/Edit section above (SportsbookPickerModal wraps this one
+   with a fixed title/intro/option list; the team/notify pickers use
+   it directly). z-index above .nav-more-panel (60) and the cookie
+   banner (50) so it's never covered by either while open.
+   --------------------------------------------------------------- */
+
+.pill-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.pill-picker-panel {
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 1.75rem;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+}
+
+.pill-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+/* "Coin Based Books" gate row (My Bookies, user 2026-11-16: "toggle top
+   right enble/disable coin based Books"), grouped with the close button
+   on the header's right side. */
+.pill-picker-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-shrink: 0;
+}
+
+.pill-picker-gate-toggle {
+  font-size: 0.72rem;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.pill-picker-header h3 {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--green);
+  font-size: 1.2rem;
+  margin: 0;
+  text-shadow: 0 0 12px rgba(var(--glow-rgb), 0.35);
+}
+
+.pill-picker-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.pill-picker-close:hover {
+  color: var(--green);
+}
+
+.pill-picker-intro {
+  color: var(--text-dim);
   font-size: 0.85rem;
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
+}
+
+.pill-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+
+.pill-picker-option {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
   color: var(--text);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.pill-picker-option:hover {
+  border-color: var(--green);
+}
+
+.pill-picker-option.active {
+  background: var(--green-faint);
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 12px rgba(var(--glow-rgb), 0.3);
+}
+
+/* Fliff/Sportzino pills while the "Coin Based Books" gate above is off
+   -- not clickable (native disabled), visibly inert so it reads as
+   "turn the toggle on first", not a normal unselected pill. */
+.pill-picker-option-disabled,
+.pill-picker-option-disabled:hover {
+  color: var(--text-dim);
+  border-color: var(--panel-border);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pill-picker-done {
+  margin-top: 0.25rem;
+}
+
+/* PropEditButton.tsx's per-leg "Line Edit" button + modal (user,
+   2026-11-15). Same overlay/panel chrome as .pill-picker-* above, sized
+   for a short form instead of a pill grid. */
+.prop-edit-btn {
+  /* Anchored to .parlay-leg's own top-right corner (user, 2026-11-15:
+     "dont place edit next to the percentage place [it] on right margin
+     opposite player name") -- level with the player-name line instead
+     of sitting in the odds/prob flex row further down. .parlay-leg is
+     the positioned ancestor (position: relative, see its own rule). */
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  background: none;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.prop-edit-btn:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.prop-edit-btn-active {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-faint);
+}
+
+.prop-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.prop-edit-panel {
+  width: 100%;
+  max-width: 360px;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
+}
+
+.prop-edit-panel h3 {
+  font-family: 'Chakra Petch', monospace;
+  color: var(--green);
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+}
+
+.prop-edit-note {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin: 0 0 1.1rem;
+}
+
+.prop-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.9rem;
+}
+
+/* "Apply To" toggle's own explainer line (PropEditButton.tsx) -- smaller
+   and dimmer than .prop-edit-field's label text since it's just
+   restating what the selected pill already says. */
+.prop-edit-scope-hint {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
+.prop-edit-field input {
+  background: var(--input-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text-strong);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+}
+
+.prop-edit-side-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.prop-edit-side-toggle button {
+  flex: 1;
+  padding: 0.45rem 0;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
   cursor: pointer;
 }
 
-.team-checklist-item input[type="checkbox"] {
-  accent-color: var(--green);
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
+.prop-edit-side-toggle button.active {
+  background: var(--green-faint);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.prop-edit-error {
+  color: var(--red, #e05252);
+  font-size: 0.78rem;
+  margin: -0.4rem 0 0.9rem;
+}
+
+.prop-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Leg-level "customized" marker (ParlayCard.tsx/NbaParlayCard.tsx) --
+   shown on a leg with a saved edit, and on the card's own outcome badge
+   spot in place of Hit/Missed once any leg is edited, since grading
+   always reflects the ORIGINAL line, not what's displayed. */
+.parlay-leg-edited-tag {
+  color: var(--accent-amber, #d9a441);
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-left: 0.35rem;
+}
+
+.parlay-outcome-customized {
+  background: transparent;
+  color: var(--accent-amber, #d9a441);
+  border: 1px solid var(--accent-amber, #d9a441);
 }
 
 .form-footer-note {
@@ -4526,6 +4860,51 @@ h1.glow span {
   overflow: hidden;
 }
 
+/* NBA past-weeks record links (NbaParlaysView.tsx), laid out in the same
+   .parlay-grid as the parlay cards above (user, 2026-11-16: "groups of
+   3 just like the parlays") instead of stacking plain text links with
+   no real spacing between them. */
+.nba-past-week-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  /* Same gold as .parlay-week-subtitle used before this became a grid
+     of cards (user, 2026-11-16: "change the font back to Yellow as
+     before") -- the bigger size stays, just reverting the color. */
+  color: var(--gold);
+  font-family: 'Chakra Petch', monospace;
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.nba-past-week-card:hover {
+  border-color: var(--green);
+}
+
+/* Same gold->green swap as .parlay-week-subtitle's own light-theme
+   override -- --gold is too muted/brown for a readable light-theme
+   link. */
+:root[data-theme="light"] .nba-past-week-card {
+  color: var(--green);
+}
+
+/* Invisible grid placeholders (NbaParlaysView.tsx) so a non-multiple-of-3
+   pastWeeks count (almost always, since the season doesn't reset to a
+   multiple of 3 past weeks) still lines up under the SAME 3 columns the
+   parlay cards above use, instead of auto-fit stretching the real tiles
+   to fill the leftover column share (user, 2026-11-16: "it should only
+   be 2 of the 3 columns"). visibility:hidden (not display:none) keeps
+   the grid track itself in the layout. */
+.nba-past-week-filler {
+  visibility: hidden;
+}
+
 /* Light theme, current (ungraded) week's parlay cards only -- the
    pale-blue navbar/side-rail backdrop instead of plain white, same
    "too much flat white" fix as .parlay-notice/.parlay-week-subtitle's
@@ -4611,6 +4990,75 @@ h1.glow span {
   font-size: 0.72rem;
 }
 
+/* NbaParlayCard's "Not in your books" badge -- only renders when a
+   fallback day (page.tsx's filterDaysToEnabledBooks) shows a parlay
+   outside the user's own My Bookies picks. Amber, not red: it's a
+   heads-up to check the book, not an error. */
+.parlay-card-book-warn {
+  color: var(--accent-amber, #d9a441);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.64rem;
+}
+
+/* NbaParlaysView's DaySection fallback note -- shown above a day's grid
+   when none of its parlays matched the user's My Bookies picks and the
+   day fell back to the model's unfiltered best picks instead of going
+   blank. */
+/* Solid backdrop (user, 2026-11-15: "hard to read with rain add solid
+   back drop") -- same display:inline-block + var(--panel-solid) fix as
+   .parlay-week-subtitle/.eff-scoring-subtitle use against this page's
+   own RainCanvas animation; a plain text color alone isn't legible over
+   it, backdrop or not. */
+.parlay-fallback-note {
+  color: var(--accent-amber, #d9a441);
+  /* +1 (user, 2026-11-15), up from 0.82rem. */
+  font-size: 0.88rem;
+  margin: 0.2rem 0 0.6rem;
+  display: inline-block;
+  background: var(--panel-solid);
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+}
+
+.parlay-fallback-note a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+:root[data-theme="light"] .parlay-fallback-note {
+  background: rgba(234, 241, 250, 0.95);
+}
+
+/* NFL /parlays' own book-preference tip (user, 2026-11-15) -- same spot
+   as .parlay-fallback-note (NBA's "none matched, here's the overall
+   best" message) but always shown on the current week, not just when a
+   fallback actually happened, so it stays dim/informational rather than
+   amber/alert-colored. Same solid-backdrop treatment as
+   .parlay-fallback-note above, for the same RainCanvas-legibility reason. */
+/* Second line inside .parlay-week-subtitle's own box (user, 2026-11-15:
+   "it has it in 2 text boxes ... add it to the current box but have it
+   in 2 lines") -- was its own separate boxed paragraph; now just an
+   inline span after a <br/>, so it shares one backdrop/box with the
+   subtitle line above it instead of getting a second one. Dimmer than
+   the gold subtitle text to keep it a secondary tip, not competing for
+   attention with "these are the model's current best picks." */
+/* Same size/color as the subtitle line it follows (user, 2026-11-15:
+   "need to be the same size and font color") -- inherits
+   .parlay-week-subtitle's gold/0.92rem by not overriding either; only
+   the line-break spacing is its own. The link itself stays green and
+   underlined so it still reads as clickable against the gold text. */
+.parlay-book-pref-line {
+  display: inline-block;
+  margin-top: 0.3rem;
+}
+
+.parlay-book-pref-line a {
+  color: var(--green);
+  text-decoration: underline;
+}
+
 .parlay-card-title {
   font-family: 'Chakra Petch', monospace;
   font-weight: 700;
@@ -4693,6 +5141,7 @@ h1.glow span {
 }
 
 .parlay-leg {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -4959,6 +5408,13 @@ h1.glow span {
 .lineup-box-jersey {
   color: rgba(255, 255, 255, 0.85);
   margin-right: 0.3em;
+}
+
+/* A depth-chart starter who isn't on the active roster and has no
+   listed backup -- see lineup.ts's rosterNote. */
+.lineup-box-roster-note {
+  color: #f87171;
+  font-weight: 700;
 }
 
 .lineup-box-grade {
