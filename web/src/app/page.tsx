@@ -33,6 +33,7 @@ import { buildWeekParlays } from "@/app/parlays/page";
 import { loadNbaWeekParlays } from "@/app/parlays/nba/page";
 import { getUserPropEdits } from "@/lib/propEdits";
 import { getUserOddsFormat } from "@/lib/oddsFormatPrefs";
+import { getUserEnabledBooks, booksExcludedByUserPref } from "@/lib/sportsbookPrefs";
 import { DEFAULT_ODDS_FORMAT } from "@/lib/oddsFormat";
 import { getCurrentNbaWeek, etDateKey } from "@/lib/nbaSchedule";
 import { formatDate } from "@/app/parlays/nba/NbaParlaysView";
@@ -592,8 +593,22 @@ async function SignedInDashboard({
   // is swapped out for a "Parlays to Play" section instead, reusing the
   // same cached, Postgres-backed builders the /parlays and /parlays/nba
   // pages already use -- no ESPN links on this dashboard for now.
+  //
+  // userExcludedBooks (user, 2026-11-18: "being in the US I should not
+  // see this book" -- Stoiximan/Fanatics/etc. showing on this preview
+  // despite My Bookies being set to hardrock/draftkings/fanduel) -- this
+  // call was missing the same "My Bookies" exclusion list the dedicated
+  // /parlays page's own buildWeekParlays call already passes for the
+  // current week (see parlays/page.tsx), so the preview always rendered
+  // as if no preference were set at all (hideBannedBooks is a no-op --
+  // see getLeagueBettingEdge's own comment). Same booksExcludedByUserPref
+  // helper, so "no preference" still correctly falls back to excluding
+  // just DEFAULT_OFF_BOOKS, not every real-money book.
+  const userExcludedBooks = userId ? booksExcludedByUserPref(await getUserEnabledBooks(await createClient(), userId)) : [];
   const nflWeekParlays =
-    season !== undefined && currentWeek !== null ? await buildWeekParlays(season, currentWeek, true) : null;
+    season !== undefined && currentWeek !== null
+      ? await buildWeekParlays(season, currentWeek, true, userExcludedBooks)
+      : null;
 
   const nbaWeek = getCurrentNbaWeek();
   const { days: nbaDays } = await loadNbaWeekParlays(nbaWeek.weekStart, nbaWeek.weekEndExclusive, true, false);
