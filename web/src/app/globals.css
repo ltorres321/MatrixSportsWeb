@@ -1048,6 +1048,37 @@ a {
   font-size: 1.3rem;
 }
 
+/* TikTok's own brand marks (not react-icons) already carry their own
+   background -- white wordmark-on-white for light theme, white glyph
+   on a black square for dark theme -- so the button itself stays
+   transparent and just clips them to the same rounded square as the
+   other provider buttons. Both images render stacked in the DOM;
+   which one is visible is swapped per data-theme on <html>, same
+   pattern as every other theme-dependent rule in this file. */
+.social-btn-tiktok {
+  background: transparent;
+  overflow: hidden;
+  padding: 0;
+}
+
+.social-btn-tiktok-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.social-btn-tiktok-icon-light {
+  display: none;
+}
+
+:root[data-theme="light"] .social-btn-tiktok-icon-dark {
+  display: none;
+}
+
+:root[data-theme="light"] .social-btn-tiktok-icon-light {
+  display: block;
+}
+
 /* ---------------------------------------------------------------
    Header glow (home.html)
    --------------------------------------------------------------- */
