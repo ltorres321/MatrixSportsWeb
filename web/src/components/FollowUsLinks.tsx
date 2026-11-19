@@ -60,6 +60,25 @@ export default function FollowUsLinks() {
             <Icon className="social-btn-icon" />
           </a>
         ))}
+        {/* Official TikTok mark instead of react-icons' generic glyph --
+            two theme variants swapped in CSS (.social-btn-tiktok-icon-*)
+            via the same :root[data-theme="light"] pattern globals.css
+            uses everywhere else, since theme is set server-side on
+            <html> and this component has no client-side theme state of
+            its own to branch on. */}
+        <a
+          href="https://www.tiktok.com/@mr.anderson1010"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="social-btn social-btn-tiktok"
+          title="Follow us on TikTok"
+          aria-label="Follow us on TikTok"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset, not a next/image candidate */}
+          <img src="/assets/brand/tiktok-logo-dark.png" alt="" className="social-btn-tiktok-icon social-btn-tiktok-icon-dark" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset, not a next/image candidate */}
+          <img src="/assets/brand/tiktok-logo-light.webp" alt="" className="social-btn-tiktok-icon social-btn-tiktok-icon-light" />
+        </a>
       </div>
     </div>
   );
