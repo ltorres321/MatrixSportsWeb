@@ -2,22 +2,23 @@ import { americanToDecimal, bestParlay, type NbaParlay, type NbaParlayLeg, type 
 
 // League-wide counterpart to nbaParlayHelper.ts's buildGameParlays -- same
 // pure leg/parlay math (americanToDecimal, bestParlay reused as-is), but
-// drawn from EVERY game in a Sunday-to-Sunday week (nbaLeagueBettingEdge.ts)
-// instead of one game's own top 10. Backs the "Parlays" page's NBA tab
-// (app/parlays/nba), the NBA sibling of leagueParlayHelper.ts (NFL).
+// drawn from EVERY game on ONE ET day (nbaLeagueBettingEdge.ts) instead of
+// one game's own top 10. app/parlays/nba/page.tsx calls
+// buildNbaLeagueParlays once per ET day of the current Sunday-to-Saturday
+// week, with that day's picks from public.nba_league_parlay_picks, so each
+// day gets its own 4 two-leg + 2 three-leg bets. Backs the "Parlays" page's
+// NBA tab (app/parlays/nba), the NBA sibling of leagueParlayHelper.ts (NFL).
+// (This file originally pooled a whole Sunday-to-Sunday week at once; the
+// per-day design replaced that on 2026-11-05 -- see SportsAnalytics sql/018.)
 
-// A 3-leg parlay only uses legs within the week's own top
-// LEAGUE_THREE_LEG_PRANK_CAP (by pick.pRank, league-wide here) -- NOT a
-// fixed probability floor, same "scale-invariant" reasoning as
-// nbaParlayHelper.ts's own THREE_LEG_PRANK_CAP. Scaled up from the
-// per-game cap of 5 by roughly how much bigger a week's slate is than one
-// game's top-10 pool: an NBA week (Sun-Sun) runs ~45-55 games, about 3x
-// NFL's own per-week slate (~16) that leagueParlayHelper.ts scaled its
-// cap of 5 up to 30 for -- same multiple applied here (5 -> 90) rather
-// than reusing NFL's literal 30, since NBA's weekly pool of eligible
-// props is proportionally larger. Not a precise ratio, just a generous
-// multiple of the per-game cap -- revisit if it ever feels too loose or
-// too tight in practice.
+// A 3-leg parlay only uses legs within the day's own top
+// LEAGUE_THREE_LEG_PRANK_CAP (by pick.pRank) -- NOT a fixed probability
+// floor, same "scale-invariant" reasoning as nbaParlayHelper.ts's own
+// THREE_LEG_PRANK_CAP. NOTE: pRank is ranked WITHIN each ET day by
+// src4/41 (sql/018's p_rank), not league-wide across the week. The 90 was
+// sized for the old whole-week pool (~3x NFL's cap of 30); against a single
+// day's pool it will rarely bind. Left unchanged on purpose -- revisit if
+// a tighter per-day cap is wanted.
 export const LEAGUE_THREE_LEG_PRANK_CAP = 90;
 
 // Same 4+2=6 total bets as leagueParlayHelper.ts (NFL). Design rule: the
