@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useLivePolling } from "@/lib/useLivePolling";
 import type { NbaGameDetail, NbaInjuryEntry, NbaPropEdge } from "@/lib/nbaGameDetail";
 import type { StarterGradePlayer, TeamStarterGrades } from "@/lib/nbaStarterGrades";
 import type { TeamGradeSet, TeamStatWithRank } from "@/lib/nbaTeamGrades";
@@ -17,11 +17,10 @@ import type { PropEditRow } from "@/lib/propEditMath";
 import type { OddsFormat } from "@/lib/oddsFormat";
 import NbaLineupSection from "./NbaLineupSection";
 
-// Same polling interval as GameDetailView.tsx's LIVE_REFRESH_MS --
-// router.refresh() re-runs getNbaGameDetail server-side, which re-hits
-// nbaSchedule.ts's live feed (60s cache there, so this doesn't poll
-// TheSportsDB any faster than that feed actually updates).
-const LIVE_REFRESH_MS = 20_000;
+// Live polling (interval + hidden-tab pause) is useLivePolling.ts --
+// its router.refresh() re-runs getNbaGameDetail server-side, which
+// re-hits nbaSchedule.ts's live feed (60s cache there, so this doesn't
+// poll TheSportsDB any faster than that feed actually updates).
 
 // NBA equivalent of GameDetailView.tsx's real structure (confirmed
 // against a live screenshot of the NFL page, not guessed): an
@@ -1392,7 +1391,6 @@ export default function NbaGameDetailView({
   oddsFormat: OddsFormat;
 }) {
   const [activeTab, setActiveTab] = useState<PageTab>(initialView === "radar" ? "matchups" : "overview");
-  const router = useRouter();
   // Same "Advanced Analysis" jump link as GameDetailView.tsx (NFL) --
   // see that file's own comment for the full reasoning.
   const [toolsSpotlight, setToolsSpotlight] = useState(false);
@@ -1402,11 +1400,7 @@ export default function NbaGameDetailView({
     window.setTimeout(() => setToolsSpotlight(false), 2500);
   }
 
-  useEffect(() => {
-    if (!game.isLive) return;
-    const interval = setInterval(() => router.refresh(), LIVE_REFRESH_MS);
-    return () => clearInterval(interval);
-  }, [game.isLive, router]);
+  useLivePolling(game.isLive);
 
   return (
     <>

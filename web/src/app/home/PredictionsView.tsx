@@ -1,20 +1,14 @@
 "use client";
 
-import { Fragment, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Fragment } from "react";
 import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
+import { useLivePolling } from "@/lib/useLivePolling";
 import type { Matchup } from "@/lib/matchups";
 import MatchupCard from "@/components/MatchupCard";
 import AdFrame from "@/components/AdFrame";
 import MobileAdFrame from "@/components/MobileAdFrame";
 import AdUnit from "@/components/AdUnit";
-
-// How often to re-fetch while at least one game on screen is live --
-// short enough to feel real-time, long enough not to hammer the
-// server (each refresh re-runs the Server Component, which itself
-// only re-hits ESPN at most once per liveScores.ts's own 30s cache).
-const LIVE_REFRESH_MS = 20_000;
 
 // This is the page people linger on scanning percentages across a
 // whole slate, so the full-week list gets more ad exposure than a
@@ -68,19 +62,15 @@ export default function PredictionsView({
   matchups: Matchup[];
 }) {
   const { isMember, isRealMember, toggle } = useMemberPreview();
-  const router = useRouter();
   const hasLiveGame = matchups.some((m) => m.status === "live");
 
   // Re-runs the Server Component data fetch on an interval so scores
   // actually move while someone's sitting on the page, not just on a
   // manual reload -- stops polling automatically the moment nothing
   // in view is live anymore (a fresh prop from the server re-render
-  // naturally flips hasLiveGame to false once every game's final).
-  useEffect(() => {
-    if (!hasLiveGame) return;
-    const interval = setInterval(() => router.refresh(), LIVE_REFRESH_MS);
-    return () => clearInterval(interval);
-  }, [hasLiveGame, router]);
+  // naturally flips hasLiveGame to false once every game's final), and
+  // pauses while the tab is hidden (see useLivePolling.ts).
+  useLivePolling(hasLiveGame);
 
   if (activeSeason === null) {
     return (

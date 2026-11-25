@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 // formatNbaDateLabel/formatNbaMonthLabel come from matchups.ts, NOT
 // nbaPredictions.ts -- see matchups.ts's own header for why a client
@@ -11,6 +9,7 @@ import type { Matchup } from "@/lib/matchups";
 import { formatNbaDateLabel, formatNbaMonthLabel } from "@/lib/matchups";
 import NbaMatchupCard from "@/components/NbaMatchupCard";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
+import { useLivePolling } from "@/lib/useLivePolling";
 
 // NBA equivalent of PredictionsView.tsx, deliberately smaller: no ad
 // frames (orthogonal to "show win probabilities," not part of this
@@ -32,8 +31,8 @@ import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPre
 // status (added for the single-game page first), this view just
 // never re-fetched while one was on screen, so a live score sat
 // frozen until a manual reload -- confirmed live: real games in
-// progress stayed on the page's last-fetched snapshot.
-const LIVE_REFRESH_MS = 20_000;
+// progress stayed on the page's last-fetched snapshot. The interval and
+// the hidden-tab pause both live in useLivePolling.ts.
 
 export default function NbaPredictionsView({
   seasons,
@@ -53,15 +52,10 @@ export default function NbaPredictionsView({
   matchups: Matchup[];
 }) {
   const { isMember, toggle } = useMemberPreview();
-  const router = useRouter();
   const hasLiveGame = matchups.some((m) => m.status === "live");
   const locked = !isMember;
 
-  useEffect(() => {
-    if (!hasLiveGame) return;
-    const interval = setInterval(() => router.refresh(), LIVE_REFRESH_MS);
-    return () => clearInterval(interval);
-  }, [hasLiveGame, router]);
+  useLivePolling(hasLiveGame);
 
   if (season === null || activeDate === null) {
     return (
