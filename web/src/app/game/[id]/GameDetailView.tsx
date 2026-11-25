@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMemberPreview, SHOW_MEMBER_PREVIEW_TOGGLE } from "@/lib/useMemberPreview";
+import { useLivePolling } from "@/lib/useLivePolling";
 import { teamByAlias, teamLogoPath } from "@/lib/teams";
 import { scalePosition, type GameStat, type GameStatSide } from "@/lib/gameStats";
 import type { Story } from "@/lib/stories";
@@ -32,8 +32,6 @@ import {
 } from "@/components/ParlayCard";
 import type { PropEditRow } from "@/lib/propEditMath";
 import type { OddsFormat } from "@/lib/oddsFormat";
-
-const LIVE_REFRESH_MS = 20_000;
 
 function teamDisplay(alias: string): string {
   const team = teamByAlias(alias);
@@ -2767,7 +2765,6 @@ export default function GameDetailView({
   oddsFormat: OddsFormat;
 }) {
   const { isMember, toggle } = useMemberPreview();
-  const router = useRouter();
   const locked = !game.premier && !isMember;
   const [activeTab, setActiveTab] = useState<PageTab>("overview");
   // "Advanced Analysis" jump link (user request: the Matchups/Betting
@@ -2785,11 +2782,9 @@ export default function GameDetailView({
     window.setTimeout(() => setToolsSpotlight(false), 2500);
   }
 
-  useEffect(() => {
-    if (game.status !== "live") return;
-    const interval = setInterval(() => router.refresh(), LIVE_REFRESH_MS);
-    return () => clearInterval(interval);
-  }, [game.status, router]);
+  // Polls while the game is live; pauses while the tab is hidden
+  // (interval and visibility handling live in useLivePolling.ts).
+  useLivePolling(game.status === "live");
 
   return (
     <>
